@@ -1,0 +1,4 @@
+[submodule "lib/panoptic-v1.1"]
+	path = lib/panoptic-v1.1
+	url = https://github.com/panoptic-labs/panoptic-v1-core.git
+	branch = v1.1.x
