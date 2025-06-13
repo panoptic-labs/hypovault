@@ -187,7 +187,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     /// @notice Allows the manager to cancel a deposit in the current (unfulfilled) epoch.
     /// @dev If deposited funds in previous epochs have not been completely fulfilled, the manager can execute those deposits to move the unfulfilled amount to the current epoch.
     /// @param user The address that requested the deposit
-    function cancelDeposit(address user) external {
+    function cancelDeposit(address user) external onlyManager {
         uint256 currentEpoch = depositEpoch;
 
         uint256 queuedDepositAmount = queuedDeposit[user][currentEpoch];
@@ -201,7 +201,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     /// @notice Allows the manager to cancel a withdrawal in the current (unfulfilled) epoch.
     /// @dev If withdrawn shares in previous epochs have not been completely fulfilled, the manager can execute those withdrawals to move the unfulfilled amount to the current epoch.
     /// @param user The address that requested the withdrawal
-    function cancelWithdrawal(address user) external {
+    function cancelWithdrawal(address user) external onlyManager {
         uint256 currentEpoch = withdrawalEpoch;
 
         uint128 queuedWithdrawalAmount = queuedWithdrawal[user][currentEpoch].amount;
