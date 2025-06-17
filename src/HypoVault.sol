@@ -230,7 +230,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     }
 
     /// @notice Converts an active pending deposit into shares.
-    /// @dev Can only be called by the manager.
     /// @param user The address that requested the deposit
     /// @param epoch The epoch in which the deposit was requested
     function executeDeposit(address user, uint256 epoch) external {
@@ -268,7 +267,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     }
 
     /// @notice Converts an active pending withdrawal into assets.
-    /// @dev Can only be called by the manager.
     /// @param user The address that requested the withdrawal
     /// @param epoch The epoch in which the withdrawal was requested
     function executeWithdrawal(address user, uint256 epoch) external {
