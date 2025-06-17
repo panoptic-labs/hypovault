@@ -14,7 +14,7 @@ import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
 import {SafeTransferLib} from "lib/panoptic-v1.1/contracts/libraries/SafeTransferLib.sol";
 
 /// @author Axicon Labs Limited
-/// @notice A vault that allows a manager to allocate assets deposited by users and distribute profits asynchronously.
+/// @notice A vault in which a manager allocates assets deposited by users and distributes profits asynchronously.
 contract HypoVault is ERC20Minimal, Multicall, Ownable {
     using Math for uint256;
     using Address for address;
@@ -30,14 +30,24 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
         uint128 basis;
     }
 
-    /// @notice A type that represents the state of an epoch.
-    /// @param availableAssets The amount of assets that have been deposited or can be withdrawn
-    /// @param availableShares The amount of shares that have been withdrawn or can be redeemed
-    /// @param amountFulfilled The amount of assets fulfilled for deposits, shares fulfilled for withdrawals
-    struct EpochState {
-        uint128 availableAssets;
-        uint128 availableShares;
-        uint128 amountFulfilled;
+    /// @notice A type that represents the state of a deposit epoch.
+    /// @param assetsDeposited The amount of assets deposited
+    /// @param sharesReceived The amount of shares received over `assetsFulfilled`
+    /// @param assetsFulfilled The amount of assets fulfilled (out of `assetsDeposited`)
+    struct DepositEpochState {
+        uint128 assetsDeposited;
+        uint128 sharesReceived;
+        uint128 assetsFulfilled;
+    }
+
+    /// @notice A type that represents the state of a withdrawal epoch.
+    /// @param sharesWithdrawn The amount of shares withdrawn over `assetsFulfilled`
+    /// @param assetsReceived The amount of assets received over `sharesFulfilled`
+    /// @param sharesFulfilled The amount of shares fulfilled (out of `sharesWithdrawn`)
+    struct WithdrawalEpochState {
+        uint128 sharesWithdrawn;
+        uint128 assetsReceived;
+        uint128 sharesFulfilled;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -79,13 +89,13 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     uint128 public depositEpoch;
 
     /// @notice Assets in the vault reserved for fulfilled withdrawal requests.
-    uint256 public withdrawableAssets;
+    uint256 public reservedWithdrawalAssets;
 
     /// @notice Contains information about the quantity of assets requested and fulfilled for deposits in each epoch.
-    mapping(uint256 epoch => EpochState) public depositEpochState;
+    mapping(uint256 epoch => DepositEpochState) public depositEpochState;
 
     /// @notice Contains information about the quantity of shares requested and fulfilled for withdrawals in each epoch.
-    mapping(uint256 epoch => EpochState) public withdrawalEpochState;
+    mapping(uint256 epoch => WithdrawalEpochState) public withdrawalEpochState;
 
     /// @notice Records the state of a deposit request for a user in a given epoch.
     mapping(address user => mapping(uint256 epoch => uint128 depositAmount)) public queuedDeposit;
@@ -125,19 +135,22 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
         _;
     }
 
-    /// @notice Allows the owner to set the manager.
+    /// @notice Sets the manager.
+    /// @dev Can only be called by the owner.
     /// @param _manager The new manager.
     function setManager(address _manager) external onlyOwner {
         manager = _manager;
     }
 
-    /// @notice Allows the owner to set the accountant.
+    /// @notice Sets the accountant.
+    /// @dev Can only be called by the owner.
     /// @param _accountant The new accountant.
-    function setAccountant(address _accountant) external onlyOwner {
-        accountant = IVaultAccountant(_accountant);
+    function setAccountant(IVaultAccountant _accountant) external onlyOwner {
+        accountant = _accountant;
     }
 
-    /// @notice Allows the owner to set the wallet that receives the performance fee.
+    /// @notice Sets the wallet that receives the performance fee.
+    /// @dev Can only be called by the owner.
     /// @param _feeWallet The new fee wallet.
     function setFeeWallet(address _feeWallet) external onlyOwner {
         feeWallet = _feeWallet;
@@ -147,7 +160,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
                           DEPOSIT/REDEEM LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Allows a user to request a deposit of assets.
+    /// @notice Requests a deposit of assets.
     /// @param assets The amount of assets to deposit
     /// @param receiver The address to receive the shares
     function requestDeposit(uint128 assets, address receiver) external {
@@ -155,12 +168,14 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
 
         queuedDeposit[receiver][currentEpoch] += assets;
 
-        depositEpochState[currentEpoch].availableAssets += assets;
+        depositEpochState[currentEpoch].assetsDeposited += assets;
 
         SafeTransferLib.safeTransferFrom(underlyingToken, msg.sender, address(this), assets);
     }
 
-    // queues a withdrawal that executes at the beginning of the next epoch
+    /// @notice Requests a withdrawal of shares.
+    /// @param shares The amount of shares to withdraw
+    /// @param receiver The address to receive the assets
     function requestWithdrawal(uint128 shares, address receiver) external {
         _burnVirtual(msg.sender, shares);
 
@@ -172,7 +187,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
 
         uint256 userBalance = balanceOf[msg.sender];
 
-        uint256 withdrawalBasis = (previousBasis * shares) / balanceOf[msg.sender];
+        uint256 withdrawalBasis = (previousBasis * shares) / userBalance;
 
         userBasis[msg.sender] = previousBasis - withdrawalBasis;
 
@@ -181,38 +196,41 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
             basis: uint128(withdrawalBasis + ((shares * previousBasis) % userBalance) > 0 ? 1 : 0)
         });
 
-        withdrawalEpochState[withdrawalEpoch].availableShares += shares;
+        withdrawalEpochState[_withdrawalEpoch].sharesWithdrawn += shares;
     }
 
-    /// @notice Allows the manager to cancel a deposit in the current (unfulfilled) epoch.
+    /// @notice Cancels a deposit in the current (unfulfilled) epoch.
+    /// @dev Can only be called by the manager.
     /// @dev If deposited funds in previous epochs have not been completely fulfilled, the manager can execute those deposits to move the unfulfilled amount to the current epoch.
-    /// @param user The address that requested the deposit
-    function cancelDeposit(address user) external onlyManager {
+    /// @param depositor The address that requested the deposit
+    function cancelDeposit(address depositor) external onlyManager {
         uint256 currentEpoch = depositEpoch;
 
-        uint256 queuedDepositAmount = queuedDeposit[user][currentEpoch];
-        queuedDeposit[user][currentEpoch] = 0;
+        uint256 queuedDepositAmount = queuedDeposit[depositor][currentEpoch];
+        queuedDeposit[depositor][currentEpoch] = 0;
 
-        depositEpochState[currentEpoch].availableAssets -= uint128(queuedDepositAmount);
+        depositEpochState[currentEpoch].assetsDeposited -= uint128(queuedDepositAmount);
 
-        SafeTransferLib.safeTransfer(underlyingToken, user, queuedDepositAmount);
+        SafeTransferLib.safeTransfer(underlyingToken, depositor, queuedDepositAmount);
     }
 
-    /// @notice Allows the manager to cancel a withdrawal in the current (unfulfilled) epoch.
+    /// @notice Cancels a withdrawal in the current (unfulfilled) epoch.
+    /// @dev Can only be called by the manager.
     /// @dev If withdrawn shares in previous epochs have not been completely fulfilled, the manager can execute those withdrawals to move the unfulfilled amount to the current epoch.
-    /// @param user The address that requested the withdrawal
-    function cancelWithdrawal(address user) external onlyManager {
+    /// @param withdrawer The address that requested the withdrawal
+    function cancelWithdrawal(address withdrawer) external onlyManager {
         uint256 currentEpoch = withdrawalEpoch;
 
-        uint128 queuedWithdrawalAmount = queuedWithdrawal[user][currentEpoch].amount;
-        queuedWithdrawal[user][currentEpoch].amount = 0;
+        uint128 queuedWithdrawalAmount = queuedWithdrawal[withdrawer][currentEpoch].amount;
+        queuedWithdrawal[withdrawer][currentEpoch].amount = 0;
 
-        withdrawalEpochState[currentEpoch].availableShares -= queuedWithdrawalAmount;
+        withdrawalEpochState[currentEpoch].sharesWithdrawn -= queuedWithdrawalAmount;
 
-        _mintVirtual(user, queuedWithdrawalAmount);
+        _mintVirtual(withdrawer, queuedWithdrawalAmount);
     }
 
-    /// @notice Allows the manager to convert an active pending deposit into shares.
+    /// @notice Converts an active pending deposit into shares.
+    /// @dev Can only be called by the manager.
     /// @param user The address that requested the deposit
     /// @param epoch The epoch in which the deposit was requested
     function executeDeposit(address user, uint256 epoch) external {
@@ -221,54 +239,59 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
         uint256 queuedDepositAmount = queuedDeposit[user][epoch];
         queuedDeposit[user][epoch] = 0;
 
-        EpochState memory _depositEpochState = depositEpochState[epoch];
+        DepositEpochState memory _depositEpochState = depositEpochState[epoch];
 
-        uint256 assetsDeposited = Math.mulDiv(
+        uint256 userAssetsDeposited = Math.mulDiv(
             queuedDepositAmount,
-            _depositEpochState.amountFulfilled,
-            _depositEpochState.availableAssets
+            _depositEpochState.assetsFulfilled,
+            _depositEpochState.assetsDeposited
         );
 
         // shares from pending deposits are already added to the supply at the start of every new epoch
         _mintVirtual(
             user,
             Math.mulDiv(
-                assetsDeposited,
-                _depositEpochState.availableShares,
-                _depositEpochState.availableAssets
+                userAssetsDeposited,
+                _depositEpochState.sharesReceived,
+                _depositEpochState.assetsDeposited
             )
         );
 
-        userBasis[user] += assetsDeposited;
+        userBasis[user] += userAssetsDeposited;
 
         queuedDeposit[user][epoch] = 0;
 
-        uint256 assetsRemaining = queuedDepositAmount - assetsDeposited;
+        uint256 assetsRemaining = queuedDepositAmount - userAssetsDeposited;
+
+        // move remainder of deposit to next epoch -- unfulfilled assets in this epoch will be handled in the next epoch
         if (assetsRemaining > 0) queuedDeposit[user][epoch + 1] += uint128(assetsRemaining);
     }
 
-    // convert an active pending withdrawal into assets
+    /// @notice Converts an active pending withdrawal into assets.
+    /// @dev Can only be called by the manager.
+    /// @param user The address that requested the withdrawal
+    /// @param epoch The epoch in which the withdrawal was requested
     function executeWithdrawal(address user, uint256 epoch) external {
         if (withdrawalEpoch >= epoch) revert EpochNotFulfilled();
 
         PendingWithdrawal memory pendingWithdrawal = queuedWithdrawal[user][epoch];
 
-        EpochState memory _withdrawalEpochState = withdrawalEpochState[epoch];
+        WithdrawalEpochState memory _withdrawalEpochState = withdrawalEpochState[epoch];
 
         // prorated shares to fulfill = amount * fulfilled shares / total shares withdrawn
         uint256 sharesToFulfill = (uint256(pendingWithdrawal.amount) *
-            _withdrawalEpochState.amountFulfilled) / _withdrawalEpochState.availableShares;
+            _withdrawalEpochState.sharesFulfilled) / _withdrawalEpochState.sharesWithdrawn;
         // assets to withdraw = prorated shares to withdraw * assets fulfilled / total shares withdrawn
         uint256 assetsToWithdraw = Math.mulDiv(
             sharesToFulfill,
-            _withdrawalEpochState.availableAssets,
-            _withdrawalEpochState.availableShares
+            _withdrawalEpochState.assetsReceived,
+            _withdrawalEpochState.sharesWithdrawn
         );
 
-        withdrawableAssets -= assetsToWithdraw;
+        reservedWithdrawalAssets -= assetsToWithdraw;
 
-        uint256 withdrawnBasis = (pendingWithdrawal.basis * _withdrawalEpochState.amountFulfilled) /
-            _withdrawalEpochState.availableShares;
+        uint256 withdrawnBasis = (pendingWithdrawal.basis * _withdrawalEpochState.sharesFulfilled) /
+            _withdrawalEpochState.sharesWithdrawn;
         uint256 performanceFee = (uint256(
             Math.max(0, int256(assetsToWithdraw) - int256(withdrawnBasis))
         ) * performanceFeeBps) / 10_000;
@@ -277,6 +300,8 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
 
         uint256 sharesRemaining = pendingWithdrawal.amount - sharesToFulfill;
         uint256 basisRemaining = pendingWithdrawal.basis - withdrawnBasis;
+
+        // move remainder of withdrawal to next epoch -- unfulfilled shares in this epoch will be handled in the next epoch
         if (sharesToFulfill + basisRemaining > 0) {
             PendingWithdrawal memory nextQueuedWithdrawal = queuedWithdrawal[user][epoch + 1];
             queuedWithdrawal[user][epoch + 1] = PendingWithdrawal({
@@ -286,7 +311,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
         }
 
         if (performanceFee > 0) {
-            assetsToWithdraw -= uint256(performanceFee);
+            assetsToWithdraw -= performanceFee;
             SafeTransferLib.safeTransfer(underlyingToken, feeWallet, uint256(performanceFee));
         }
 
@@ -297,7 +322,8 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
                             VAULT MANAGEMENT
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Allows `manager` to make an arbitrary function call from this contract.
+    /// @notice Makes an arbitrary function call from this contract.
+    /// @dev Can only be called by the manager.
     function manage(
         address target,
         bytes calldata data,
@@ -306,7 +332,8 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
         result = target.functionCallWithValue(data, value);
     }
 
-    /// @notice Allows `manager` to make arbitrary function calls from this contract.
+    /// @notice Makes arbitrary function calls from this contract.
+    /// @dev Can only be called by the manager.
     function manage(
         address[] calldata targets,
         bytes[] calldata data,
@@ -319,7 +346,8 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
         }
     }
 
-    /// @notice Allows the manager to fulfill deposit requests.
+    /// @notice Fulfills deposit requests.
+    /// @dev Can only be called by the manager.
     /// @param assetsToFulfill The amount of assets to fulfill
     /// @param managerInput If provided, an arbitrary input to the accountant contract
     function fulfillDeposits(
@@ -328,55 +356,56 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     ) external onlyManager {
         uint256 currentEpoch = depositEpoch;
 
-        EpochState memory epochState = depositEpochState[currentEpoch];
+        DepositEpochState memory epochState = depositEpochState[currentEpoch];
 
         uint256 totalAssets = accountant.computeNAV(address(this), managerInput) +
             1 -
-            epochState.availableAssets -
-            withdrawableAssets;
+            epochState.assetsDeposited -
+            reservedWithdrawalAssets;
 
         uint256 _totalSupply = totalSupply;
 
         uint256 sharesReceived = Math.mulDiv(assetsToFulfill, _totalSupply, totalAssets);
 
-        uint256 assetsRemaining = epochState.availableAssets - assetsToFulfill;
+        uint256 assetsRemaining = epochState.assetsDeposited - assetsToFulfill;
 
-        depositEpochState[currentEpoch] = EpochState({
-            availableAssets: uint128(epochState.availableAssets),
-            availableShares: uint128(sharesReceived),
-            amountFulfilled: uint128(assetsToFulfill)
+        depositEpochState[currentEpoch] = DepositEpochState({
+            assetsDeposited: uint128(epochState.assetsDeposited),
+            sharesReceived: uint128(sharesReceived),
+            assetsFulfilled: uint128(assetsToFulfill)
         });
 
         currentEpoch++;
         depositEpoch = uint128(currentEpoch);
 
-        depositEpochState[currentEpoch] = EpochState({
-            availableAssets: 0,
-            availableShares: uint128(assetsRemaining),
-            amountFulfilled: 0
+        depositEpochState[currentEpoch] = DepositEpochState({
+            assetsDeposited: uint128(assetsRemaining),
+            sharesReceived: 0,
+            assetsFulfilled: 0
         });
 
         totalSupply = _totalSupply + sharesReceived;
     }
 
-    /// @notice Allows the manager to fulfill withdrawal requests.
+    /// @notice Fulfills withdrawal requests.
+    /// @dev Can only be called by the manager.
     /// @param sharesToFulfill The amount of shares to fulfill
-    /// @param maxAssetsReceived The maximum amount of assets that can be received
+    /// @param maxAssetsReceived The maximum amount of assets the manager is willing to disburse
     /// @param managerInput If provided, an arbitrary input to the accountant contract
     function fulfillWithdrawals(
         uint256 sharesToFulfill,
         uint256 maxAssetsReceived,
         bytes memory managerInput
     ) external onlyManager {
-        uint256 _withdrawableAssets = withdrawableAssets;
+        uint256 _reservedWithdrawalAssets = reservedWithdrawalAssets;
         uint256 totalAssets = accountant.computeNAV(address(this), managerInput) +
             1 -
-            depositEpochState[depositEpoch].availableAssets -
-            _withdrawableAssets;
+            depositEpochState[depositEpoch].assetsDeposited -
+            _reservedWithdrawalAssets;
 
         uint256 currentEpoch = withdrawalEpoch;
 
-        EpochState memory epochState = withdrawalEpochState[currentEpoch];
+        WithdrawalEpochState memory epochState = withdrawalEpochState[currentEpoch];
 
         uint256 _totalSupply = totalSupply;
 
@@ -384,27 +413,27 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
 
         if (assetsReceived > maxAssetsReceived) revert WithdrawalNotFulfillable();
 
-        uint256 sharesRemaining = epochState.amountFulfilled - sharesToFulfill;
+        uint256 sharesRemaining = epochState.sharesWithdrawn - sharesToFulfill;
 
-        withdrawalEpochState[currentEpoch] = EpochState({
-            availableAssets: uint128(assetsReceived),
-            availableShares: uint128(epochState.availableShares),
-            amountFulfilled: uint128(sharesToFulfill)
+        withdrawalEpochState[currentEpoch] = WithdrawalEpochState({
+            assetsReceived: uint128(assetsReceived),
+            sharesWithdrawn: uint128(epochState.sharesWithdrawn),
+            sharesFulfilled: uint128(sharesToFulfill)
         });
 
         currentEpoch++;
 
         withdrawalEpoch = uint128(currentEpoch);
 
-        withdrawalEpochState[currentEpoch] = EpochState({
-            availableAssets: 0,
-            availableShares: uint128(sharesRemaining),
-            amountFulfilled: 0
+        withdrawalEpochState[currentEpoch] = WithdrawalEpochState({
+            assetsReceived: 0,
+            sharesWithdrawn: uint128(sharesRemaining),
+            sharesFulfilled: 0
         });
 
         totalSupply = _totalSupply - sharesToFulfill;
 
-        withdrawableAssets = _withdrawableAssets + assetsReceived;
+        reservedWithdrawalAssets = _reservedWithdrawalAssets + assetsReceived;
     }
 
     /// @notice Internal utility to mint tokens to a user's account without updating the total supply.

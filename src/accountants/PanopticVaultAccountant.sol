@@ -96,6 +96,8 @@ contract PanopticVaultAccountant is Ownable {
 
         if (keccak256(abi.encode(pools)) != vaultPools[vault]) revert InvalidPools();
 
+        address[] memory underlyingTokens = new address[](pools.length * 2);
+
         for (uint256 i = 0; i < pools.length; i++) {
             if (
                 Math.abs(
@@ -105,8 +107,8 @@ contract PanopticVaultAccountant is Ownable {
             ) revert StaleOraclePrice();
 
             uint256[2][] memory positionBalanceArray;
-            int256 positionValue0;
-            int256 positionValue1;
+            int256 poolExposure0;
+            int256 poolExposure1;
             {
                 LeftRightUnsigned shortPremium;
                 LeftRightUnsigned longPremium;
@@ -115,10 +117,10 @@ contract PanopticVaultAccountant is Ownable {
                     .pool
                     .getAccumulatedFeesAndPositionsData(vault, true, tokenIds);
 
-                positionValue0 =
+                poolExposure0 =
                     int256(uint256(shortPremium.rightSlot())) -
                     int256(uint256(longPremium.rightSlot()));
-                positionValue1 =
+                poolExposure1 =
                     int256(uint256(longPremium.leftSlot())) -
                     int256(uint256(shortPremium.leftSlot()));
             }
@@ -141,13 +143,13 @@ contract PanopticVaultAccountant is Ownable {
 
                     if (tokenIds[j].isLong(k) == 0) {
                         unchecked {
-                            positionValue0 += int256(amount0);
-                            positionValue1 += int256(amount1);
+                            poolExposure0 += int256(amount0);
+                            poolExposure1 += int256(amount1);
                         }
                     } else {
                         unchecked {
-                            positionValue0 -= int256(amount0);
-                            positionValue1 -= int256(amount1);
+                            poolExposure0 -= int256(amount0);
+                            poolExposure1 -= int256(amount1);
                         }
                     }
                 }
@@ -155,16 +157,35 @@ contract PanopticVaultAccountant is Ownable {
             }
             if (numLegs != tokenIds[i].countLegs()) revert IncorrectPositionList();
 
-            positionValue0 += int256(pools[i].token0.balanceOf(vault));
-            positionValue1 += int256(pools[i].token1.balanceOf(vault));
+            bool skipToken0 = false;
+            bool skipToken1 = false;
+            for (uint256 j = 0; j < underlyingTokens.length; j++) {
+                if (underlyingTokens[j] == address(pools[i].token0)) skipToken0 = true;
+                if (underlyingTokens[j] == address(pools[i].token1)) skipToken1 = true;
+
+                if (underlyingTokens[j] == address(0)) {
+                    if (!skipToken0)
+                        underlyingTokens[j] = address(pools[i].token0) == address(0)
+                            ? 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
+                            : address(pools[i].token0);
+                    if (!skipToken1) underlyingTokens[j + 1] = address(pools[i].token1);
+                    break;
+                }
+            }
+
+            if (!skipToken0)
+                poolExposure0 += address(pools[i].token0) == address(0)
+                    ? int256(address(vault).balance)
+                    : int256(pools[i].token0.balanceOf(vault));
+            if (!skipToken1) poolExposure1 += int256(pools[i].token1.balanceOf(vault));
 
             uint256 collateralBalance = pools[i].pool.collateralToken0().balanceOf(vault);
-            positionValue0 += int256(
+            poolExposure0 += int256(
                 pools[i].pool.collateralToken0().previewRedeem(collateralBalance)
             );
 
             collateralBalance = pools[i].pool.collateralToken1().balanceOf(vault);
-            positionValue1 += int256(
+            poolExposure1 += int256(
                 pools[i].pool.collateralToken1().previewRedeem(collateralBalance)
             );
 
@@ -179,13 +200,13 @@ contract PanopticVaultAccountant is Ownable {
                     pools[i].maxPriceDeviation
                 ) revert StaleOraclePrice();
 
-                positionValue0 = pools[i].isToken0Flipped
+                poolExposure0 = pools[i].isToken0Flipped
                     ? AccountingMath.convert1to0(
-                        positionValue0,
+                        poolExposure0,
                         Math.getSqrtRatioAtTick(conversionPrice)
                     )
                     : AccountingMath.convert0to1(
-                        positionValue0,
+                        poolExposure0,
                         Math.getSqrtRatioAtTick(conversionPrice)
                     );
             }
@@ -200,19 +221,23 @@ contract PanopticVaultAccountant is Ownable {
                     pools[i].maxPriceDeviation
                 ) revert StaleOraclePrice();
 
-                positionValue1 = pools[i].isToken1Flipped
+                poolExposure1 = pools[i].isToken1Flipped
                     ? AccountingMath.convert1to0(
-                        positionValue1,
+                        poolExposure1,
                         Math.getSqrtRatioAtTick(conversionPrice)
                     )
                     : AccountingMath.convert0to1(
-                        positionValue1,
+                        poolExposure1,
                         Math.getSqrtRatioAtTick(conversionPrice)
                     );
             }
-            nav += uint256(Math.max(positionValue0 + positionValue1, 0));
+            nav += uint256(Math.max(poolExposure0 + poolExposure1, 0));
         }
 
-        nav += IERC20Partial(underlyingToken).balanceOf(vault);
+        bool skipUnderlying = false;
+        for (uint256 i = 0; i < underlyingTokens.length; i++) {
+            if (underlyingTokens[i] == underlyingToken) skipUnderlying = true;
+        }
+        if (!skipUnderlying) nav += IERC20Partial(underlyingToken).balanceOf(vault);
     }
 }
