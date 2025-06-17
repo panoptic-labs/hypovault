@@ -98,6 +98,9 @@ contract PanopticVaultAccountant is Ownable {
 
         address[] memory underlyingTokens = new address[](pools.length * 2);
 
+        // resolves stack too deep error
+        address _vault = vault;
+
         for (uint256 i = 0; i < pools.length; i++) {
             if (
                 Math.abs(
@@ -115,7 +118,7 @@ contract PanopticVaultAccountant is Ownable {
 
                 (shortPremium, longPremium, positionBalanceArray) = pools[i]
                     .pool
-                    .getAccumulatedFeesAndPositionsData(vault, true, tokenIds);
+                    .getAccumulatedFeesAndPositionsData(_vault, true, tokenIds);
 
                 poolExposure0 =
                     int256(uint256(shortPremium.rightSlot())) -
@@ -175,16 +178,16 @@ contract PanopticVaultAccountant is Ownable {
 
             if (!skipToken0)
                 poolExposure0 += address(pools[i].token0) == address(0)
-                    ? int256(address(vault).balance)
-                    : int256(pools[i].token0.balanceOf(vault));
-            if (!skipToken1) poolExposure1 += int256(pools[i].token1.balanceOf(vault));
+                    ? int256(address(_vault).balance)
+                    : int256(pools[i].token0.balanceOf(_vault));
+            if (!skipToken1) poolExposure1 += int256(pools[i].token1.balanceOf(_vault));
 
-            uint256 collateralBalance = pools[i].pool.collateralToken0().balanceOf(vault);
+            uint256 collateralBalance = pools[i].pool.collateralToken0().balanceOf(_vault);
             poolExposure0 += int256(
                 pools[i].pool.collateralToken0().previewRedeem(collateralBalance)
             );
 
-            collateralBalance = pools[i].pool.collateralToken1().balanceOf(vault);
+            collateralBalance = pools[i].pool.collateralToken1().balanceOf(_vault);
             poolExposure1 += int256(
                 pools[i].pool.collateralToken1().previewRedeem(collateralBalance)
             );
@@ -238,6 +241,6 @@ contract PanopticVaultAccountant is Ownable {
         for (uint256 i = 0; i < underlyingTokens.length; i++) {
             if (underlyingTokens[i] == underlyingToken) skipUnderlying = true;
         }
-        if (!skipUnderlying) nav += IERC20Partial(underlyingToken).balanceOf(vault);
+        if (!skipUnderlying) nav += IERC20Partial(underlyingToken).balanceOf(_vault);
     }
 }

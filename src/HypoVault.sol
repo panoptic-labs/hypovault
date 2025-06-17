@@ -233,7 +233,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     /// @param user The address that requested the deposit
     /// @param epoch The epoch in which the deposit was requested
     function executeDeposit(address user, uint256 epoch) external {
-        if (depositEpoch >= epoch) revert EpochNotFulfilled();
+        if (epoch >= depositEpoch) revert EpochNotFulfilled();
 
         uint256 queuedDepositAmount = queuedDeposit[user][epoch];
         queuedDeposit[user][epoch] = 0;
@@ -270,7 +270,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     /// @param user The address that requested the withdrawal
     /// @param epoch The epoch in which the withdrawal was requested
     function executeWithdrawal(address user, uint256 epoch) external {
-        if (withdrawalEpoch >= epoch) revert EpochNotFulfilled();
+        if (epoch >= withdrawalEpoch) revert EpochNotFulfilled();
 
         PendingWithdrawal memory pendingWithdrawal = queuedWithdrawal[user][epoch];
 
