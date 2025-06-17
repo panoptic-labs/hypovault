@@ -177,8 +177,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     /// @param shares The amount of shares to withdraw
     /// @param receiver The address to receive the assets
     function requestWithdrawal(uint128 shares, address receiver) external {
-        _burnVirtual(msg.sender, shares);
-
         uint256 _withdrawalEpoch = withdrawalEpoch;
 
         PendingWithdrawal memory pendingWithdrawal = queuedWithdrawal[receiver][_withdrawalEpoch];
@@ -197,6 +195,8 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
         });
 
         withdrawalEpochState[_withdrawalEpoch].sharesWithdrawn += shares;
+
+        _burnVirtual(msg.sender, shares);
     }
 
     /// @notice Cancels a deposit in the current (unfulfilled) epoch.
