@@ -160,6 +160,9 @@ contract PanopticVaultAccountant is Ownable {
             }
             if (numLegs != tokenIds[i].countLegs()) revert IncorrectPositionList();
 
+            if (address(pools[i].token0) == address(0))
+                pools[i].token0 = IERC20Partial(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
+
             bool skipToken0 = false;
             bool skipToken1 = false;
             for (uint256 j = 0; j < underlyingTokens.length; j++) {
@@ -167,17 +170,15 @@ contract PanopticVaultAccountant is Ownable {
                 if (underlyingTokens[j] == address(pools[i].token1)) skipToken1 = true;
 
                 if (underlyingTokens[j] == address(0)) {
-                    if (!skipToken0)
-                        underlyingTokens[j] = address(pools[i].token0) == address(0)
-                            ? 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
-                            : address(pools[i].token0);
+                    if (!skipToken0) underlyingTokens[j] = address(pools[i].token0);
                     if (!skipToken1) underlyingTokens[j + 1] = address(pools[i].token1);
                     break;
                 }
             }
 
             if (!skipToken0)
-                poolExposure0 += address(pools[i].token0) == address(0)
+                poolExposure0 += address(pools[i].token0) ==
+                    address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)
                     ? int256(address(_vault).balance)
                     : int256(pools[i].token0.balanceOf(_vault));
             if (!skipToken1) poolExposure1 += int256(pools[i].token1.balanceOf(_vault));
