@@ -69,30 +69,37 @@ contract PanopticVaultAccountant is Ownable {
     /// @notice Whether the list of pools for the vault is locked
     mapping(address vault => bool isLocked) public vaultLocked;
 
+    /// @notice Updates the pools hash for a vault.
+    /// @dev This function can only be called by the owner of the contract.
+    /// @param vault The address of the vault to update the pools hash for
+    /// @param poolsHash The new pools hash to set for the vault
     function updatePoolsHash(address vault, bytes32 poolsHash) external onlyOwner {
         if (vaultLocked[vault]) revert VaultLocked();
         vaultPools[vault] = poolsHash;
     }
 
-    /// @notice Locks the vault from updating its pools hash
+    /// @notice Locks the vault from updating its pools hash.
+    /// @dev This function can only be called by the owner of the contract.
+    /// @param vault The address of the vault to lock
     function lockVault(address vault) external onlyOwner {
         vaultLocked[vault] = true;
     }
 
     /// @notice Returns the NAV of the portfolio contained in `vault` in terms of its underlying token
     /// @param vault The address of the vault to value
-    /// @param managerInput Additional input from the vault manager to be used in the accounting process, if applicable
+    /// @param underlyingToken The underlying token of the vault
+    /// @param managerInput Input calldata from the vault manager consisting of price quotes from the manager, pool information, and a position lsit for each pool
     /// @return nav The NAV of the portfolio contained in `vault` in terms of its underlying token
     function computeNAV(
         address vault,
+        address underlyingToken,
         bytes calldata managerInput
     ) external view returns (uint256 nav) {
         (
-            address underlyingToken,
             ManagerPrices[] memory managerPrices,
             PoolInfo[] memory pools,
-            TokenId[] memory tokenIds
-        ) = abi.decode(managerInput, (address, ManagerPrices[], PoolInfo[], TokenId[]));
+            TokenId[][] memory tokenIds
+        ) = abi.decode(managerInput, (ManagerPrices[], PoolInfo[], TokenId[][]));
 
         if (keccak256(abi.encode(pools)) != vaultPools[vault]) revert InvalidPools();
 
@@ -118,7 +125,7 @@ contract PanopticVaultAccountant is Ownable {
 
                 (shortPremium, longPremium, positionBalanceArray) = pools[i]
                     .pool
-                    .getAccumulatedFeesAndPositionsData(_vault, true, tokenIds);
+                    .getAccumulatedFeesAndPositionsData(_vault, true, tokenIds[i]);
 
                 poolExposure0 =
                     int256(uint256(shortPremium.rightSlot())) -
@@ -129,22 +136,20 @@ contract PanopticVaultAccountant is Ownable {
             }
 
             uint256 numLegs;
-            for (uint256 j = 0; j < tokenIds.length; j++) {
+            for (uint256 j = 0; j < tokenIds[i].length; j++) {
                 if (positionBalanceArray[j][1] == 0) revert IncorrectPositionList();
-                uint256 positionLegs = tokenIds[j].countLegs();
+                uint256 positionLegs = tokenIds[i][j].countLegs();
                 for (uint256 k = 0; k < positionLegs; k++) {
-                    if (positionBalanceArray[j][1] != 0) revert IncorrectPositionList();
-
                     (uint256 amount0, uint256 amount1) = Math.getAmountsForLiquidity(
                         managerPrices[i].poolPrice,
                         AccountingMath.getLiquidityChunk(
-                            tokenIds[j],
+                            tokenIds[i][j],
                             k,
                             uint128(positionBalanceArray[j][1])
                         )
                     );
 
-                    if (tokenIds[j].isLong(k) == 0) {
+                    if (tokenIds[i][j].isLong(k) == 0) {
                         unchecked {
                             poolExposure0 += int256(amount0);
                             poolExposure1 += int256(amount1);
@@ -158,7 +163,7 @@ contract PanopticVaultAccountant is Ownable {
                 }
                 numLegs += positionLegs;
             }
-            if (numLegs != tokenIds[i].countLegs()) revert IncorrectPositionList();
+            if (numLegs != pools[i].pool.numberOfLegs(_vault)) revert IncorrectPositionList();
 
             if (address(pools[i].token0) == address(0))
                 pools[i].token0 = IERC20Partial(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);

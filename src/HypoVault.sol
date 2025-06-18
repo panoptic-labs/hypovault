@@ -41,7 +41,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     }
 
     /// @notice A type that represents the state of a withdrawal epoch.
-    /// @param sharesWithdrawn The amount of shares withdrawn over `assetsFulfilled`
+    /// @param sharesWithdrawn The amount of shares withdrawn
     /// @param assetsReceived The amount of assets received over `sharesFulfilled`
     /// @param sharesFulfilled The amount of shares fulfilled (out of `sharesWithdrawn`)
     struct WithdrawalEpochState {
@@ -356,7 +356,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
 
         DepositEpochState memory epochState = depositEpochState[currentEpoch];
 
-        uint256 totalAssets = accountant.computeNAV(address(this), managerInput) +
+        uint256 totalAssets = accountant.computeNAV(address(this), underlyingToken, managerInput) +
             1 -
             epochState.assetsDeposited -
             reservedWithdrawalAssets;
@@ -396,7 +396,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
         bytes memory managerInput
     ) external onlyManager {
         uint256 _reservedWithdrawalAssets = reservedWithdrawalAssets;
-        uint256 totalAssets = accountant.computeNAV(address(this), managerInput) +
+        uint256 totalAssets = accountant.computeNAV(address(this), underlyingToken, managerInput) +
             1 -
             depositEpochState[depositEpoch].assetsDeposited -
             _reservedWithdrawalAssets;
