@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "forge-std/console.sol";
+import "forge-std/console2.sol";
 import "../src/HypoVault.sol";
 import {ERC20S} from "lib/panoptic-v1.1/test/foundry/testUtils/ERC20S.sol";
 import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
@@ -24,7 +24,11 @@ contract VaultAccountantMock {
         expectedManagerInput = _expectedManagerInput;
     }
 
-    function computeNAV(address vault, bytes memory managerInput) external view returns (uint256) {
+    function computeNAV(
+        address vault,
+        address,
+        bytes memory managerInput
+    ) external view returns (uint256) {
         require(vault == expectedVault, "Invalid vault");
         if (managerInput.length > 0) {
             require(
@@ -135,7 +139,7 @@ contract HypoVaultTest is Test {
 
         // Request deposit
         vm.prank(Alice);
-        vault.requestDeposit(uint128(depositAmount), Alice);
+        vault.requestDeposit(uint128(depositAmount));
 
         assertEq(token.balanceOf(address(vault)), depositAmount);
         assertEq(token.balanceOf(Alice), aliceBalanceBefore - depositAmount);
@@ -185,7 +189,7 @@ contract HypoVaultTest is Test {
 
         // Request deposit in epoch 1
         vm.prank(Alice);
-        vault.requestDeposit(uint128(depositAmount), Alice);
+        vault.requestDeposit(uint128(depositAmount));
 
         // Calculate expected shares before fulfillment
         uint256 totalSupplyBefore = vault.totalSupply();
@@ -221,11 +225,11 @@ contract HypoVaultTest is Test {
 
         // All users request deposits
         vm.prank(Alice);
-        vault.requestDeposit(uint128(aliceDeposit), Alice);
+        vault.requestDeposit(uint128(aliceDeposit));
         vm.prank(Bob);
-        vault.requestDeposit(uint128(bobDeposit), Bob);
+        vault.requestDeposit(uint128(bobDeposit));
         vm.prank(Charlie);
-        vault.requestDeposit(uint128(charlieDeposit), Charlie);
+        vault.requestDeposit(uint128(charlieDeposit));
 
         assertEq(token.balanceOf(address(vault)), totalDeposits);
 
@@ -284,7 +288,7 @@ contract HypoVaultTest is Test {
 
         // Request deposit
         vm.prank(Alice);
-        vault.requestDeposit(uint128(depositAmount), Alice);
+        vault.requestDeposit(uint128(depositAmount));
 
         // Calculate expected values
         uint256 totalSupplyBefore = vault.totalSupply();
@@ -328,9 +332,9 @@ contract HypoVaultTest is Test {
 
         // Users request deposits
         vm.prank(Alice);
-        vault.requestDeposit(uint128(aliceDeposit), Alice);
+        vault.requestDeposit(uint128(aliceDeposit));
         vm.prank(Bob);
-        vault.requestDeposit(uint128(bobDeposit), Bob);
+        vault.requestDeposit(uint128(bobDeposit));
 
         // Calculate expected values
         uint256 totalSupplyBefore = vault.totalSupply();
@@ -415,7 +419,7 @@ contract HypoVaultTest is Test {
 
         // Request deposit
         vm.prank(Alice);
-        vault.requestDeposit(uint128(depositAmount), Alice);
+        vault.requestDeposit(uint128(depositAmount));
 
         vm.startPrank(Manager);
 
@@ -472,13 +476,13 @@ contract HypoVaultTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_withdrawal_with_multiple_users() public {
-        // Setup: Multiple users deposit to avoid division by zero issues
+        // Setup: Multiple users deposit to provide liquidity
         vm.prank(Alice);
-        vault.requestDeposit(100 ether, Alice);
+        vault.requestDeposit(100 ether);
         vm.prank(Bob);
-        vault.requestDeposit(100 ether, Bob);
+        vault.requestDeposit(100 ether);
         vm.prank(Charlie);
-        vault.requestDeposit(100 ether, Charlie);
+        vault.requestDeposit(100 ether);
 
         vm.startPrank(Manager);
         accountant.setNav(300 ether);
@@ -494,7 +498,7 @@ contract HypoVaultTest is Test {
 
         vm.stopPrank();
         vm.prank(Alice);
-        vault.requestWithdrawal(uint128(sharesToWithdraw), Alice);
+        vault.requestWithdrawal(uint128(sharesToWithdraw));
 
         // Check that shares were burned and basis reduced proportionally
         assertEq(vault.balanceOf(Alice), aliceShares - sharesToWithdraw);
@@ -523,20 +527,18 @@ contract HypoVaultTest is Test {
         vault.executeWithdrawal(Alice, 0);
         vm.stopPrank();
 
-        // Check withdrawal completed - Alice receives exact amount due to basis calculation bug
         uint256 actualAssetsReceived = token.balanceOf(Alice) - aliceBalanceBefore;
 
-        // Due to the basis calculation bug, Alice receives a specific amount
-        // The exact amount depends on the complex interaction of the bug with multiple users
-        assertEq(actualAssetsReceived, 49500000000000000001); // Exact amount from the bug calculation
+        // Alice should receive exactly 50 ether for withdrawing half her shares
+        assertEq(actualAssetsReceived, 50000000000000000000); // 50 ether
     }
 
     function test_withdrawal_with_profit_performance_fee() public {
         // Setup: Multiple users to avoid division by zero
         vm.prank(Alice);
-        vault.requestDeposit(100 ether, Alice);
+        vault.requestDeposit(100 ether);
         vm.prank(Bob);
-        vault.requestDeposit(100 ether, Bob);
+        vault.requestDeposit(100 ether);
 
         vm.startPrank(Manager);
         accountant.setNav(200 ether);
@@ -551,7 +553,7 @@ contract HypoVaultTest is Test {
 
         vm.stopPrank();
         vm.prank(Alice);
-        vault.requestWithdrawal(uint128(sharesToWithdraw), Alice);
+        vault.requestWithdrawal(uint128(sharesToWithdraw));
 
         // Vault gains value - set higher NAV for profit
         vm.startPrank(Manager);
@@ -566,31 +568,28 @@ contract HypoVaultTest is Test {
         vault.executeWithdrawal(Alice, 0);
         vm.stopPrank();
 
-        // Due to the basis calculation bug, performance fees and amounts are unpredictable
-        // The bug occurs because basis is calculated after shares are burned, leading to division by zero
         uint256 feeCharged = token.balanceOf(FeeWallet) - feeWalletBalanceBefore;
         uint256 actualAssetsReceived = token.balanceOf(Alice) - aliceBalanceBefore;
         uint256 aliceBasisAfter = vault.userBasis(Alice);
 
-        // Document the actual values (these will vary due to the bug but test should still verify behavior)
-        // Fee charged should be positive due to vault appreciation
-        assertEq(feeCharged, 749999999999999999); // Actual fee from the bug calculation
+        // Performance fee should be 1% of 25 ether profit = 0.25 ether
+        assertEq(feeCharged, 249999999999999999); // 0.25 ether performance fee
 
-        // Alice should receive some assets
-        assertEq(actualAssetsReceived, 74250000000000000000); // Actual amount from the bug calculation
+        // Alice should receive 75 ether - 0.25 ether fee = 74.75 ether
+        assertEq(actualAssetsReceived, 74750000000000000000); // 74.75 ether
 
-        // Alice's basis should be reduced proportionally (now correctly calculated)
-        assertEq(aliceBasisAfter, 50000000000000000000); // Basis is now correctly maintained
+        // Alice's basis should be reduced proportionally
+        assertEq(aliceBasisAfter, 50000000000000000000);
     }
 
     function test_withdrawal_with_loss_no_performance_fee() public {
         // Setup: Multiple users to avoid division by zero
         vm.prank(Alice);
-        vault.requestDeposit(100 ether, Alice);
+        vault.requestDeposit(100 ether);
         vm.prank(Bob);
-        vault.requestDeposit(100 ether, Bob);
+        vault.requestDeposit(100 ether);
         vm.prank(Charlie);
-        vault.requestDeposit(100 ether, Charlie);
+        vault.requestDeposit(100 ether);
 
         vm.startPrank(Manager);
         accountant.setNav(300 ether);
@@ -606,7 +605,7 @@ contract HypoVaultTest is Test {
 
         vm.stopPrank();
         vm.prank(Alice);
-        vault.requestWithdrawal(uint128(sharesToWithdraw), Alice);
+        vault.requestWithdrawal(uint128(sharesToWithdraw));
 
         // Vault loses value
         vm.startPrank(Manager);
@@ -621,18 +620,13 @@ contract HypoVaultTest is Test {
         vault.executeWithdrawal(Alice, 0);
         vm.stopPrank();
 
-        // Performance fee calculation is affected by the basis calculation bug
-        // where basis is calculated after shares are burned, leading to incorrect results
         uint256 feeCharged = token.balanceOf(FeeWallet) - feeWalletBalanceBefore;
         uint256 actualAssetsReceived = token.balanceOf(Alice) - aliceBalanceBefore;
         uint256 aliceBasisAfter = vault.userBasis(Alice);
 
-        // Due to the bug, a fee is incorrectly charged even on losses
-        // In a corrected implementation, this should be 0 for losses
-        assertEq(feeCharged, 399999999999999999); // Actual incorrect fee from the bug
+        assertEq(feeCharged, 0);
 
-        // Alice receives assets despite the vault losing value due to the bug
-        assertEq(actualAssetsReceived, 39600000000000000001); // Actual amount from the bug calculation
+        assertEq(actualAssetsReceived, 40 ether);
 
         // Alice's basis is now correctly maintained at 50% of original (100 ether -> 50 ether)
         assertEq(aliceBasisAfter, 50000000000000000000);
@@ -645,11 +639,11 @@ contract HypoVaultTest is Test {
     function test_withdrawal_partial() public {
         // Setup: Multiple users to avoid division by zero
         vm.prank(Alice);
-        vault.requestDeposit(300 ether, Alice);
+        vault.requestDeposit(300 ether);
         vm.prank(Bob);
-        vault.requestDeposit(200 ether, Bob);
+        vault.requestDeposit(200 ether);
         vm.prank(Charlie);
-        vault.requestDeposit(200 ether, Charlie);
+        vault.requestDeposit(200 ether);
 
         vm.startPrank(Manager);
         accountant.setNav(700 ether);
@@ -665,7 +659,7 @@ contract HypoVaultTest is Test {
 
         vm.stopPrank();
         vm.prank(Alice);
-        vault.requestWithdrawal(uint128(sharesToWithdraw), Alice);
+        vault.requestWithdrawal(uint128(sharesToWithdraw));
 
         // Partially fulfill withdrawal (60% of requested shares)
         uint256 sharesToFulfill = (sharesToWithdraw * 60) / 100;
@@ -681,10 +675,10 @@ contract HypoVaultTest is Test {
         // Check partial withdrawal amount
         uint256 actualAssetsReceived = token.balanceOf(Alice) - aliceBalanceBefore;
 
-        // Due to the basis calculation bug, Alice receives a specific amount that includes performance fees
+        // For partial withdrawal, Alice should receive 32.4 ether
         // Alice withdraws 30% of shares (90e25), fulfills 60% of that (54e25 shares)
-        // The actual amount after fees and basis calculation bug is:
-        assertEq(actualAssetsReceived, 32076000000000000000); // Actual amount from the bug calculation
+        // Based on the logged calculations:
+        assertEq(actualAssetsReceived, 32400000000000000000); // 32.4 ether
 
         // Check remaining shares moved to next epoch
         uint256 remainingShares = sharesToWithdraw - sharesToFulfill;
@@ -701,7 +695,7 @@ contract HypoVaultTest is Test {
 
         // Alice requests deposit
         vm.prank(Alice);
-        vault.requestDeposit(uint128(depositAmount), Alice);
+        vault.requestDeposit(uint128(depositAmount));
 
         uint256 aliceBalanceBefore = token.balanceOf(Alice);
 
@@ -718,9 +712,9 @@ contract HypoVaultTest is Test {
     function test_cancel_unfulfilled_withdrawal() public {
         // Setup: Multiple users to avoid division by zero
         vm.prank(Alice);
-        vault.requestDeposit(100 ether, Alice);
+        vault.requestDeposit(100 ether);
         vm.prank(Bob);
-        vault.requestDeposit(100 ether, Bob);
+        vault.requestDeposit(100 ether);
 
         vm.startPrank(Manager);
         accountant.setNav(200 ether);
@@ -735,7 +729,7 @@ contract HypoVaultTest is Test {
 
         vm.stopPrank();
         vm.prank(Alice);
-        vault.requestWithdrawal(uint128(sharesToWithdraw), Alice);
+        vault.requestWithdrawal(uint128(sharesToWithdraw));
 
         // Verify shares were burned and basis reduced proportionally
         assertEq(vault.balanceOf(Alice), aliceShares - sharesToWithdraw);
@@ -751,6 +745,101 @@ contract HypoVaultTest is Test {
         assertEq(amount, 0);
         assertEq(vault.balanceOf(Alice), aliceShares);
         // Note: basis is not restored in cancellation
+    }
+
+    function test_cancel_withdrawal_restores_basis() public {
+        // Setup: Multiple users to avoid division by zero
+        vm.prank(Alice);
+        vault.requestDeposit(200 ether);
+        vm.prank(Bob);
+        vault.requestDeposit(100 ether);
+        vm.prank(Charlie);
+        vault.requestDeposit(100 ether);
+
+        vm.startPrank(Manager);
+        accountant.setNav(400 ether);
+        vault.fulfillDeposits(400 ether, "");
+        vault.executeDeposit(Alice, 0);
+        vault.executeDeposit(Bob, 0);
+        vault.executeDeposit(Charlie, 0);
+
+        // Record initial state
+        uint256 aliceSharesInitial = vault.balanceOf(Alice);
+        uint256 aliceBasisInitial = vault.userBasis(Alice);
+        uint256 bobSharesInitial = vault.balanceOf(Bob);
+        uint256 bobBasisInitial = vault.userBasis(Bob);
+
+        // Alice and Bob request withdrawals of different amounts
+        uint256 aliceSharesToWithdraw = (aliceSharesInitial * 3) / 4; // 75% of Alice's shares
+        uint256 bobSharesToWithdraw = bobSharesInitial / 3; // 33% of Bob's shares
+
+        vm.stopPrank();
+        vm.prank(Alice);
+        vault.requestWithdrawal(uint128(aliceSharesToWithdraw));
+
+        vm.prank(Bob);
+        vault.requestWithdrawal(uint128(bobSharesToWithdraw));
+
+        // Verify shares were burned and basis reduced proportionally
+        uint256 aliceSharesAfterRequest = vault.balanceOf(Alice);
+        uint256 aliceBasisAfterRequest = vault.userBasis(Alice);
+        uint256 bobSharesAfterRequest = vault.balanceOf(Bob);
+        uint256 bobBasisAfterRequest = vault.userBasis(Bob);
+
+        assertEq(aliceSharesAfterRequest, aliceSharesInitial - aliceSharesToWithdraw);
+        assertEq(bobSharesAfterRequest, bobSharesInitial - bobSharesToWithdraw);
+
+        // Verify that basis was reduced (we'll check exact restoration later)
+        assertTrue(aliceBasisAfterRequest < aliceBasisInitial);
+        assertTrue(bobBasisAfterRequest < bobBasisInitial);
+
+        // Check withdrawal queue state
+        (uint128 aliceQueuedAmount, uint128 aliceQueuedBasis) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 bobQueuedAmount, uint128 bobQueuedBasis) = vault.queuedWithdrawal(Bob, 0);
+
+        assertEq(aliceQueuedAmount, aliceSharesToWithdraw);
+        assertEq(bobQueuedAmount, bobSharesToWithdraw);
+
+        // The queued basis should be the withdrawn basis amount
+        uint256 expectedAliceQueuedBasis = aliceBasisInitial - aliceBasisAfterRequest;
+        uint256 expectedBobQueuedBasis = bobBasisInitial - bobBasisAfterRequest;
+
+        assertEq(aliceQueuedBasis, expectedAliceQueuedBasis);
+        assertEq(bobQueuedBasis, expectedBobQueuedBasis);
+
+        // Manager cancels both withdrawals
+        vm.startPrank(Manager);
+        vault.cancelWithdrawal(Alice);
+        vault.cancelWithdrawal(Bob);
+        vm.stopPrank();
+
+        // Verify complete restoration
+        // Shares should be fully restored
+        assertEq(vault.balanceOf(Alice), aliceSharesInitial);
+        assertEq(vault.balanceOf(Bob), bobSharesInitial);
+
+        // Basis should be fully restored
+        assertEq(vault.userBasis(Alice), aliceBasisInitial);
+        assertEq(vault.userBasis(Bob), bobBasisInitial);
+
+        // Withdrawal queues should be cleared
+        (uint128 aliceQueuedAmountAfter, uint128 aliceQueuedBasisAfter) = vault.queuedWithdrawal(
+            Alice,
+            0
+        );
+        (uint128 bobQueuedAmountAfter, uint128 bobQueuedBasisAfter) = vault.queuedWithdrawal(
+            Bob,
+            0
+        );
+
+        assertEq(aliceQueuedAmountAfter, 0);
+        assertEq(aliceQueuedBasisAfter, 0);
+        assertEq(bobQueuedAmountAfter, 0);
+        assertEq(bobQueuedBasisAfter, 0);
+
+        // Withdrawal epoch state should be updated
+        (uint128 sharesWithdrawn, , ) = vault.withdrawalEpochState(0);
+        assertEq(sharesWithdrawn, 0); // Both withdrawals cancelled
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -851,7 +940,7 @@ contract HypoVaultTest is Test {
 
     function test_zero_amount_deposit() public {
         vm.prank(Alice);
-        vault.requestDeposit(0, Alice);
+        vault.requestDeposit(0);
 
         assertEq(vault.queuedDeposit(Alice, 0), 0);
         assertEq(token.balanceOf(address(vault)), 0);
@@ -860,9 +949,9 @@ contract HypoVaultTest is Test {
     function test_withdrawal_not_fulfillable() public {
         // Setup shares
         vm.prank(Alice);
-        vault.requestDeposit(100 ether, Alice);
+        vault.requestDeposit(100 ether);
         vm.prank(Bob);
-        vault.requestDeposit(100 ether, Bob);
+        vault.requestDeposit(100 ether);
 
         vm.startPrank(Manager);
         accountant.setNav(200 ether);
@@ -875,7 +964,7 @@ contract HypoVaultTest is Test {
         // Request withdrawal
         vm.stopPrank();
         vm.prank(Alice);
-        vault.requestWithdrawal(uint128(aliceShares / 2), Alice);
+        vault.requestWithdrawal(uint128(aliceShares / 2));
 
         // Try to fulfill with maxAssetsReceived too low
         vm.startPrank(Manager);
@@ -891,9 +980,9 @@ contract HypoVaultTest is Test {
 
         // Request and fulfill deposit
         vm.prank(Alice);
-        vault.requestDeposit(uint128(depositAmount), Alice);
+        vault.requestDeposit(uint128(depositAmount));
         vm.prank(Bob);
-        vault.requestDeposit(uint128(depositAmount), Bob);
+        vault.requestDeposit(uint128(depositAmount));
 
         // Calculate expected shares to be minted
         uint256 totalAssets = 200 ether + 1 - 200 ether - vault.reservedWithdrawalAssets(); // = 1
@@ -921,7 +1010,7 @@ contract HypoVaultTest is Test {
         // Request withdrawal
         vm.stopPrank();
         vm.prank(Alice);
-        vault.requestWithdrawal(uint128(aliceShares / 2), Alice);
+        vault.requestWithdrawal(uint128(aliceShares / 2));
 
         // Fulfill withdrawal - total supply should decrease by exact amount withdrawn
         vm.startPrank(Manager);
@@ -938,9 +1027,9 @@ contract HypoVaultTest is Test {
     function test_complex_multi_epoch_scenario() public {
         // Epoch 0: Alice deposits 100, Bob deposits 200
         vm.prank(Alice);
-        vault.requestDeposit(100 ether, Alice);
+        vault.requestDeposit(100 ether);
         vm.prank(Bob);
-        vault.requestDeposit(200 ether, Bob);
+        vault.requestDeposit(200 ether);
 
         vm.startPrank(Manager);
 
@@ -951,7 +1040,7 @@ contract HypoVaultTest is Test {
         // Epoch 1: Charlie deposits 100
         vm.stopPrank();
         vm.prank(Charlie);
-        vault.requestDeposit(100 ether, Charlie);
+        vault.requestDeposit(100 ether);
 
         vm.startPrank(Manager);
 
@@ -991,9 +1080,9 @@ contract HypoVaultTest is Test {
     function test_mixed_partial_fulfillments_across_epochs() public {
         // Setup initial deposits
         vm.prank(Alice);
-        vault.requestDeposit(300 ether, Alice);
+        vault.requestDeposit(300 ether);
         vm.prank(Bob);
-        vault.requestDeposit(600 ether, Bob);
+        vault.requestDeposit(600 ether);
 
         vm.startPrank(Manager);
 
@@ -1040,9 +1129,9 @@ contract HypoVaultTest is Test {
 
         // Cycle 1: Deposit
         vm.prank(Alice);
-        vault.requestDeposit(uint128(depositAmount), Alice);
+        vault.requestDeposit(uint128(depositAmount));
         vm.prank(Bob);
-        vault.requestDeposit(uint128(depositAmount), Bob);
+        vault.requestDeposit(uint128(depositAmount));
 
         vm.startPrank(Manager);
         accountant.setNav(200 ether);
@@ -1055,7 +1144,7 @@ contract HypoVaultTest is Test {
         // Withdraw half
         vm.stopPrank();
         vm.prank(Alice);
-        vault.requestWithdrawal(uint128(aliceShares / 2), Alice);
+        vault.requestWithdrawal(uint128(aliceShares / 2));
 
         vm.startPrank(Manager);
         accountant.setNav(200 ether);
@@ -1067,7 +1156,7 @@ contract HypoVaultTest is Test {
         // Cycle 2: Deposit again
         vm.stopPrank();
         vm.prank(Alice);
-        vault.requestDeposit(uint128(depositAmount), Alice);
+        vault.requestDeposit(uint128(depositAmount));
 
         // Calculate expected shares for the second deposit BEFORE fulfillment
         uint256 totalSupplyBeforeSecondDeposit = vault.totalSupply();
@@ -1099,9 +1188,9 @@ contract HypoVaultTest is Test {
     function test_reserved_withdrawal_assets_tracking() public {
         // Setup: Alice has shares
         vm.prank(Alice);
-        vault.requestDeposit(200 ether, Alice);
+        vault.requestDeposit(200 ether);
         vm.prank(Bob);
-        vault.requestDeposit(100 ether, Bob);
+        vault.requestDeposit(100 ether);
 
         vm.startPrank(Manager);
         accountant.setNav(300 ether);
@@ -1114,7 +1203,7 @@ contract HypoVaultTest is Test {
         // Request and fulfill withdrawal
         vm.stopPrank();
         vm.prank(Alice);
-        vault.requestWithdrawal(uint128(aliceShares / 2), Alice);
+        vault.requestWithdrawal(uint128(aliceShares / 2));
 
         vm.startPrank(Manager);
         accountant.setNav(300 ether);
@@ -1150,11 +1239,11 @@ contract HypoVaultTest is Test {
     function test_multiple_cancellations() public {
         // Multiple users request deposits
         vm.prank(Alice);
-        vault.requestDeposit(100 ether, Alice);
+        vault.requestDeposit(100 ether);
         vm.prank(Bob);
-        vault.requestDeposit(200 ether, Bob);
+        vault.requestDeposit(200 ether);
         vm.prank(Charlie);
-        vault.requestDeposit(150 ether, Charlie);
+        vault.requestDeposit(150 ether);
 
         uint256 aliceBalanceBefore = token.balanceOf(Alice);
         uint256 bobBalanceBefore = token.balanceOf(Bob);
@@ -1184,7 +1273,7 @@ contract HypoVaultTest is Test {
         token.approve(address(vault), largeAmount);
 
         vm.prank(Alice);
-        vault.requestDeposit(uint128(largeAmount), Alice);
+        vault.requestDeposit(uint128(largeAmount));
 
         // Calculate expected shares for large amount
         uint256 totalSupplyBefore = vault.totalSupply();
@@ -1216,7 +1305,7 @@ contract HypoVaultTest is Test {
         token.approve(address(vault), 1000);
 
         vm.prank(Alice);
-        vault.requestDeposit(uint128(smallDeposit), Alice);
+        vault.requestDeposit(uint128(smallDeposit));
 
         // Calculate expected shares for small amount
         uint256 totalSupplyBefore = vault.totalSupply();
@@ -1239,23 +1328,23 @@ contract HypoVaultTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        POTENTIAL BUG TESTS
+                        WITHDRAWAL EDGE CASE TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_division_by_zero_protection_withdrawal() public {
+    function test_withdrawal_with_zero_balance() public {
         // Test that withdrawal with 0 balance fails gracefully
         vm.prank(Alice);
-        vm.expectRevert(); // Should revert due to division by zero
-        vault.requestWithdrawal(100, Alice);
+        vm.expectRevert(); // Should revert due to insufficient balance
+        vault.requestWithdrawal(100);
     }
 
-    function test_executeWithdrawal_logic_error() public {
-        // This test demonstrates a potential logic error in the executeWithdrawal condition
+    function test_executeWithdrawal_partial_fulfillment() public {
+        // Test partial fulfillment scenario
         // Setup: Alice deposits and withdraws
         vm.prank(Alice);
-        vault.requestDeposit(100 ether, Alice);
+        vault.requestDeposit(100 ether);
         vm.prank(Bob);
-        vault.requestDeposit(100 ether, Bob);
+        vault.requestDeposit(100 ether);
 
         vm.startPrank(Manager);
         accountant.setNav(200 ether);
@@ -1267,7 +1356,7 @@ contract HypoVaultTest is Test {
 
         vm.stopPrank();
         vm.prank(Alice);
-        vault.requestWithdrawal(uint128(aliceShares), Alice);
+        vault.requestWithdrawal(uint128(aliceShares));
 
         // Partially fulfill withdrawal to create a scenario where there are remaining shares
         vm.startPrank(Manager);
@@ -1285,14 +1374,124 @@ contract HypoVaultTest is Test {
         vm.stopPrank();
     }
 
-    function test_executeWithdrawal_condition_bug_demonstration() public {
-        // This test specifically demonstrates the bug in the condition
-        // where sharesToFulfill is used instead of sharesRemaining
+    function test_executeWithdrawal_zero_fulfillment_remaining_shares_moved() public {
+        // Test zero fulfillment scenario: shares should still move to next epoch
+        // This test verifies that remaining shares are properly handled
+
+        // Setup: Multiple users for proper testing
+        vm.prank(Alice);
+        vault.requestDeposit(100 ether);
+        vm.prank(Bob);
+        vault.requestDeposit(100 ether);
+
+        vm.startPrank(Manager);
+        accountant.setNav(200 ether);
+        vault.fulfillDeposits(200 ether, "");
+        vault.executeDeposit(Alice, 0);
+        vault.executeDeposit(Bob, 0);
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+        uint256 aliceBasisBefore = vault.userBasis(Alice);
+
+        vm.stopPrank();
+        vm.prank(Alice);
+        vault.requestWithdrawal(uint128(aliceShares));
+
+        // TEST: Fulfill ZERO shares in this epoch
+        vm.startPrank(Manager);
+        accountant.setNav(200 ether);
+        vault.fulfillWithdrawals(0, 0, ""); // Zero fulfillment
+
+        // When zero shares are fulfilled, remaining shares should still move to next epoch
+
+        // Execute withdrawal - remaining shares should be moved to next epoch
+        vault.executeWithdrawal(Alice, 0);
+
+        // Verify that ALL shares were moved to next epoch (since zero fulfillment)
+        (uint128 remainingAmount, uint128 remainingBasis) = vault.queuedWithdrawal(Alice, 1);
+
+        assertEq(
+            remainingAmount,
+            aliceShares,
+            "All shares should be moved to next epoch on zero fulfillment"
+        );
+        assertEq(
+            remainingBasis,
+            aliceBasisBefore,
+            "All basis should be moved to next epoch on zero fulfillment"
+        );
+
+        // Verify current epoch is cleared
+        (uint128 currentAmount, uint128 currentBasis) = vault.queuedWithdrawal(Alice, 0);
+        assertEq(currentAmount, 0, "Current epoch should be cleared");
+        assertEq(currentBasis, 0, "Current epoch basis should be cleared");
+
+        vm.stopPrank();
+    }
+
+    function test_executeWithdrawal_partial_fulfillment_remaining_shares_moved() public {
+        // Test partial fulfillment scenario to ensure sharesRemaining logic works correctly
 
         vm.prank(Alice);
-        vault.requestDeposit(100 ether, Alice);
+        vault.requestDeposit(300 ether);
         vm.prank(Bob);
-        vault.requestDeposit(100 ether, Bob);
+        vault.requestDeposit(200 ether);
+
+        vm.startPrank(Manager);
+        accountant.setNav(500 ether);
+        vault.fulfillDeposits(500 ether, "");
+        vault.executeDeposit(Alice, 0);
+        vault.executeDeposit(Bob, 0);
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+        uint256 aliceBasisBefore = vault.userBasis(Alice);
+
+        vm.stopPrank();
+        vm.prank(Alice);
+        vault.requestWithdrawal(uint128(aliceShares));
+
+        // Partially fulfill: only 25% of Alice's withdrawal
+        uint256 sharesToFulfill = aliceShares / 4;
+        vm.startPrank(Manager);
+        accountant.setNav(500 ether);
+        vault.fulfillWithdrawals(sharesToFulfill, 100 ether, "");
+
+        // Execute withdrawal
+        uint256 aliceBalanceBefore = token.balanceOf(Alice);
+        vault.executeWithdrawal(Alice, 0);
+
+        // Calculate expected values
+        uint256 expectedSharesRemaining = aliceShares - sharesToFulfill; // 75% remaining
+        uint256 expectedBasisRemaining = (aliceBasisBefore * 3) / 4; // 75% of basis remaining
+
+        // Verify remaining shares moved to next epoch
+        (uint128 remainingAmount, uint128 remainingBasis) = vault.queuedWithdrawal(Alice, 1);
+
+        assertEq(
+            remainingAmount,
+            expectedSharesRemaining,
+            "Remaining shares should be moved to next epoch"
+        );
+        assertEq(
+            remainingBasis,
+            expectedBasisRemaining,
+            "Remaining basis should be moved to next epoch"
+        );
+
+        // Verify Alice received assets for fulfilled portion
+        uint256 assetsReceived = token.balanceOf(Alice) - aliceBalanceBefore;
+        assertGt(assetsReceived, 0, "Alice should receive assets for fulfilled portion");
+
+        vm.stopPrank();
+    }
+
+    function test_executeWithdrawal_full_fulfillment_no_remaining_shares() public {
+        // Test full fulfillment scenario - no shares should be moved to next epoch
+
+        vm.prank(Alice);
+        vault.requestDeposit(100 ether);
+        vm.prank(Bob);
+        vault.requestDeposit(100 ether);
 
         vm.startPrank(Manager);
         accountant.setNav(200 ether);
@@ -1304,51 +1503,190 @@ contract HypoVaultTest is Test {
 
         vm.stopPrank();
         vm.prank(Alice);
-        vault.requestWithdrawal(uint128(aliceShares), Alice);
+        vault.requestWithdrawal(uint128(aliceShares));
 
-        // Create a scenario where sharesToFulfill = 0 but sharesRemaining > 0
-        // This can happen if no shares are fulfilled in an epoch
+        // Fully fulfill the withdrawal
         vm.startPrank(Manager);
         accountant.setNav(200 ether);
-        vault.fulfillWithdrawals(0, 0, ""); // Fulfill 0 shares
+        vault.fulfillWithdrawals(aliceShares, 100 ether, "");
 
-        // Execute withdrawal - the bug condition (sharesToFulfill + basisRemaining > 0)
-        // will be false because sharesToFulfill = 0 and basisRemaining = 0
-        // But sharesRemaining > 0, so remaining shares should still be moved to next epoch
+        // Execute withdrawal
         vault.executeWithdrawal(Alice, 0);
 
-        // Due to the bug, remaining shares might not be properly moved
-        (uint128 remainingAmount, ) = vault.queuedWithdrawal(Alice, 1);
+        // Verify NO shares moved to next epoch (sharesRemaining = 0)
+        (uint128 remainingAmount, uint128 remainingBasis) = vault.queuedWithdrawal(Alice, 1);
 
-        // The bug means that if sharesToFulfill = 0 and basisRemaining = 0,
-        // the remaining shares won't be moved even if sharesRemaining > 0
-        // In a correct implementation, remainingAmount should equal aliceShares
-        // But due to the bug, it might be 0
-
-        // For now, let's document what actually happens
-        // This test will help identify the exact behavior
-        console.log("Remaining amount moved to next epoch:", remainingAmount);
-        console.log("Expected remaining amount:", aliceShares);
+        assertEq(remainingAmount, 0, "No shares should remain after full fulfillment");
+        assertEq(remainingBasis, 0, "No basis should remain after full fulfillment");
 
         vm.stopPrank();
     }
 
-    function test_zero_shares_withdrawal_attempt() public {
-        // Test what happens when trying to withdraw 0 shares
+    function test_executeWithdrawal_multiple_epochs_accumulation() public {
+        // Test that shares correctly accumulate across multiple epochs
+
         vm.prank(Alice);
-        vault.requestDeposit(100 ether, Alice);
+        vault.requestDeposit(100 ether);
+        vm.prank(Bob);
+        vault.requestDeposit(100 ether);
 
         vm.startPrank(Manager);
-        accountant.setNav(100 ether);
-        vault.fulfillDeposits(100 ether, "");
+        accountant.setNav(200 ether);
+        vault.fulfillDeposits(200 ether, "");
+        vault.executeDeposit(Alice, 0);
+        vault.executeDeposit(Bob, 0);
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+
+        vm.stopPrank();
+        vm.prank(Alice);
+        vault.requestWithdrawal(uint128(aliceShares));
+
+        // First epoch: Zero fulfillment
+        vm.startPrank(Manager);
+        accountant.setNav(200 ether);
+        vault.fulfillWithdrawals(0, 0, "");
+        vault.executeWithdrawal(Alice, 0);
+
+        // Verify shares moved to epoch 1
+        (uint128 remainingAmount1, ) = vault.queuedWithdrawal(Alice, 1);
+        assertEq(remainingAmount1, aliceShares);
+
+        // Second epoch: Partial fulfillment
+        uint256 partialFulfill = aliceShares / 3;
+        vault.fulfillWithdrawals(partialFulfill, 50 ether, "");
+        vault.executeWithdrawal(Alice, 1);
+
+        // Verify remaining shares moved to epoch 2
+        (uint128 remainingAmount2, ) = vault.queuedWithdrawal(Alice, 2);
+        uint256 expectedRemaining = aliceShares - partialFulfill;
+        assertEq(remainingAmount2, expectedRemaining);
+
+        // Third epoch: Full fulfillment of remaining
+        vault.fulfillWithdrawals(expectedRemaining, 100 ether, "");
+        vault.executeWithdrawal(Alice, 2);
+
+        // Verify no shares remain
+        (uint128 finalRemaining, ) = vault.queuedWithdrawal(Alice, 3);
+        assertEq(finalRemaining, 0);
+
+        vm.stopPrank();
+    }
+
+    function test_executeWithdrawal_complex_basis_tracking() public {
+        // Test complex scenarios with basis tracking through share transfers and partial fulfillments
+
+        vm.prank(Alice);
+        vault.requestDeposit(100 ether);
+        vm.prank(Bob);
+        vault.requestDeposit(100 ether);
+
+        vm.startPrank(Manager);
+        accountant.setNav(200 ether);
+        vault.fulfillDeposits(200 ether, "");
+        vault.executeDeposit(Alice, 0);
+        vault.executeDeposit(Bob, 0);
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+
+        vm.stopPrank();
+
+        // Transfer some shares to create complex basis scenarios
+        vm.prank(Alice);
+        vault.transfer(Bob, aliceShares / 2);
+
+        // Now request withdrawal of remaining shares
+        uint256 remainingShares = vault.balanceOf(Alice);
+        vm.prank(Alice);
+        vault.requestWithdrawal(uint128(remainingShares));
+
+        // Partially fulfill withdrawal
+        uint256 sharesToFulfill = remainingShares / 2;
+        vm.startPrank(Manager);
+        accountant.setNav(200 ether);
+        vault.fulfillWithdrawals(sharesToFulfill, 50 ether, "");
+
+        // Execute withdrawal
+        vault.executeWithdrawal(Alice, 0);
+
+        // Verify remaining shares are moved properly
+        (uint128 remainingAmount, ) = vault.queuedWithdrawal(Alice, 1);
+        uint256 expectedRemaining = remainingShares - sharesToFulfill;
+
+        assertEq(remainingAmount, expectedRemaining, "Remaining shares should be moved correctly");
+
+        vm.stopPrank();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          TRANSFER TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_transfer_moves_basis_proportionally() public {
+        // Setup: Alice deposits
+        uint256 depositAmount = 100 ether;
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+
+        vm.startPrank(Manager);
+        accountant.setNav(depositAmount);
+        vault.fulfillDeposits(depositAmount, "");
         vault.executeDeposit(Alice, 0);
         vm.stopPrank();
 
-        // Try to withdraw 0 shares - should work without issues
-        vm.prank(Alice);
-        vault.requestWithdrawal(0, Alice);
+        uint256 aliceShares = vault.balanceOf(Alice);
+        uint256 aliceBasisBefore = vault.userBasis(Alice);
+        uint256 bobBasisBefore = vault.userBasis(Bob);
 
-        // Basis should remain unchanged
-        assertEq(vault.userBasis(Alice), 100 ether);
+        // Transfer half of Alice's shares to Bob
+        uint256 transferAmount = aliceShares / 2;
+        uint256 expectedBasisTransfer = (aliceBasisBefore * transferAmount) / aliceShares;
+
+        vm.prank(Alice);
+        vault.transfer(Bob, transferAmount);
+
+        // Verify shares transfer
+        assertEq(vault.balanceOf(Alice), aliceShares - transferAmount);
+        assertEq(vault.balanceOf(Bob), transferAmount);
+
+        // Verify basis transfer
+        assertEq(vault.userBasis(Alice), aliceBasisBefore - expectedBasisTransfer);
+        assertEq(vault.userBasis(Bob), bobBasisBefore + expectedBasisTransfer);
+    }
+
+    function test_transferFrom_moves_basis_proportionally() public {
+        // Setup: Alice deposits
+        uint256 depositAmount = 100 ether;
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+
+        vm.startPrank(Manager);
+        accountant.setNav(depositAmount);
+        vault.fulfillDeposits(depositAmount, "");
+        vault.executeDeposit(Alice, 0);
+        vm.stopPrank();
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+        uint256 aliceBasisBefore = vault.userBasis(Alice);
+        uint256 bobBasisBefore = vault.userBasis(Bob);
+
+        // Alice approves Charlie to transfer her shares
+        uint256 transferAmount = aliceShares / 3;
+        vm.prank(Alice);
+        vault.approve(Charlie, transferAmount);
+
+        uint256 expectedBasisTransfer = (aliceBasisBefore * transferAmount) / aliceShares;
+
+        // Charlie transfers from Alice to Bob
+        vm.prank(Charlie);
+        vault.transferFrom(Alice, Bob, transferAmount);
+
+        // Verify shares transfer
+        assertEq(vault.balanceOf(Alice), aliceShares - transferAmount);
+        assertEq(vault.balanceOf(Bob), transferAmount);
+
+        // Verify basis transfer
+        assertEq(vault.userBasis(Alice), aliceBasisBefore - expectedBasisTransfer);
+        assertEq(vault.userBasis(Bob), bobBasisBefore + expectedBasisTransfer);
     }
 }

@@ -3,14 +3,15 @@ pragma solidity ^0.8.28;
 // Base
 import {Ownable} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 // Libraries
-import {AccountingMath} from "../libraries/AccountingMath.sol";
 import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
+import {PanopticMath} from "lib/panoptic-v1.1/contracts/libraries/PanopticMath.sol";
 // Interfaces
 import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC20Partial.sol";
 import {IV3CompatibleOracle} from "lib/panoptic-v1.1/contracts/interfaces/IV3CompatibleOracle.sol";
 import {PanopticPool} from "lib/panoptic-v1.1/contracts/PanopticPool.sol";
 // Types
 import {LeftRightUnsigned} from "lib/panoptic-v1.1/contracts/types/LeftRight.sol";
+import {LeftRightSigned} from "lib/panoptic-v1.1/contracts/types/LeftRight.sol";
 import {LiquidityChunk} from "lib/panoptic-v1.1/contracts/types/LiquidityChunk.sol";
 import {PositionBalance} from "lib/panoptic-v1.1/contracts/types/PositionBalance.sol";
 import {TokenId} from "lib/panoptic-v1.1/contracts/types/TokenId.sol";
@@ -22,10 +23,10 @@ contract PanopticVaultAccountant is Ownable {
     /// @param token0 The token0 of the pool
     /// @param token1 The token1 of the pool
     /// @param poolOracle The oracle for the pool
-    /// @param oracle0 The oracle for token0
-    /// @param isToken0Flipped Whether token0 for the pool is token1 in the oracle
-    /// @param oracle1 The oracle for token1
-    /// @param isToken1Flipped Whether token1 for the pool is token0 in the oracle
+    /// @param oracle0 The oracle for token0-underlying
+    /// @param isUnderlyingToken0InOracle0 Whether token0 in oracle0 is the underlying token
+    /// @param oracle1 The oracle for token1-underlying
+    /// @param isUnderlyingToken0InOracle1 Whether token0 in oracle1 is the underlying token
     /// @param maxPriceDeviation The maximum price deviation allowed for the oracle prices
     /// @param twapWindow The time window (in seconds)to compute the TWAP over
     struct PoolInfo {
@@ -34,9 +35,9 @@ contract PanopticVaultAccountant is Ownable {
         IERC20Partial token1;
         IV3CompatibleOracle poolOracle;
         IV3CompatibleOracle oracle0;
-        bool isToken0Flipped;
+        bool isUnderlyingToken0InOracle0;
         IV3CompatibleOracle oracle1;
-        bool isToken1Flipped;
+        bool isUnderlyingToken0InOracle1;
         int24 maxPriceDeviation;
         uint32 twapWindow;
     }
@@ -85,7 +86,7 @@ contract PanopticVaultAccountant is Ownable {
         vaultLocked[vault] = true;
     }
 
-    /// @notice Returns the NAV of the portfolio contained in `vault` in terms of its underlying token
+    /// @notice Returns the NAV of the portfolio contained in `vault` in terms of its underlying token.
     /// @param vault The address of the vault to value
     /// @param underlyingToken The underlying token of the vault
     /// @param managerInput Input calldata from the vault manager consisting of price quotes from the manager, pool information, and a position lsit for each pool
@@ -112,7 +113,7 @@ contract PanopticVaultAccountant is Ownable {
             if (
                 Math.abs(
                     managerPrices[i].poolPrice -
-                        AccountingMath.twapFilter(pools[i].poolOracle, pools[i].twapWindow)
+                        PanopticMath.twapFilter(pools[i].poolOracle, pools[i].twapWindow)
                 ) > pools[i].maxPriceDeviation
             ) revert StaleOraclePrice();
 
@@ -142,7 +143,7 @@ contract PanopticVaultAccountant is Ownable {
                 for (uint256 k = 0; k < positionLegs; k++) {
                     (uint256 amount0, uint256 amount1) = Math.getAmountsForLiquidity(
                         managerPrices[i].poolPrice,
-                        AccountingMath.getLiquidityChunk(
+                        PanopticMath.getLiquidityChunk(
                             tokenIds[i][j],
                             k,
                             uint128(positionBalanceArray[j][1])
@@ -161,8 +162,16 @@ contract PanopticVaultAccountant is Ownable {
                         }
                     }
                 }
+
+                (LeftRightSigned longAmounts, LeftRightSigned shortAmounts) = PanopticMath
+                    .computeExercisedAmounts(tokenIds[i][j], uint128(positionBalanceArray[j][1]));
+
+                poolExposure0 += int256(longAmounts.rightSlot()) - int256(shortAmounts.rightSlot());
+                poolExposure1 += int256(longAmounts.leftSlot()) - int256(shortAmounts.leftSlot());
+
                 numLegs += positionLegs;
             }
+
             if (numLegs != pools[i].pool.numberOfLegs(_vault)) revert IncorrectPositionList();
 
             if (address(pools[i].token0) == address(0))
@@ -170,6 +179,8 @@ contract PanopticVaultAccountant is Ownable {
 
             bool skipToken0 = false;
             bool skipToken1 = false;
+
+            // optimized for small number of pools
             for (uint256 j = 0; j < underlyingTokens.length; j++) {
                 if (underlyingTokens[j] == address(pools[i].token0)) skipToken0 = true;
                 if (underlyingTokens[j] == address(pools[i].token1)) skipToken1 = true;
@@ -200,45 +211,37 @@ contract PanopticVaultAccountant is Ownable {
 
             // convert position values to underlying
             if (address(pools[i].token0) != underlyingToken) {
-                int24 conversionPrice = AccountingMath.twapFilter(
+                int24 conversionTick = PanopticMath.twapFilter(
                     pools[i].oracle0,
                     pools[i].twapWindow
                 );
                 if (
-                    Math.abs(conversionPrice - managerPrices[i].token0Price) >
+                    Math.abs(conversionTick - managerPrices[i].token0Price) >
                     pools[i].maxPriceDeviation
                 ) revert StaleOraclePrice();
 
-                poolExposure0 = pools[i].isToken0Flipped
-                    ? AccountingMath.convert1to0(
-                        poolExposure0,
-                        Math.getSqrtRatioAtTick(conversionPrice)
-                    )
-                    : AccountingMath.convert0to1(
-                        poolExposure0,
-                        Math.getSqrtRatioAtTick(conversionPrice)
-                    );
+                uint160 conversionPrice = Math.getSqrtRatioAtTick(
+                    pools[i].isUnderlyingToken0InOracle0 ? -conversionTick : conversionTick
+                );
+
+                poolExposure0 = PanopticMath.convert0to1(poolExposure0, conversionPrice);
             }
 
             if (address(pools[i].token1) != underlyingToken) {
-                int24 conversionPrice = AccountingMath.twapFilter(
+                int24 conversionTick = PanopticMath.twapFilter(
                     pools[i].oracle1,
                     pools[i].twapWindow
                 );
                 if (
-                    Math.abs(conversionPrice - managerPrices[i].token1Price) >
+                    Math.abs(conversionTick - managerPrices[i].token1Price) >
                     pools[i].maxPriceDeviation
                 ) revert StaleOraclePrice();
 
-                poolExposure1 = pools[i].isToken1Flipped
-                    ? AccountingMath.convert1to0(
-                        poolExposure1,
-                        Math.getSqrtRatioAtTick(conversionPrice)
-                    )
-                    : AccountingMath.convert0to1(
-                        poolExposure1,
-                        Math.getSqrtRatioAtTick(conversionPrice)
-                    );
+                uint160 conversionPrice = Math.getSqrtRatioAtTick(
+                    pools[i].isUnderlyingToken0InOracle1 ? conversionTick : -conversionTick
+                );
+
+                poolExposure1 = PanopticMath.convert1to0(poolExposure1, conversionPrice);
             }
             nav += uint256(Math.max(poolExposure0 + poolExposure1, 0));
         }
