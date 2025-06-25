@@ -849,8 +849,7 @@ contract PanopticVaultAccountantTest is Test {
         return
             TokenId
             .wrap(0)
-            .addPoolId(1) // Pool ID
-            .addTickSpacing(60).addLeg({ // Standard tick spacing
+            .addPoolId(1).addTickSpacing(60).addLeg({ // Pool ID // Standard tick spacing
                     legIndex: 0,
                     _optionRatio: 1,
                     _asset: tokenType, // Same as tokenType for consistency
@@ -892,8 +891,7 @@ contract PanopticVaultAccountantTest is Test {
         return
             TokenId
             .wrap(0)
-            .addPoolId(1) // Pool ID
-            .addTickSpacing(60).addLeg({ // Standard tick spacing
+            .addPoolId(1).addTickSpacing(60).addLeg({ // Pool ID // Standard tick spacing
                     legIndex: 0,
                     _optionRatio: 1,
                     _asset: tokenType, // Same as tokenType for consistency
