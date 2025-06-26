@@ -187,7 +187,9 @@ contract PanopticVaultAccountant is Ownable {
 
                 if (underlyingTokens[j] == address(0)) {
                     if (!skipToken0) underlyingTokens[j] = address(pools[i].token0);
-                    if (!skipToken1) underlyingTokens[j + 1] = address(pools[i].token1);
+                    // ensure a gap is not created in the underlyingTokens array
+                    if (!skipToken1)
+                        underlyingTokens[j + (skipToken0 ? 0 : 1)] = address(pools[i].token1);
                     break;
                 }
             }
@@ -243,9 +245,12 @@ contract PanopticVaultAccountant is Ownable {
 
                 poolExposure1 = PanopticMath.convert1to0(poolExposure1, conversionPrice);
             }
+
+            // debt in pools with negative exposure does not need to be paid back
             nav += uint256(Math.max(poolExposure0 + poolExposure1, 0));
         }
 
+        // underlying cannot be native (0x000/0xeee)
         bool skipUnderlying = false;
         for (uint256 i = 0; i < underlyingTokens.length; i++) {
             if (underlyingTokens[i] == underlyingToken) skipUnderlying = true;

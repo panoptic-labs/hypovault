@@ -847,9 +847,7 @@ contract PanopticVaultAccountantTest is Test {
         }
 
         return
-            TokenId
-            .wrap(0)
-            .addPoolId(1).addTickSpacing(60).addLeg({ // Pool ID // Standard tick spacing
+            TokenId.wrap(0).addPoolId(1).addTickSpacing(60).addLeg({ // Pool ID // Standard tick spacing
                     legIndex: 0,
                     _optionRatio: 1,
                     _asset: tokenType, // Same as tokenType for consistency
@@ -889,9 +887,7 @@ contract PanopticVaultAccountantTest is Test {
         }
 
         return
-            TokenId
-            .wrap(0)
-            .addPoolId(1).addTickSpacing(60).addLeg({ // Pool ID // Standard tick spacing
+            TokenId.wrap(0).addPoolId(1).addTickSpacing(60).addLeg({ // Pool ID // Standard tick spacing
                     legIndex: 0,
                     _optionRatio: 1,
                     _asset: tokenType, // Same as tokenType for consistency
@@ -1296,8 +1292,16 @@ contract PanopticVaultAccountantTest is Test {
 
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
-        assertGt(nav, 0);
+        // Expected NAV should be base balances: 100 + 200 + 50 + 75 + 1000 = 1425 ether
         // OTM short positions should not contribute much to NAV
+        uint256 expectedBaseNAV = 100 ether + 200 ether + 50 ether + 75 ether + 1000 ether; // 1425 ether
+        uint256 tolerance = 50 ether; // Allow tolerance for position calculations and conversions
+        assertApproxEqAbs(
+            nav,
+            expectedBaseNAV,
+            tolerance,
+            "NAV should be approximately the base balance for OTM short positions"
+        );
     }
 
     function test_computeNAV_outOfRangePut_short() public {
@@ -1315,8 +1319,16 @@ contract PanopticVaultAccountantTest is Test {
 
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
-        assertGt(nav, 0);
+        // Expected NAV should be base balances: 100 + 200 + 50 + 75 + 1000 = 1425 ether
         // OTM short positions should not contribute much to NAV
+        uint256 expectedBaseNAV = 100 ether + 200 ether + 50 ether + 75 ether + 1000 ether; // 1425 ether
+        uint256 tolerance = 50 ether; // Allow tolerance for position calculations and conversions
+        assertApproxEqAbs(
+            nav,
+            expectedBaseNAV,
+            tolerance,
+            "NAV should be approximately the base balance for OTM short positions"
+        );
     }
 
     function test_computeNAV_inRangeCall_long() public {
@@ -1334,8 +1346,16 @@ contract PanopticVaultAccountantTest is Test {
 
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
-        assertGt(nav, 0);
+        // Expected NAV should be base balances plus intrinsic value from long position
+        uint256 expectedBaseNAV = 100 ether + 200 ether + 50 ether + 75 ether + 1000 ether; // 1425 ether
         // ITM long positions should contribute to NAV through intrinsic value
+        uint256 tolerance = 100 ether; // Larger tolerance for position value calculations
+        assertGt(
+            nav,
+            expectedBaseNAV - tolerance,
+            "NAV should include intrinsic value from ITM long call"
+        );
+        assertLt(nav, expectedBaseNAV + 500 ether, "NAV should not be unreasonably high");
     }
 
     function test_computeNAV_inRangePut_long() public {
@@ -1353,8 +1373,16 @@ contract PanopticVaultAccountantTest is Test {
 
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
-        assertGt(nav, 0);
+        // Expected NAV should be base balances plus intrinsic value from long position
+        uint256 expectedBaseNAV = 100 ether + 200 ether + 50 ether + 75 ether + 1000 ether; // 1425 ether
         // ITM long positions should contribute to NAV through intrinsic value
+        uint256 tolerance = 100 ether; // Larger tolerance for position value calculations
+        assertGt(
+            nav,
+            expectedBaseNAV - tolerance,
+            "NAV should include intrinsic value from ITM long put"
+        );
+        assertLt(nav, expectedBaseNAV + 500 ether, "NAV should not be unreasonably high");
     }
 
     function test_computeNAV_multiLegPosition() public {
@@ -1391,7 +1419,16 @@ contract PanopticVaultAccountantTest is Test {
 
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
-        assertGt(nav, 0);
+        // Expected NAV: token0(100) + token1(200) + collateral0(50) + collateral1(75) + underlying(1000) = 1425 ether
+        // Plus premium contributions: shortPremium0(5) - longPremium0(3) + longPremium1(8) - shortPremium1(10) = 0
+        uint256 expectedBaseNAV = 100 ether + 200 ether + 50 ether + 75 ether + 1000 ether; // 1425 ether
+        uint256 tolerance = 100 ether; // Allow tolerance for multi-leg position calculations
+        assertApproxEqAbs(
+            nav,
+            expectedBaseNAV,
+            tolerance,
+            "NAV should include multi-leg position value correctly"
+        );
     }
 
     function test_computeNAV_staleOraclePrice_token0() public {

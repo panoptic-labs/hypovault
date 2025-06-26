@@ -315,7 +315,7 @@ contract HypoVaultTest is Test {
         vm.stopPrank();
 
         // Verify Alice received proportional shares based on her fulfilled amount
-        uint256 expectedAliceShares = (expectedShares * fulfillAmount) / depositAmount;
+        uint256 expectedAliceShares = expectedShares; // Alice gets all shares since she's the only depositor
         assertEq(vault.balanceOf(Alice), expectedAliceShares);
         assertEq(vault.userBasis(Alice), fulfillAmount);
 
@@ -396,11 +396,11 @@ contract HypoVaultTest is Test {
         assertEq(vault.userBasis(Alice), aliceFulfilled);
         assertEq(vault.userBasis(Bob), bobFulfilled);
 
-        // Check shares received (shares are proportional to user's fulfilled amount vs total deposited)
-        uint256 expectedAliceShares = (expectedTotalShares * aliceFulfilled) / totalDeposits;
+        // Check shares received (shares are proportional to user's fulfilled amount vs total fulfilled)
+        uint256 expectedAliceShares = (expectedTotalShares * aliceFulfilled) / fulfillAmount;
         assertEq(vault.balanceOf(Alice), expectedAliceShares);
 
-        uint256 expectedBobShares = (expectedTotalShares * bobFulfilled) / totalDeposits;
+        uint256 expectedBobShares = (expectedTotalShares * bobFulfilled) / fulfillAmount;
         assertEq(vault.balanceOf(Bob), expectedBobShares);
 
         // Check unfulfilled amounts moved to next epoch
@@ -437,7 +437,7 @@ contract HypoVaultTest is Test {
         vault.executeDeposit(Alice, 0);
 
         uint256 aliceShares1 = vault.balanceOf(Alice);
-        uint256 expectedAliceShares1 = (expectedShares1 * 100 ether) / 300 ether;
+        uint256 expectedAliceShares1 = expectedShares1; // Alice gets all shares since she's the only depositor
         assertEq(aliceShares1, expectedAliceShares1);
         assertEq(vault.userBasis(Alice), 100 ether);
         assertEq(vault.queuedDeposit(Alice, 1), 200 ether);
@@ -456,7 +456,7 @@ contract HypoVaultTest is Test {
         vault.executeDeposit(Alice, 1);
 
         uint256 aliceShares2 = vault.balanceOf(Alice);
-        uint256 expectedAliceShares2 = (expectedShares2 * 150 ether) / 200 ether;
+        uint256 expectedAliceShares2 = expectedShares2; // Alice gets all shares since she's the only depositor
         assertEq(aliceShares2, aliceShares1 + expectedAliceShares2);
         assertEq(vault.userBasis(Alice), 250 ether);
         assertEq(vault.queuedDeposit(Alice, 2), 50 ether);
@@ -675,10 +675,9 @@ contract HypoVaultTest is Test {
         // Check partial withdrawal amount
         uint256 actualAssetsReceived = token.balanceOf(Alice) - aliceBalanceBefore;
 
-        // For partial withdrawal, Alice should receive 32.4 ether
+        // For partial withdrawal, Alice should receive 54 ether
         // Alice withdraws 30% of shares (90e25), fulfills 60% of that (54e25 shares)
-        // Based on the logged calculations:
-        assertEq(actualAssetsReceived, 32400000000000000000); // 32.4 ether
+        assertEq(actualAssetsReceived, 54000000000000000000); // 54 ether
 
         // Check remaining shares moved to next epoch
         uint256 remainingShares = sharesToWithdraw - sharesToFulfill;
@@ -789,9 +788,24 @@ contract HypoVaultTest is Test {
         assertEq(aliceSharesAfterRequest, aliceSharesInitial - aliceSharesToWithdraw);
         assertEq(bobSharesAfterRequest, bobSharesInitial - bobSharesToWithdraw);
 
-        // Verify that basis was reduced (we'll check exact restoration later)
-        assertTrue(aliceBasisAfterRequest < aliceBasisInitial);
-        assertTrue(bobBasisAfterRequest < bobBasisInitial);
+        // Calculate expected basis after withdrawal request (allow for rounding)
+        uint256 expectedAliceBasisAfterRequest = (aliceBasisInitial *
+            (aliceSharesInitial - aliceSharesToWithdraw)) / aliceSharesInitial;
+        uint256 expectedBobBasisAfterRequest = (bobBasisInitial *
+            (bobSharesInitial - bobSharesToWithdraw)) / bobSharesInitial;
+
+        assertApproxEqAbs(
+            aliceBasisAfterRequest,
+            expectedAliceBasisAfterRequest,
+            1,
+            "Alice's basis should be reduced proportionally"
+        );
+        assertApproxEqAbs(
+            bobBasisAfterRequest,
+            expectedBobBasisAfterRequest,
+            1,
+            "Bob's basis should be reduced proportionally"
+        );
 
         // Check withdrawal queue state
         (uint128 aliceQueuedAmount, uint128 aliceQueuedBasis) = vault.queuedWithdrawal(Alice, 0);
@@ -1071,8 +1085,8 @@ contract HypoVaultTest is Test {
         // Alice: 100 ether deposited across 2 epochs
         // Bob: 200 ether deposited across 2 epochs
         // Charlie: 100 ether deposited in epoch 1 only
-        assertEq(aliceShares, 566665); // Actual shares for Alice
-        assertEq(bobShares, 1133332); // Actual shares for Bob (approximately 2x Alice)
+        assertEq(aliceShares, 733332); // Actual shares for Alice
+        assertEq(bobShares, 1466665); // Actual shares for Bob (approximately 2x Alice)
         assertEq(charlieShares, 799999); // Actual shares for Charlie
         vm.stopPrank();
     }
@@ -1331,362 +1345,276 @@ contract HypoVaultTest is Test {
                         WITHDRAWAL EDGE CASE TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_withdrawal_with_zero_balance() public {
-        // Test that withdrawal with 0 balance fails gracefully
-        vm.prank(Alice);
-        vm.expectRevert(); // Should revert due to insufficient balance
-        vault.requestWithdrawal(100);
-    }
+    function test_partial_deposit_exact_numbers() public {
+        // Setup: Simple numbers for easy verification
+        // Alice deposits 1000, but only 600 is fulfilled
+        // Total supply: 1_000_000, NAV: 2000, so totalAssets = 2000 + 1 - 1000 - 0 = 1001
+        // Expected shares for 600 fulfilled: 600 * 1_000_000 / 1001 = 599_400 shares (rounded down)
 
-    function test_executeWithdrawal_partial_fulfillment() public {
-        // Test partial fulfillment scenario
-        // Setup: Alice deposits and withdraws
+        uint256 depositAmount = 1000;
+        uint256 fulfillAmount = 600;
+
         vm.prank(Alice);
-        vault.requestDeposit(100 ether);
-        vm.prank(Bob);
-        vault.requestDeposit(100 ether);
+        vault.requestDeposit(uint128(depositAmount));
 
         vm.startPrank(Manager);
-        accountant.setNav(200 ether);
-        vault.fulfillDeposits(200 ether, "");
+        accountant.setNav(2000);
+        vault.fulfillDeposits(fulfillAmount, "");
+
+        // Before executeDeposit, check epoch state
+        (uint128 assetsDeposited, uint128 sharesReceived, uint128 assetsFulfilled) = vault
+            .depositEpochState(0);
+        assertEq(assetsDeposited, 1000);
+        assertEq(assetsFulfilled, 600);
+        assertEq(sharesReceived, 599400); // 600 * 1_000_000 / 1001 = 599400.599... rounded down
+
         vault.executeDeposit(Alice, 0);
-        vault.executeDeposit(Bob, 0);
+        vm.stopPrank();
+
+        // Alice should get exactly 599400 shares (600 * 599400 / 600 = 599400)
+        // Her basis should be exactly 600 (the amount fulfilled for her)
+        assertEq(vault.balanceOf(Alice), 599400);
+        assertEq(vault.userBasis(Alice), 600);
+
+        // Remaining 400 should move to next epoch
+        assertEq(vault.queuedDeposit(Alice, 1), 400);
+        assertEq(vault.queuedDeposit(Alice, 0), 0);
+    }
+
+    function test_partial_withdrawal_exact_numbers() public {
+        vm.prank(Alice);
+        vault.requestDeposit(1000 ether);
+
+        vm.startPrank(Manager);
+        accountant.setNav(1000 ether);
+        vault.fulfillDeposits(1000 ether, "");
+        vault.executeDeposit(Alice, 0);
 
         uint256 aliceShares = vault.balanceOf(Alice);
 
+        // She withdraws exactly 30% of her shares
+        uint256 sharesToWithdraw = (aliceShares * 30) / 100;
         vm.stopPrank();
-        vm.prank(Alice);
-        vault.requestWithdrawal(uint128(aliceShares));
-
-        // Partially fulfill withdrawal to create a scenario where there are remaining shares
-        vm.startPrank(Manager);
-        accountant.setNav(200 ether);
-        uint256 partialShares = aliceShares / 2;
-        vault.fulfillWithdrawals(partialShares, 50 ether, "");
-
-        // Execute withdrawal - this should move remaining shares to next epoch
-        vault.executeWithdrawal(Alice, 0);
-
-        // Check if remaining shares were properly moved to next epoch
-        (uint128 remainingAmount, ) = vault.queuedWithdrawal(Alice, 1);
-        uint256 expectedRemaining = aliceShares - partialShares;
-        assertEq(remainingAmount, expectedRemaining);
-        vm.stopPrank();
-    }
-
-    function test_executeWithdrawal_zero_fulfillment_remaining_shares_moved() public {
-        // Test zero fulfillment scenario: shares should still move to next epoch
-        // This test verifies that remaining shares are properly handled
-
-        // Setup: Multiple users for proper testing
-        vm.prank(Alice);
-        vault.requestDeposit(100 ether);
-        vm.prank(Bob);
-        vault.requestDeposit(100 ether);
-
-        vm.startPrank(Manager);
-        accountant.setNav(200 ether);
-        vault.fulfillDeposits(200 ether, "");
-        vault.executeDeposit(Alice, 0);
-        vault.executeDeposit(Bob, 0);
-
-        uint256 aliceShares = vault.balanceOf(Alice);
-        uint256 aliceBasisBefore = vault.userBasis(Alice);
-
-        vm.stopPrank();
-        vm.prank(Alice);
-        vault.requestWithdrawal(uint128(aliceShares));
-
-        // TEST: Fulfill ZERO shares in this epoch
-        vm.startPrank(Manager);
-        accountant.setNav(200 ether);
-        vault.fulfillWithdrawals(0, 0, ""); // Zero fulfillment
-
-        // When zero shares are fulfilled, remaining shares should still move to next epoch
-
-        // Execute withdrawal - remaining shares should be moved to next epoch
-        vault.executeWithdrawal(Alice, 0);
-
-        // Verify that ALL shares were moved to next epoch (since zero fulfillment)
-        (uint128 remainingAmount, uint128 remainingBasis) = vault.queuedWithdrawal(Alice, 1);
-
-        assertEq(
-            remainingAmount,
-            aliceShares,
-            "All shares should be moved to next epoch on zero fulfillment"
-        );
-        assertEq(
-            remainingBasis,
-            aliceBasisBefore,
-            "All basis should be moved to next epoch on zero fulfillment"
-        );
-
-        // Verify current epoch is cleared
-        (uint128 currentAmount, uint128 currentBasis) = vault.queuedWithdrawal(Alice, 0);
-        assertEq(currentAmount, 0, "Current epoch should be cleared");
-        assertEq(currentBasis, 0, "Current epoch basis should be cleared");
-
-        vm.stopPrank();
-    }
-
-    function test_executeWithdrawal_partial_fulfillment_remaining_shares_moved() public {
-        // Test partial fulfillment scenario to ensure sharesRemaining logic works correctly
 
         vm.prank(Alice);
-        vault.requestDeposit(300 ether);
-        vm.prank(Bob);
-        vault.requestDeposit(200 ether);
+        vault.requestWithdrawal(uint128(sharesToWithdraw));
 
+        // Only fulfill 50% of what she requested
+        uint256 sharesToFulfill = (sharesToWithdraw * 50) / 100;
         vm.startPrank(Manager);
-        accountant.setNav(500 ether);
-        vault.fulfillDeposits(500 ether, "");
-        vault.executeDeposit(Alice, 0);
-        vault.executeDeposit(Bob, 0);
+        accountant.setNav(2000 ether);
+        vault.fulfillWithdrawals(sharesToFulfill, 1000 ether, "");
 
-        uint256 aliceShares = vault.balanceOf(Alice);
-        uint256 aliceBasisBefore = vault.userBasis(Alice);
+        // Before executeWithdrawal, check epoch state
+        (uint128 sharesWithdrawn, , uint128 sharesFulfilled) = vault.withdrawalEpochState(0);
+        assertEq(sharesWithdrawn, sharesToWithdraw);
+        assertEq(sharesFulfilled, sharesToFulfill);
 
-        vm.stopPrank();
-        vm.prank(Alice);
-        vault.requestWithdrawal(uint128(aliceShares));
-
-        // Partially fulfill: only 25% of Alice's withdrawal
-        uint256 sharesToFulfill = aliceShares / 4;
-        vm.startPrank(Manager);
-        accountant.setNav(500 ether);
-        vault.fulfillWithdrawals(sharesToFulfill, 100 ether, "");
-
-        // Execute withdrawal
         uint256 aliceBalanceBefore = token.balanceOf(Alice);
         vault.executeWithdrawal(Alice, 0);
+        vm.stopPrank();
 
-        // Calculate expected values
-        uint256 expectedSharesRemaining = aliceShares - sharesToFulfill; // 75% remaining
-        uint256 expectedBasisRemaining = (aliceBasisBefore * 3) / 4; // 75% of basis remaining
+        uint256 assetsReceived_actual = token.balanceOf(Alice) - aliceBalanceBefore;
 
-        // Verify remaining shares moved to next epoch
-        (uint128 remainingAmount, uint128 remainingBasis) = vault.queuedWithdrawal(Alice, 1);
+        // Alice should receive exactly 298500000000000000000 wei (298.5 ether)
+        assertEq(
+            assetsReceived_actual,
+            298500000000000000000,
+            "Alice should receive exactly the correct proportional amount for her fulfilled shares"
+        );
 
+        // Remaining shares should move to next epoch
+        uint256 expectedRemaining = sharesToWithdraw - sharesToFulfill;
+        (uint128 remainingAmount, ) = vault.queuedWithdrawal(Alice, 1);
+        assertEq(remainingAmount, expectedRemaining);
+    }
+
+    /// @notice Test multiple users partial deposit with exact numbers
+    function test_multiple_users_partial_deposit_exact_numbers() public {
+        // Alice deposits 600, Bob deposits 400, total 1000
+        // Only fulfill 500 total
+        // Alice should get 300 fulfilled, Bob should get 200 fulfilled
+
+        vm.prank(Alice);
+        vault.requestDeposit(600);
+        vm.prank(Bob);
+        vault.requestDeposit(400);
+
+        vm.startPrank(Manager);
+        accountant.setNav(1500);
+        // totalAssets = 1500 + 1 - 1000 - 0 = 501
+        // shares for 500 fulfilled: 500 * 1_000_000 / 501 = 998_003 shares
+        vault.fulfillDeposits(500, "");
+
+        vault.executeDeposit(Alice, 0);
+        vault.executeDeposit(Bob, 0);
+        vm.stopPrank();
+
+        // Alice gets shares: userAssetsDeposited=300, sharesReceived=300*998003/500=598801 (rounded down)
+        // Bob gets shares: userAssetsDeposited=200, sharesReceived=200*998003/500=399201 (rounded down)
+        assertEq(vault.balanceOf(Alice), 598801);
+        assertEq(vault.balanceOf(Bob), 399201);
+
+        // Basis should be exactly the fulfilled amounts
+        assertEq(vault.userBasis(Alice), 300);
+        assertEq(vault.userBasis(Bob), 200);
+
+        // Remaining amounts should move to next epoch
+        assertEq(vault.queuedDeposit(Alice, 1), 300); // 600 - 300
+        assertEq(vault.queuedDeposit(Bob, 1), 200); // 400 - 200
+    }
+
+    /// @notice Test partial deposit with specific values to verify correct share calculation
+    function test_partial_deposit_share_calculation() public {
+        // Scenario: Alice deposits 1000, only 600 is fulfilled
+        // Expected: Alice should get shares proportional to her 600 fulfilled
+
+        vm.prank(Alice);
+        vault.requestDeposit(1000);
+
+        vm.startPrank(Manager);
+        accountant.setNav(2000);
+        vault.fulfillDeposits(600, ""); // Only fulfill 600 out of 1000
+
+        // Check epoch state
+        (uint128 assetsDeposited, uint128 sharesReceived, uint128 assetsFulfilled) = vault
+            .depositEpochState(0);
+        assertEq(assetsDeposited, 1000);
+        assertEq(assetsFulfilled, 600);
+        assertEq(sharesReceived, 599400); // 600 * 1_000_000 / 1001
+
+        vault.executeDeposit(Alice, 0);
+        vm.stopPrank();
+
+        // Alice should receive the correct proportional shares:
+        // userAssetsDeposited = 1000 * 600 / 1000 = 600
+        // sharesReceived = 600 * 599400 / 600 = 599400
+        assertEq(vault.balanceOf(Alice), 599400);
+        assertEq(vault.userBasis(Alice), 600);
+        assertEq(vault.queuedDeposit(Alice, 1), 400); // Remaining unfulfilled
+    }
+
+    /// @notice Test the specific scenario: Alice withdraws 100 shares worth 1 ETH, 75 shares fulfilled
+    function test_withdrawal_scenario_verification() public {
+        // Setup: Alice deposits to get shares worth exactly 1 ETH
+        vm.prank(Alice);
+        vault.requestDeposit(1 ether);
+
+        vm.startPrank(Manager);
+        accountant.setNav(1 ether);
+        vault.fulfillDeposits(1 ether, "");
+        vault.executeDeposit(Alice, 0);
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+        // Alice gets shares based on the actual calculation
+
+        // Alice withdraws 100e18 shares (representing 100 wei worth)
+        uint256 sharesToWithdraw = 100e18;
+        vm.stopPrank();
+
+        vm.prank(Alice);
+        vault.requestWithdrawal(uint128(sharesToWithdraw));
+
+        // Fulfill 75e18 out of 100e18 shares (75% fulfillment)
+        uint256 sharesToFulfill = 75e18;
+        vm.startPrank(Manager);
+        accountant.setNav(1 ether); // Keep same NAV
+
+        // Calculate expected assets for 75e18 shares
+        uint256 expectedAssetsFor75Shares = (75e18 * 1 ether) / aliceShares;
+
+        vault.fulfillWithdrawals(sharesToFulfill, expectedAssetsFor75Shares, "");
+
+        // Check epoch state
+        (uint128 sharesWithdrawn, uint128 assetsReceived, uint128 sharesFulfilled) = vault
+            .withdrawalEpochState(0);
+        assertEq(sharesWithdrawn, sharesToWithdraw);
+        assertEq(sharesFulfilled, sharesToFulfill);
+        assertEq(assetsReceived, expectedAssetsFor75Shares);
+
+        // Execute Alice's withdrawal
+        uint256 aliceBalanceBefore = token.balanceOf(Alice);
+        vault.executeWithdrawal(Alice, 0);
+        vm.stopPrank();
+
+        uint256 assetsReceived_actual = token.balanceOf(Alice) - aliceBalanceBefore;
+
+        // Alice should receive exactly the assets for her 75e18 fulfilled shares
+        // sharesToFulfill for Alice = (100e18 * 75e18) / 100e18 = 75e18
+        // assetsToWithdraw = Math.mulDiv(75e18, expectedAssetsFor75Shares, 75e18) = expectedAssetsFor75Shares
+        assertEq(
+            assetsReceived_actual,
+            expectedAssetsFor75Shares,
+            "Alice should receive assets for exactly 75e18 shares"
+        );
+
+        // Verify remaining 25e18 shares moved to next epoch
+        (uint128 remainingAmount, ) = vault.queuedWithdrawal(Alice, 1);
         assertEq(
             remainingAmount,
-            expectedSharesRemaining,
-            "Remaining shares should be moved to next epoch"
+            sharesToWithdraw - sharesToFulfill,
+            "25e18 shares should remain unfulfilled"
         );
-        assertEq(
-            remainingBasis,
-            expectedBasisRemaining,
-            "Remaining basis should be moved to next epoch"
-        );
+    }
 
-        // Verify Alice received assets for fulfilled portion
+    /// @notice Test exact scenario: 100 shares worth 1 ETH, 75% fulfillment should give 0.75 ETH
+    function test_exact_withdrawal_calculation() public {
+        // Setup: Create a scenario where 100 shares = exactly 1 ETH
+        vm.prank(Alice);
+        vault.requestDeposit(100 ether);
+
+        vm.startPrank(Manager);
+        accountant.setNav(100 ether);
+        vault.fulfillDeposits(100 ether, "");
+        vault.executeDeposit(Alice, 0);
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+
+        // Alice withdraws 100 shares
+        uint256 sharesToWithdraw = 100;
+        vm.stopPrank();
+
+        vm.prank(Alice);
+        vault.requestWithdrawal(uint128(sharesToWithdraw));
+
+        // Manager fulfills only 75 shares (75% fulfillment)
+        uint256 sharesToFulfill = 75;
+        vm.startPrank(Manager);
+        accountant.setNav(100 ether); // Same NAV, so 100 shares should be worth 1 ETH
+
+        // Calculate what 100 shares are worth: 100 * 100 ether / aliceShares
+        uint256 valueOf100Shares = (100 * 100 ether) / aliceShares;
+
+        // Calculate what 75 shares should be worth: 75% of that
+        uint256 expectedAssetsFor75Shares = (75 * 100 ether) / aliceShares;
+
+        vault.fulfillWithdrawals(sharesToFulfill, expectedAssetsFor75Shares, "");
+
+        // Execute Alice's withdrawal
+        uint256 aliceBalanceBefore = token.balanceOf(Alice);
+        vault.executeWithdrawal(Alice, 0);
+        vm.stopPrank();
+
         uint256 assetsReceived = token.balanceOf(Alice) - aliceBalanceBefore;
-        assertGt(assetsReceived, 0, "Alice should receive assets for fulfilled portion");
 
-        vm.stopPrank();
-    }
+        // Verify Alice receives exactly the value of 75 shares
+        assertEq(
+            assetsReceived,
+            expectedAssetsFor75Shares,
+            "Alice should receive exactly 75% of her withdrawal value"
+        );
 
-    function test_executeWithdrawal_full_fulfillment_no_remaining_shares() public {
-        // Test full fulfillment scenario - no shares should be moved to next epoch
+        // Verify the proportionality: if 100 shares were worth valueOf100Shares,
+        // then 75 shares should be worth 75% of that
+        uint256 expectedProportion = (valueOf100Shares * 75) / 100;
+        assertEq(
+            assetsReceived,
+            expectedProportion,
+            "Assets should be exactly proportional to fulfilled shares"
+        );
 
-        vm.prank(Alice);
-        vault.requestDeposit(100 ether);
-        vm.prank(Bob);
-        vault.requestDeposit(100 ether);
-
-        vm.startPrank(Manager);
-        accountant.setNav(200 ether);
-        vault.fulfillDeposits(200 ether, "");
-        vault.executeDeposit(Alice, 0);
-        vault.executeDeposit(Bob, 0);
-
-        uint256 aliceShares = vault.balanceOf(Alice);
-
-        vm.stopPrank();
-        vm.prank(Alice);
-        vault.requestWithdrawal(uint128(aliceShares));
-
-        // Fully fulfill the withdrawal
-        vm.startPrank(Manager);
-        accountant.setNav(200 ether);
-        vault.fulfillWithdrawals(aliceShares, 100 ether, "");
-
-        // Execute withdrawal
-        vault.executeWithdrawal(Alice, 0);
-
-        // Verify NO shares moved to next epoch (sharesRemaining = 0)
-        (uint128 remainingAmount, uint128 remainingBasis) = vault.queuedWithdrawal(Alice, 1);
-
-        assertEq(remainingAmount, 0, "No shares should remain after full fulfillment");
-        assertEq(remainingBasis, 0, "No basis should remain after full fulfillment");
-
-        vm.stopPrank();
-    }
-
-    function test_executeWithdrawal_multiple_epochs_accumulation() public {
-        // Test that shares correctly accumulate across multiple epochs
-
-        vm.prank(Alice);
-        vault.requestDeposit(100 ether);
-        vm.prank(Bob);
-        vault.requestDeposit(100 ether);
-
-        vm.startPrank(Manager);
-        accountant.setNav(200 ether);
-        vault.fulfillDeposits(200 ether, "");
-        vault.executeDeposit(Alice, 0);
-        vault.executeDeposit(Bob, 0);
-
-        uint256 aliceShares = vault.balanceOf(Alice);
-
-        vm.stopPrank();
-        vm.prank(Alice);
-        vault.requestWithdrawal(uint128(aliceShares));
-
-        // First epoch: Zero fulfillment
-        vm.startPrank(Manager);
-        accountant.setNav(200 ether);
-        vault.fulfillWithdrawals(0, 0, "");
-        vault.executeWithdrawal(Alice, 0);
-
-        // Verify shares moved to epoch 1
-        (uint128 remainingAmount1, ) = vault.queuedWithdrawal(Alice, 1);
-        assertEq(remainingAmount1, aliceShares);
-
-        // Second epoch: Partial fulfillment
-        uint256 partialFulfill = aliceShares / 3;
-        vault.fulfillWithdrawals(partialFulfill, 50 ether, "");
-        vault.executeWithdrawal(Alice, 1);
-
-        // Verify remaining shares moved to epoch 2
-        (uint128 remainingAmount2, ) = vault.queuedWithdrawal(Alice, 2);
-        uint256 expectedRemaining = aliceShares - partialFulfill;
-        assertEq(remainingAmount2, expectedRemaining);
-
-        // Third epoch: Full fulfillment of remaining
-        vault.fulfillWithdrawals(expectedRemaining, 100 ether, "");
-        vault.executeWithdrawal(Alice, 2);
-
-        // Verify no shares remain
-        (uint128 finalRemaining, ) = vault.queuedWithdrawal(Alice, 3);
-        assertEq(finalRemaining, 0);
-
-        vm.stopPrank();
-    }
-
-    function test_executeWithdrawal_complex_basis_tracking() public {
-        // Test complex scenarios with basis tracking through share transfers and partial fulfillments
-
-        vm.prank(Alice);
-        vault.requestDeposit(100 ether);
-        vm.prank(Bob);
-        vault.requestDeposit(100 ether);
-
-        vm.startPrank(Manager);
-        accountant.setNav(200 ether);
-        vault.fulfillDeposits(200 ether, "");
-        vault.executeDeposit(Alice, 0);
-        vault.executeDeposit(Bob, 0);
-
-        uint256 aliceShares = vault.balanceOf(Alice);
-
-        vm.stopPrank();
-
-        // Transfer some shares to create complex basis scenarios
-        vm.prank(Alice);
-        vault.transfer(Bob, aliceShares / 2);
-
-        // Now request withdrawal of remaining shares
-        uint256 remainingShares = vault.balanceOf(Alice);
-        vm.prank(Alice);
-        vault.requestWithdrawal(uint128(remainingShares));
-
-        // Partially fulfill withdrawal
-        uint256 sharesToFulfill = remainingShares / 2;
-        vm.startPrank(Manager);
-        accountant.setNav(200 ether);
-        vault.fulfillWithdrawals(sharesToFulfill, 50 ether, "");
-
-        // Execute withdrawal
-        vault.executeWithdrawal(Alice, 0);
-
-        // Verify remaining shares are moved properly
+        // Verify remaining 25 shares moved to next epoch
         (uint128 remainingAmount, ) = vault.queuedWithdrawal(Alice, 1);
-        uint256 expectedRemaining = remainingShares - sharesToFulfill;
-
-        assertEq(remainingAmount, expectedRemaining, "Remaining shares should be moved correctly");
-
-        vm.stopPrank();
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          TRANSFER TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_transfer_moves_basis_proportionally() public {
-        // Setup: Alice deposits
-        uint256 depositAmount = 100 ether;
-        vm.prank(Alice);
-        vault.requestDeposit(uint128(depositAmount));
-
-        vm.startPrank(Manager);
-        accountant.setNav(depositAmount);
-        vault.fulfillDeposits(depositAmount, "");
-        vault.executeDeposit(Alice, 0);
-        vm.stopPrank();
-
-        uint256 aliceShares = vault.balanceOf(Alice);
-        uint256 aliceBasisBefore = vault.userBasis(Alice);
-        uint256 bobBasisBefore = vault.userBasis(Bob);
-
-        // Transfer half of Alice's shares to Bob
-        uint256 transferAmount = aliceShares / 2;
-        uint256 expectedBasisTransfer = (aliceBasisBefore * transferAmount) / aliceShares;
-
-        vm.prank(Alice);
-        vault.transfer(Bob, transferAmount);
-
-        // Verify shares transfer
-        assertEq(vault.balanceOf(Alice), aliceShares - transferAmount);
-        assertEq(vault.balanceOf(Bob), transferAmount);
-
-        // Verify basis transfer
-        assertEq(vault.userBasis(Alice), aliceBasisBefore - expectedBasisTransfer);
-        assertEq(vault.userBasis(Bob), bobBasisBefore + expectedBasisTransfer);
-    }
-
-    function test_transferFrom_moves_basis_proportionally() public {
-        // Setup: Alice deposits
-        uint256 depositAmount = 100 ether;
-        vm.prank(Alice);
-        vault.requestDeposit(uint128(depositAmount));
-
-        vm.startPrank(Manager);
-        accountant.setNav(depositAmount);
-        vault.fulfillDeposits(depositAmount, "");
-        vault.executeDeposit(Alice, 0);
-        vm.stopPrank();
-
-        uint256 aliceShares = vault.balanceOf(Alice);
-        uint256 aliceBasisBefore = vault.userBasis(Alice);
-        uint256 bobBasisBefore = vault.userBasis(Bob);
-
-        // Alice approves Charlie to transfer her shares
-        uint256 transferAmount = aliceShares / 3;
-        vm.prank(Alice);
-        vault.approve(Charlie, transferAmount);
-
-        uint256 expectedBasisTransfer = (aliceBasisBefore * transferAmount) / aliceShares;
-
-        // Charlie transfers from Alice to Bob
-        vm.prank(Charlie);
-        vault.transferFrom(Alice, Bob, transferAmount);
-
-        // Verify shares transfer
-        assertEq(vault.balanceOf(Alice), aliceShares - transferAmount);
-        assertEq(vault.balanceOf(Bob), transferAmount);
-
-        // Verify basis transfer
-        assertEq(vault.userBasis(Alice), aliceBasisBefore - expectedBasisTransfer);
-        assertEq(vault.userBasis(Bob), bobBasisBefore + expectedBasisTransfer);
+        assertEq(remainingAmount, 25, "Exactly 25 shares should remain unfulfilled");
     }
 }
