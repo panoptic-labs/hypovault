@@ -54,18 +54,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Emitted when a vault is created.
-    /// @param underlyingToken The address of the underlying token
-    /// @param manager The address of the vault manager
-    /// @param accountant The address of the vault accountant
-    /// @param performanceFeeBps The performance fee in basis points
-    event VaultCreated(
-        address indexed underlyingToken,
-        address indexed manager,
-        IVaultAccountant indexed accountant,
-        uint256 performanceFeeBps
-    );
-
     /// @notice Emitted when the manager address is updated
     /// @param previousManager The address of the previous manager
     /// @param newManager The address of the new manager
@@ -218,8 +206,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
         accountant = _accountant;
         performanceFeeBps = _performanceFeeBps;
         totalSupply = 1_000_000;
-
-        emit VaultCreated(underlyingToken, manager, accountant, performanceFeeBps);
     }
 
     /*//////////////////////////////////////////////////////////////
