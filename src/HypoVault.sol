@@ -54,6 +54,36 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Emitted when a vault is created.
+    /// @param underlyingToken The address of the underlying token
+    /// @param manager The address of the vault manager
+    /// @param accountant The address of the vault accountant
+    /// @param performanceFeeBps The performance fee in basis points
+    event VaultCreated(
+        address indexed underlyingToken,
+        address indexed manager,
+        IVaultAccountant indexed accountant,
+        uint256 performanceFeeBps
+    );
+
+    /// @notice Emitted when the manager address is updated
+    /// @param previousManager The address of the previous manager
+    /// @param newManager The address of the new manager
+    event ManagerUpdated(address indexed previousManager, address indexed newManager);
+
+    /// @notice Emitted when the accountant address is updated
+    /// @param oldAccountant The address of the previous accountant
+    /// @param newAccountant The address of the new accountant
+    event AccountantUpdated(
+        IVaultAccountant indexed oldAccountant,
+        IVaultAccountant indexed newAccountant
+    );
+
+    /// @notice Emitted when the fee wallet address is updated
+    /// @param oldFeeWallet The address of the previous fee wallet
+    /// @param newFeeWallet The address of the new fee wallet
+    event FeeWalletUpdated(address indexed oldFeeWallet, address indexed newFeeWallet);
+
     /// @notice Emitted when a deposit is requested.
     /// @param user The address that requested the deposit
     /// @param assets The amount of assets requested
@@ -188,6 +218,8 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
         accountant = _accountant;
         performanceFeeBps = _performanceFeeBps;
         totalSupply = 1_000_000;
+
+        emit VaultCreated(underlyingToken, manager, accountant, performanceFeeBps);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -202,23 +234,29 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
 
     /// @notice Sets the manager.
     /// @dev Can only be called by the owner.
-    /// @param _manager The new manager.
-    function setManager(address _manager) external onlyOwner {
-        manager = _manager;
+    /// @param _newManager The new manager.
+    function setManager(address _newManager) external onlyOwner {
+        address oldManager = manager;
+        manager = _newManager;
+        emit ManagerUpdated(oldManager, _newManager);
     }
 
     /// @notice Sets the accountant.
     /// @dev Can only be called by the owner.
-    /// @param _accountant The new accountant.
-    function setAccountant(IVaultAccountant _accountant) external onlyOwner {
-        accountant = _accountant;
+    /// @param _newAccountant The new accountant.
+    function setAccountant(IVaultAccountant _newAccountant) external onlyOwner {
+        IVaultAccountant oldAccountant = accountant;
+        accountant = _newAccountant;
+        emit AccountantUpdated(oldAccountant, _newAccountant);
     }
 
     /// @notice Sets the wallet that receives the performance fee.
     /// @dev Can only be called by the owner.
-    /// @param _feeWallet The new fee wallet.
-    function setFeeWallet(address _feeWallet) external onlyOwner {
-        feeWallet = _feeWallet;
+    /// @param _newFeeWallet The new fee wallet.
+    function setFeeWallet(address _newFeeWallet) external onlyOwner {
+        address oldFeeWallet = feeWallet;
+        feeWallet = _newFeeWallet;
+        emit FeeWalletUpdated(oldFeeWallet, _newFeeWallet);
     }
 
     /*//////////////////////////////////////////////////////////////
