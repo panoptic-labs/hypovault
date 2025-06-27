@@ -55,9 +55,9 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Emitted when the manager address is updated
-    /// @param previousManager The address of the previous manager
+    /// @param oldManager The address of the previous manager
     /// @param newManager The address of the new manager
-    event ManagerUpdated(address indexed previousManager, address indexed newManager);
+    event ManagerUpdated(address indexed oldManager, address indexed newManager);
 
     /// @notice Emitted when the accountant address is updated
     /// @param oldAccountant The address of the previous accountant
