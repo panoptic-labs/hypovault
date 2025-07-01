@@ -40,6 +40,45 @@ contract VaultAccountantMock {
     }
 }
 
+// Mock contract to test manage function calldata passing
+contract MockTarget {
+    uint256 public value;
+    bytes public lastCalldata;
+    address public lastCaller;
+    uint256 public lastValue;
+    bool public wasCalled;
+
+    function simpleFunction(uint256 _value) external payable {
+        value = _value;
+        lastCalldata = msg.data;
+        lastCaller = msg.sender;
+        lastValue = msg.value;
+        wasCalled = true;
+    }
+
+    function complexFunction(
+        uint256 a,
+        string memory b,
+        address c,
+        bytes memory d
+    ) external payable returns (uint256, string memory) {
+        value = a;
+        lastCalldata = msg.data;
+        lastCaller = msg.sender;
+        lastValue = msg.value;
+        wasCalled = true;
+        return (a * 2, string(abi.encodePacked(b, "_modified")));
+    }
+
+    function revertingFunction() external pure {
+        revert("Test revert");
+    }
+
+    function getStoredData() external view returns (uint256, bytes memory, address, uint256, bool) {
+        return (value, lastCalldata, lastCaller, lastValue, wasCalled);
+    }
+}
+
 contract HypoVaultTest is Test {
     VaultAccountantMock public accountant;
     HypoVault public vault;
@@ -1616,5 +1655,390 @@ contract HypoVaultTest is Test {
         // Verify remaining 25 shares moved to next epoch
         (uint128 remainingAmount, ) = vault.queuedWithdrawal(Alice, 1);
         assertEq(remainingAmount, 25, "Exactly 25 shares should remain unfulfilled");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        BASIS TRANSFER TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_basis_transfer_on_share_transfer() public {
+        // Setup: Alice deposits and gets shares
+        vm.prank(Alice);
+        vault.requestDeposit(1000 ether);
+
+        vm.startPrank(Manager);
+        accountant.setNav(1000 ether);
+        vault.fulfillDeposits(1000 ether, "");
+        vault.executeDeposit(Alice, 0);
+        vm.stopPrank();
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+        uint256 aliceBasis = vault.userBasis(Alice);
+        assertEq(aliceBasis, 1000 ether);
+
+        // Alice transfers half her shares to Bob
+        uint256 sharesToTransfer = aliceShares / 2;
+        vm.prank(Alice);
+        vault.transfer(Bob, sharesToTransfer);
+
+        // Check that basis was transferred proportionally
+        uint256 expectedBasisTransferred = (aliceBasis * sharesToTransfer) / aliceShares;
+        assertEq(vault.userBasis(Alice), aliceBasis - expectedBasisTransferred);
+        assertEq(vault.userBasis(Bob), expectedBasisTransferred);
+
+        // Check share balances
+        assertEq(vault.balanceOf(Alice), aliceShares - sharesToTransfer);
+        assertEq(vault.balanceOf(Bob), sharesToTransfer);
+
+        // Expected values should be exactly half
+        assertEq(vault.userBasis(Alice), 500 ether);
+        assertEq(vault.userBasis(Bob), 500 ether);
+    }
+
+    function test_basis_transfer_on_transferFrom() public {
+        // Setup: Alice deposits and gets shares
+        vm.prank(Alice);
+        vault.requestDeposit(2000 ether);
+
+        vm.startPrank(Manager);
+        accountant.setNav(2000 ether);
+        vault.fulfillDeposits(2000 ether, "");
+        vault.executeDeposit(Alice, 0);
+        vm.stopPrank();
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+        uint256 aliceBasis = vault.userBasis(Alice);
+
+        // Alice approves Charlie to transfer her shares
+        vm.prank(Alice);
+        vault.approve(Charlie, aliceShares);
+
+        // Charlie transfers 25% of Alice's shares to Dave
+        uint256 sharesToTransfer = aliceShares / 4;
+        vm.prank(Charlie);
+        vault.transferFrom(Alice, Dave, sharesToTransfer);
+
+        // Check that basis was transferred proportionally
+        uint256 expectedBasisTransferred = (aliceBasis * sharesToTransfer) / aliceShares;
+        assertEq(vault.userBasis(Alice), aliceBasis - expectedBasisTransferred);
+        assertEq(vault.userBasis(Dave), expectedBasisTransferred);
+
+        // Check share balances
+        assertEq(vault.balanceOf(Alice), aliceShares - sharesToTransfer);
+        assertEq(vault.balanceOf(Dave), sharesToTransfer);
+
+        // Expected values should be 75% and 25% respectively
+        assertEq(vault.userBasis(Alice), 1500 ether);
+        assertEq(vault.userBasis(Dave), 500 ether);
+    }
+
+    function test_basis_transfer_multiple_transfers() public {
+        // Setup: Alice deposits
+        vm.prank(Alice);
+        vault.requestDeposit(1200 ether);
+
+        vm.startPrank(Manager);
+        accountant.setNav(1200 ether);
+        vault.fulfillDeposits(1200 ether, "");
+        vault.executeDeposit(Alice, 0);
+        vm.stopPrank();
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+        uint256 aliceBasisInitial = vault.userBasis(Alice);
+
+        // Alice transfers 1/3 of her shares to Bob
+        uint256 sharesToBob = aliceShares / 3;
+        vm.prank(Alice);
+        vault.transfer(Bob, sharesToBob);
+
+        // Alice transfers 1/4 of her remaining shares to Charlie
+        uint256 aliceSharesAfterBob = vault.balanceOf(Alice);
+        uint256 sharesToCharlie = aliceSharesAfterBob / 4;
+        vm.prank(Alice);
+        vault.transfer(Charlie, sharesToCharlie);
+
+        // Check final basis distribution
+        uint256 aliceFinalBasis = vault.userBasis(Alice);
+        uint256 bobBasis = vault.userBasis(Bob);
+        uint256 charlieBasis = vault.userBasis(Charlie);
+
+        // Total basis should be conserved
+        assertEq(aliceFinalBasis + bobBasis + charlieBasis, aliceBasisInitial);
+
+        // Bob should have exactly 1/3 of original basis
+        assertEq(bobBasis, 400 ether);
+
+        // Charlie should have 1/4 of the remaining basis (1/4 * 2/3 * 1200 = 200)
+        assertEq(charlieBasis, 200 ether);
+
+        // Alice should have the rest
+        assertEq(aliceFinalBasis, 600 ether);
+    }
+
+    function test_basis_transfer_with_zero_balance() public {
+        // Setup: Alice has no shares
+        assertEq(vault.balanceOf(Alice), 0);
+        assertEq(vault.userBasis(Alice), 0);
+
+        // Alice tries to transfer 0 shares to Bob (should not revert)
+        vm.prank(Alice);
+        vault.transfer(Bob, 0);
+
+        // No basis should be transferred
+        assertEq(vault.userBasis(Alice), 0);
+        assertEq(vault.userBasis(Bob), 0);
+    }
+
+    function test_basis_transfer_precision() public {
+        // Test with small amounts that might cause rounding issues
+        vm.prank(Alice);
+        vault.requestDeposit(3 wei);
+
+        vm.startPrank(Manager);
+        accountant.setNav(3 wei);
+        vault.fulfillDeposits(3 wei, "");
+        vault.executeDeposit(Alice, 0);
+        vm.stopPrank();
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+        uint256 aliceBasis = vault.userBasis(Alice);
+
+        // Transfer 1 share to Bob
+        vm.prank(Alice);
+        vault.transfer(Bob, 1);
+
+        // Check basis transfer precision
+        uint256 expectedBasisTransferred = (aliceBasis * 1) / aliceShares;
+        assertEq(vault.userBasis(Bob), expectedBasisTransferred);
+        assertEq(vault.userBasis(Alice), aliceBasis - expectedBasisTransferred);
+
+        // Total basis should be conserved
+        assertEq(vault.userBasis(Alice) + vault.userBasis(Bob), aliceBasis);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        MANAGE FUNCTION CALLDATA TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_manage_single_call_with_calldata() public {
+        MockTarget target = new MockTarget();
+
+        // Prepare calldata for simpleFunction(123)
+        bytes memory calldata_ = abi.encodeWithSignature("simpleFunction(uint256)", 123);
+        uint256 ethValue = 1 ether;
+
+        // Fund the vault with ETH for the call
+        vm.deal(address(vault), ethValue);
+
+        // Manager calls manage function
+        vm.prank(Manager);
+        bytes memory result = vault.manage(address(target), calldata_, ethValue);
+
+        // Verify the target function was called correctly
+        assertTrue(target.wasCalled());
+        assertEq(target.value(), 123);
+        assertEq(target.lastCaller(), address(vault));
+        assertEq(target.lastValue(), ethValue);
+
+        // Verify the calldata was passed through correctly
+        assertEq(target.lastCalldata(), calldata_);
+
+        // Result should be empty for a function that doesn't return anything
+        assertEq(result.length, 0);
+    }
+
+    function test_manage_single_call_with_return_data() public {
+        MockTarget target = new MockTarget();
+
+        // Prepare calldata for complexFunction
+        bytes memory calldata_ = abi.encodeWithSignature(
+            "complexFunction(uint256,string,address,bytes)",
+            456,
+            "test_string",
+            Alice,
+            hex"deadbeef"
+        );
+
+        vm.prank(Manager);
+        bytes memory result = vault.manage(address(target), calldata_, 0);
+
+        // Verify the target function was called correctly
+        assertTrue(target.wasCalled());
+        assertEq(target.value(), 456);
+        assertEq(target.lastCaller(), address(vault));
+        assertEq(target.lastValue(), 0);
+
+        // Decode and verify return data
+        (uint256 returnedNumber, string memory returnedString) = abi.decode(
+            result,
+            (uint256, string)
+        );
+        assertEq(returnedNumber, 912); // 456 * 2
+        assertEq(returnedString, "test_string_modified");
+    }
+
+    function test_manage_multiple_calls_with_calldata() public {
+        MockTarget target1 = new MockTarget();
+        MockTarget target2 = new MockTarget();
+        MockTarget target3 = new MockTarget();
+
+        // Prepare multiple calls
+        address[] memory targets = new address[](3);
+        bytes[] memory calldatas = new bytes[](3);
+        uint256[] memory values = new uint256[](3);
+
+        targets[0] = address(target1);
+        targets[1] = address(target2);
+        targets[2] = address(target3);
+
+        calldatas[0] = abi.encodeWithSignature("simpleFunction(uint256)", 100);
+        calldatas[1] = abi.encodeWithSignature("simpleFunction(uint256)", 200);
+        calldatas[2] = abi.encodeWithSignature(
+            "complexFunction(uint256,string,address,bytes)",
+            300,
+            "multi_call",
+            Bob,
+            hex"abcd"
+        );
+
+        values[0] = 0.1 ether;
+        values[1] = 0.2 ether;
+        values[2] = 0.3 ether;
+
+        // Fund the vault
+        vm.deal(address(vault), 1 ether);
+
+        // Manager calls manage function with multiple targets
+        vm.prank(Manager);
+        bytes[] memory results = vault.manage(targets, calldatas, values);
+
+        // Verify all calls were executed correctly
+        assertEq(results.length, 3);
+
+        // Check target1
+        assertTrue(target1.wasCalled());
+        assertEq(target1.value(), 100);
+        assertEq(target1.lastCaller(), address(vault));
+        assertEq(target1.lastValue(), 0.1 ether);
+        assertEq(target1.lastCalldata(), calldatas[0]);
+
+        // Check target2
+        assertTrue(target2.wasCalled());
+        assertEq(target2.value(), 200);
+        assertEq(target2.lastCaller(), address(vault));
+        assertEq(target2.lastValue(), 0.2 ether);
+        assertEq(target2.lastCalldata(), calldatas[1]);
+
+        // Check target3
+        assertTrue(target3.wasCalled());
+        assertEq(target3.value(), 300);
+        assertEq(target3.lastCaller(), address(vault));
+        assertEq(target3.lastValue(), 0.3 ether);
+        assertEq(target3.lastCalldata(), calldatas[2]);
+
+        // Verify return data from target3 (complex function)
+        (uint256 returnedNumber, string memory returnedString) = abi.decode(
+            results[2],
+            (uint256, string)
+        );
+        assertEq(returnedNumber, 600); // 300 * 2
+        assertEq(returnedString, "multi_call_modified");
+    }
+
+    function test_manage_call_with_revert() public {
+        MockTarget target = new MockTarget();
+
+        bytes memory calldata_ = abi.encodeWithSignature("revertingFunction()");
+
+        vm.prank(Manager);
+        vm.expectRevert("Test revert");
+        vault.manage(address(target), calldata_, 0);
+    }
+
+    function test_manage_authorization() public {
+        MockTarget target = new MockTarget();
+        bytes memory calldata_ = abi.encodeWithSignature("simpleFunction(uint256)", 123);
+
+        // Non-manager cannot call manage
+        vm.prank(Alice);
+        vm.expectRevert(HypoVault.NotManager.selector);
+        vault.manage(address(target), calldata_, 0);
+
+        // Non-manager cannot call multi-manage
+        address[] memory targets = new address[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        uint256[] memory values = new uint256[](1);
+
+        targets[0] = address(target);
+        calldatas[0] = calldata_;
+        values[0] = 0;
+
+        vm.prank(Alice);
+        vm.expectRevert(HypoVault.NotManager.selector);
+        vault.manage(targets, calldatas, values);
+    }
+
+    function test_manage_complex_calldata_encoding() public {
+        MockTarget target = new MockTarget();
+
+        // Create complex calldata manually with encoded data
+        bytes memory complexData = abi.encode(
+            uint256(999),
+            "complex_test",
+            Charlie,
+            [1, 2, 3, 4, 5],
+            "another_string"
+        );
+
+        bytes memory calldata_ = abi.encodeWithSignature(
+            "complexFunction(uint256,string,address,bytes)",
+            777,
+            "encoded_struct_test",
+            Dave,
+            complexData
+        );
+
+        vm.prank(Manager);
+        bytes memory result = vault.manage(address(target), calldata_, 0);
+
+        // Verify the call was made with exact calldata
+        assertTrue(target.wasCalled());
+        assertEq(target.value(), 777);
+        assertEq(target.lastCalldata(), calldata_);
+
+        // Verify return data
+        (uint256 returnedNumber, string memory returnedString) = abi.decode(
+            result,
+            (uint256, string)
+        );
+        assertEq(returnedNumber, 1554); // 777 * 2
+        assertEq(returnedString, "encoded_struct_test_modified");
+    }
+
+    function test_manage_empty_calldata() public {
+        MockTarget target = new MockTarget();
+
+        // Call with empty calldata (should trigger fallback if it exists)
+        bytes memory emptyCalldata = "";
+
+        vm.prank(Manager);
+        // This should revert since MockTarget doesn't have a fallback function
+        vm.expectRevert();
+        vault.manage(address(target), emptyCalldata, 0);
+    }
+
+    function test_manage_preserves_msg_sender() public {
+        MockTarget target = new MockTarget();
+
+        bytes memory calldata_ = abi.encodeWithSignature("simpleFunction(uint256)", 555);
+
+        vm.prank(Manager);
+        vault.manage(address(target), calldata_, 0);
+
+        // Verify that from the target's perspective, msg.sender was the vault
+        assertEq(target.lastCaller(), address(vault));
+
+        // The manager should not be visible to the target
+        assertTrue(target.lastCaller() != Manager);
     }
 }
