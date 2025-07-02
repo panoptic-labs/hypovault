@@ -59,8 +59,8 @@ contract MockTarget {
     function complexFunction(
         uint256 a,
         string memory b,
-        address c,
-        bytes memory d
+        address,
+        bytes memory
     ) external payable returns (uint256, string memory) {
         value = a;
         lastCalldata = msg.data;
@@ -138,7 +138,14 @@ contract HypoVaultTest is Test {
     function setUp() public {
         accountant = new VaultAccountantMock();
         token = new ERC20S("Test Token", "TEST", 18);
-        vault = new HypoVault(address(token), Manager, IVaultAccountant(address(accountant)), 100); // 1% performance fee
+        vault = new HypoVault(
+            address(token),
+            Manager,
+            IVaultAccountant(address(accountant)),
+            100,
+            "TEST",
+            "Test Token"
+        ); // 1% performance fee
         accountant.setExpectedVault(address(vault));
 
         // Set fee wallet
@@ -2041,4 +2048,490 @@ contract HypoVaultTest is Test {
         // The manager should not be visible to the target
         assertTrue(target.lastCaller() != Manager);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                        RECEIVE ETH/ERC20/ERC1155 TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_vault_can_receive_eth() public {
+        uint256 ethAmount = 1 ether;
+        uint256 vaultBalanceBefore = address(vault).balance;
+
+        vm.deal(Alice, ethAmount);
+        vm.prank(Alice);
+        (bool success, ) = address(vault).call{value: ethAmount}("");
+
+        assertTrue(success, "ETH transfer should succeed");
+        assertEq(
+            address(vault).balance,
+            vaultBalanceBefore + ethAmount,
+            "Vault should receive ETH"
+        );
+    }
+
+    function test_vault_can_receive_eth_from_manager() public {
+        uint256 ethAmount = 5 ether;
+
+        vm.deal(Manager, ethAmount);
+        vm.prank(Manager);
+        (bool success, ) = address(vault).call{value: ethAmount}("");
+
+        assertTrue(success, "ETH transfer from manager should succeed");
+        assertEq(address(vault).balance, ethAmount, "Vault should receive ETH from manager");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            ERC1155/ERC721 TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_vault_can_receive_erc1155_tokens() public {
+        MockERC1155 erc1155 = new MockERC1155();
+
+        uint256 tokenId = 1;
+        uint256 amount = 100;
+        bytes memory data = "";
+
+        erc1155.mint(Alice, tokenId, amount, data);
+
+        uint256 vaultBalanceBefore = erc1155.balanceOf(address(vault), tokenId);
+        uint256 aliceBalanceBefore = erc1155.balanceOf(Alice, tokenId);
+
+        vm.prank(Alice);
+        erc1155.safeTransferFrom(Alice, address(vault), tokenId, amount, data);
+
+        assertEq(
+            erc1155.balanceOf(address(vault), tokenId),
+            vaultBalanceBefore + amount,
+            "Vault should receive ERC1155 token"
+        );
+        assertEq(
+            erc1155.balanceOf(Alice, tokenId),
+            aliceBalanceBefore - amount,
+            "Alice should have transferred ERC1155 token"
+        );
+    }
+
+    function test_vault_can_receive_batch_erc1155_tokens() public {
+        MockERC1155 erc1155 = new MockERC1155();
+
+        uint256[] memory tokenIds = new uint256[](3);
+        uint256[] memory amounts = new uint256[](3);
+        tokenIds[0] = 1;
+        tokenIds[1] = 2;
+        tokenIds[2] = 3;
+        amounts[0] = 50;
+        amounts[1] = 100;
+        amounts[2] = 200;
+        bytes memory data = "";
+
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            erc1155.mint(Alice, tokenIds[i], amounts[i], data);
+        }
+
+        vm.prank(Alice);
+        erc1155.safeBatchTransferFrom(Alice, address(vault), tokenIds, amounts, data);
+
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            assertEq(
+                erc1155.balanceOf(address(vault), tokenIds[i]),
+                amounts[i],
+                "Vault should receive ERC1155 batch tokens"
+            );
+            assertEq(
+                erc1155.balanceOf(Alice, tokenIds[i]),
+                0,
+                "Alice should have transferred all ERC1155 tokens"
+            );
+        }
+    }
+
+    function test_vault_can_receive_erc721_tokens() public {
+        MockERC721 erc721 = new MockERC721();
+
+        uint256 tokenId = 1;
+
+        erc721.mint(Alice, tokenId);
+
+        assertEq(erc721.ownerOf(tokenId), Alice, "Alice should own the NFT initially");
+
+        vm.prank(Alice);
+        erc721.safeTransferFrom(Alice, address(vault), tokenId);
+
+        assertEq(erc721.ownerOf(tokenId), address(vault), "Vault should receive ERC721 token");
+        assertEq(erc721.balanceOf(address(vault)), 1, "Vault should have 1 NFT");
+        assertEq(erc721.balanceOf(Alice), 0, "Alice should have 0 NFTs");
+    }
+
+    function test_vault_can_receive_multiple_erc721_tokens() public {
+        MockERC721 erc721 = new MockERC721();
+
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = 1;
+        tokenIds[1] = 2;
+        tokenIds[2] = 3;
+
+        // Mint ERC721 tokens to Alice
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            erc721.mint(Alice, tokenIds[i]);
+        }
+
+        assertEq(erc721.balanceOf(Alice), 3, "Alice should have 3 NFTs initially");
+
+        // Transfer ERC721 tokens to vault
+        vm.startPrank(Alice);
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            erc721.safeTransferFrom(Alice, address(vault), tokenIds[i]);
+        }
+        vm.stopPrank();
+
+        // Verify vault received all tokens
+        assertEq(erc721.balanceOf(address(vault)), 3, "Vault should have 3 NFTs");
+        assertEq(erc721.balanceOf(Alice), 0, "Alice should have 0 NFTs");
+
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            assertEq(erc721.ownerOf(tokenIds[i]), address(vault), "Vault should own all NFTs");
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            DECIMALS TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_decimals_returns_underlying_token_decimals() public view {
+        // The underlying token (TEST) has 18 decimals
+        assertEq(vault.decimals(), 18, "Vault should return underlying token decimals");
+        assertEq(token.decimals(), 18, "Underlying token should have 18 decimals");
+    }
+
+    function test_decimals_with_different_underlying_decimals() public {
+        ERC20S token6 = new ERC20S("6 Decimal Token", "T6", 6);
+        ERC20S token8 = new ERC20S("8 Decimal Token", "T8", 8);
+        ERC20S token12 = new ERC20S("12 Decimal Token", "T12", 12);
+
+        HypoVault vault6 = new HypoVault(
+            address(token6),
+            Manager,
+            IVaultAccountant(address(accountant)),
+            100,
+            "V6",
+            "6 Decimal Vault"
+        );
+        HypoVault vault8 = new HypoVault(
+            address(token8),
+            Manager,
+            IVaultAccountant(address(accountant)),
+            100,
+            "V8",
+            "8 Decimal Vault"
+        );
+        HypoVault vault12 = new HypoVault(
+            address(token12),
+            Manager,
+            IVaultAccountant(address(accountant)),
+            100,
+            "V12",
+            "12 Decimal Vault"
+        );
+
+        assertEq(vault6.decimals(), 6, "6-decimal vault should return 6 decimals");
+        assertEq(vault8.decimals(), 8, "8-decimal vault should return 8 decimals");
+        assertEq(vault12.decimals(), 12, "12-decimal vault should return 12 decimals");
+    }
+
+    function test_decimals_with_non_standard_token() public {
+        MockTokenWithoutDecimals badToken = new MockTokenWithoutDecimals();
+        HypoVault vaultBad = new HypoVault(
+            address(badToken),
+            Manager,
+            IVaultAccountant(address(accountant)),
+            100,
+            "VB",
+            "Bad Token Vault"
+        );
+
+        assertEq(vaultBad.decimals(), 0, "Vault should return 0 decimals for non-standard token");
+    }
+}
+
+contract MockERC1155 {
+    mapping(uint256 => mapping(address => uint256)) private _balances;
+    mapping(address => mapping(address => bool)) private _operatorApprovals;
+
+    event TransferSingle(
+        address indexed operator,
+        address indexed from,
+        address indexed to,
+        uint256 id,
+        uint256 value
+    );
+    event TransferBatch(
+        address indexed operator,
+        address indexed from,
+        address indexed to,
+        uint256[] ids,
+        uint256[] values
+    );
+    event ApprovalForAll(address indexed account, address indexed operator, bool approved);
+
+    function balanceOf(address account, uint256 id) public view returns (uint256) {
+        return _balances[id][account];
+    }
+
+    function isApprovedForAll(address account, address operator) public view returns (bool) {
+        return _operatorApprovals[account][operator];
+    }
+
+    function setApprovalForAll(address operator, bool approved) public {
+        _operatorApprovals[msg.sender][operator] = approved;
+        emit ApprovalForAll(msg.sender, operator, approved);
+    }
+
+    function mint(address to, uint256 id, uint256 amount, bytes memory) public {
+        _balances[id][to] += amount;
+        emit TransferSingle(msg.sender, address(0), to, id, amount);
+    }
+
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 id,
+        uint256 amount,
+        bytes memory data
+    ) public {
+        require(from == msg.sender || isApprovedForAll(from, msg.sender), "Not approved");
+        require(_balances[id][from] >= amount, "Insufficient balance");
+
+        _balances[id][from] -= amount;
+        _balances[id][to] += amount;
+
+        emit TransferSingle(msg.sender, from, to, id, amount);
+
+        _doSafeTransferAcceptanceCheck(msg.sender, from, to, id, amount, data);
+    }
+
+    function safeBatchTransferFrom(
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) public {
+        require(from == msg.sender || isApprovedForAll(from, msg.sender), "Not approved");
+        require(ids.length == amounts.length, "Arrays length mismatch");
+
+        for (uint256 i = 0; i < ids.length; i++) {
+            uint256 id = ids[i];
+            uint256 amount = amounts[i];
+            require(_balances[id][from] >= amount, "Insufficient balance");
+
+            _balances[id][from] -= amount;
+            _balances[id][to] += amount;
+        }
+
+        emit TransferBatch(msg.sender, from, to, ids, amounts);
+
+        _doBatchSafeTransferAcceptanceCheck(msg.sender, from, to, ids, amounts, data);
+    }
+
+    function _doSafeTransferAcceptanceCheck(
+        address operator,
+        address from,
+        address to,
+        uint256 id,
+        uint256 amount,
+        bytes memory data
+    ) private {
+        if (to.code.length > 0) {
+            try IERC1155Receiver(to).onERC1155Received(operator, from, id, amount, data) returns (
+                bytes4 response
+            ) {
+                if (response != IERC1155Receiver.onERC1155Received.selector) {
+                    revert("ERC1155: ERC1155Receiver rejected tokens");
+                }
+            } catch Error(string memory reason) {
+                revert(reason);
+            } catch {
+                revert("ERC1155: transfer to non ERC1155Receiver implementer");
+            }
+        }
+    }
+
+    function _doBatchSafeTransferAcceptanceCheck(
+        address operator,
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) private {
+        if (to.code.length > 0) {
+            try
+                IERC1155Receiver(to).onERC1155BatchReceived(operator, from, ids, amounts, data)
+            returns (bytes4 response) {
+                if (response != IERC1155Receiver.onERC1155BatchReceived.selector) {
+                    revert("ERC1155: ERC1155Receiver rejected tokens");
+                }
+            } catch Error(string memory reason) {
+                revert(reason);
+            } catch {
+                revert("ERC1155: transfer to non ERC1155Receiver implementer");
+            }
+        }
+    }
+}
+
+interface IERC1155Receiver {
+    function onERC1155Received(
+        address operator,
+        address from,
+        uint256 id,
+        uint256 value,
+        bytes calldata data
+    ) external returns (bytes4);
+
+    function onERC1155BatchReceived(
+        address operator,
+        address from,
+        uint256[] calldata ids,
+        uint256[] calldata values,
+        bytes calldata data
+    ) external returns (bytes4);
+}
+
+contract MockERC721 {
+    mapping(uint256 => address) private _owners;
+    mapping(address => uint256) private _balances;
+    mapping(uint256 => address) private _tokenApprovals;
+    mapping(address => mapping(address => bool)) private _operatorApprovals;
+
+    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
+    event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
+    event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
+
+    function balanceOf(address owner) public view returns (uint256) {
+        return _balances[owner];
+    }
+
+    function ownerOf(uint256 tokenId) public view returns (address) {
+        return _owners[tokenId];
+    }
+
+    function approve(address to, uint256 tokenId) public {
+        address owner = ownerOf(tokenId);
+        require(to != owner, "Approval to current owner");
+        require(msg.sender == owner || isApprovedForAll(owner, msg.sender), "Not approved");
+
+        _tokenApprovals[tokenId] = to;
+        emit Approval(owner, to, tokenId);
+    }
+
+    function getApproved(uint256 tokenId) public view returns (address) {
+        return _tokenApprovals[tokenId];
+    }
+
+    function setApprovalForAll(address operator, bool approved) public {
+        _operatorApprovals[msg.sender][operator] = approved;
+        emit ApprovalForAll(msg.sender, operator, approved);
+    }
+
+    function isApprovedForAll(address owner, address operator) public view returns (bool) {
+        return _operatorApprovals[owner][operator];
+    }
+
+    function mint(address to, uint256 tokenId) public {
+        require(to != address(0), "Mint to zero address");
+        require(_owners[tokenId] == address(0), "Token already minted");
+
+        _balances[to] += 1;
+        _owners[tokenId] = to;
+
+        emit Transfer(address(0), to, tokenId);
+    }
+
+    function safeTransferFrom(address from, address to, uint256 tokenId) public {
+        safeTransferFrom(from, to, tokenId, "");
+    }
+
+    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data) public {
+        require(_isApprovedOrOwner(msg.sender, tokenId), "Not approved");
+        _safeTransfer(from, to, tokenId, data);
+    }
+
+    function transferFrom(address from, address to, uint256 tokenId) public {
+        require(_isApprovedOrOwner(msg.sender, tokenId), "Not approved");
+        _transfer(from, to, tokenId);
+    }
+
+    function _isApprovedOrOwner(address spender, uint256 tokenId) internal view returns (bool) {
+        address owner = ownerOf(tokenId);
+        return (spender == owner ||
+            getApproved(tokenId) == spender ||
+            isApprovedForAll(owner, spender));
+    }
+
+    function _transfer(address from, address to, uint256 tokenId) internal {
+        require(ownerOf(tokenId) == from, "Transfer from incorrect owner");
+        require(to != address(0), "Transfer to zero address");
+
+        // Clear approvals from the previous owner
+        _tokenApprovals[tokenId] = address(0);
+
+        _balances[from] -= 1;
+        _balances[to] += 1;
+        _owners[tokenId] = to;
+
+        emit Transfer(from, to, tokenId);
+    }
+
+    function _safeTransfer(address from, address to, uint256 tokenId, bytes memory data) internal {
+        _transfer(from, to, tokenId);
+        require(
+            _checkOnERC721Received(from, to, tokenId, data),
+            "Transfer to non ERC721Receiver implementer"
+        );
+    }
+
+    function _checkOnERC721Received(
+        address from,
+        address to,
+        uint256 tokenId,
+        bytes memory data
+    ) private returns (bool) {
+        if (to.code.length > 0) {
+            try IERC721Receiver(to).onERC721Received(msg.sender, from, tokenId, data) returns (
+                bytes4 retval
+            ) {
+                return retval == IERC721Receiver.onERC721Received.selector;
+            } catch (bytes memory reason) {
+                if (reason.length == 0) {
+                    revert("Transfer to non ERC721Receiver implementer");
+                } else {
+                    assembly {
+                        revert(add(32, reason), mload(reason))
+                    }
+                }
+            }
+        } else {
+            return true;
+        }
+    }
+}
+
+interface IERC721Receiver {
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) external returns (bytes4);
+}
+
+// Mock token that doesn't implement decimals() properly
+contract MockTokenWithoutDecimals {
+    string public name = "Bad Token";
+    string public symbol = "BAD";
+    uint256 public totalSupply = 1000000;
+    mapping(address => uint256) public balanceOf;
+
+    // Intentionally not implementing decimals() function to test fallback behavior
 }

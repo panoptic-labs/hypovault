@@ -4,8 +4,11 @@ pragma solidity ^0.8.28;
 // Interfaces
 import {ERC20Minimal} from "lib/panoptic-v1.1/contracts/tokens/ERC20Minimal.sol";
 import {IERC20} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IVaultAccountant} from "./interfaces/IVaultAccountant.sol";
 // Base
+import {ERC721Holder} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC721/utils/ERC721Holder.sol";
+import {ERC1155Holder} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import {Multicall} from "lib/panoptic-v1.1/contracts/base/Multicall.sol";
 import {Ownable} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 // Libraries
@@ -15,7 +18,7 @@ import {SafeTransferLib} from "lib/panoptic-v1.1/contracts/libraries/SafeTransfe
 
 /// @author Axicon Labs Limited
 /// @notice A vault in which a manager allocates assets deposited by users and distributes profits asynchronously.
-contract HypoVault is ERC20Minimal, Multicall, Ownable {
+contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Holder {
     using Math for uint256;
     using Address for address;
     /*//////////////////////////////////////////////////////////////
@@ -156,6 +159,12 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     /// @notice Performance fee, in basis points, taken on each profitable withdrawal.
     uint256 public immutable performanceFeeBps;
 
+    /// @notice Symbol of the share token.
+    string public symbol;
+
+    /// @notice Name of the share token.
+    string public name;
+
     /// @notice Wallet that receives the performance fee.
     address public feeWallet;
 
@@ -195,17 +204,38 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     /// @param _manager The account authorized to execute deposits, withdrawals, and make arbitrary function calls from the vault.
     /// @param _accountant The contract that reports the net asset value of the vault.
     /// @param _performanceFeeBps The performance fee, in basis points, taken on each profitable withdrawal.
+    /// @param _symbol The symbol of the share token.
+    /// @param _name The name of the share token.
     constructor(
         address _underlyingToken,
         address _manager,
         IVaultAccountant _accountant,
-        uint256 _performanceFeeBps
+        uint256 _performanceFeeBps,
+        string memory _symbol,
+        string memory _name
     ) {
         underlyingToken = _underlyingToken;
         manager = _manager;
         accountant = _accountant;
         performanceFeeBps = _performanceFeeBps;
         totalSupply = 1_000_000;
+        symbol = _symbol;
+        name = _name;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                             TOKEN METADATA
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns the number of decimals in the share token.
+    /// @dev If the underlying token does not implement decimals(), returns 0.
+    /// @return The number of decimals in the share token
+    function decimals() external view returns (uint8) {
+        try IERC20Metadata(underlyingToken).decimals() returns (uint8 _decimals) {
+            return _decimals;
+        } catch {
+            return 0;
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -604,4 +634,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
 
         emit Transfer(from, address(0), amount);
     }
+
+    receive() external payable {}
 }
