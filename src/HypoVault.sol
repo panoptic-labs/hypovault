@@ -378,7 +378,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         uint256 sharesReceived = Math.mulDiv(
             userAssetsDeposited,
             _depositEpochState.sharesReceived,
-            _depositEpochState.assetsFulfilled
+            _depositEpochState.assetsFulfilled == 0 ? 1 : _depositEpochState.assetsFulfilled
         );
 
         // shares from pending deposits are already added to the supply at the start of every new epoch
@@ -413,7 +413,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         uint256 assetsToWithdraw = Math.mulDiv(
             sharesToFulfill,
             _withdrawalEpochState.assetsReceived,
-            _withdrawalEpochState.sharesFulfilled
+            _withdrawalEpochState.sharesFulfilled == 0 ? 1 : _withdrawalEpochState.sharesFulfilled
         );
 
         reservedWithdrawalAssets -= assetsToWithdraw;

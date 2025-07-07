@@ -132,8 +132,8 @@ contract PanopticVaultAccountant is Ownable {
                     int256(uint256(shortPremium.rightSlot())) -
                     int256(uint256(longPremium.rightSlot()));
                 poolExposure1 =
-                    int256(uint256(longPremium.leftSlot())) -
-                    int256(uint256(shortPremium.leftSlot()));
+                    int256(uint256(shortPremium.leftSlot())) -
+                    int256(uint256(longPremium.leftSlot()));
             }
 
             uint256 numLegs;
