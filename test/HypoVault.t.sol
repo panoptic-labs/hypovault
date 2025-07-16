@@ -96,8 +96,9 @@ contract HypoVaultTest is Test {
     uint256 constant BOOTSTRAP_SHARES = 1_000_000;
 
     // Events
-    event WithdrawalRequested(address indexed user, uint256 shares);
+    event WithdrawalRequested(address indexed user, uint256 shares, bool shouldRedeposit);
     event DepositRequested(address indexed user, uint256 amount);
+    event RedepositStatusChanged(address indexed user, uint256 indexed epoch, bool shouldRedeposit);
 
     /*//////////////////////////////////////////////////////////////
                             HELPER FUNCTIONS
@@ -2763,7 +2764,7 @@ contract HypoVaultTest is Test {
 
         // Expect WithdrawalRequested event
         vm.expectEmit(true, false, false, true);
-        emit WithdrawalRequested(Alice, sharesToWithdraw);
+        emit WithdrawalRequested(Alice, sharesToWithdraw, true);
 
         vm.prank(Manager);
         vault.requestWithdrawalFrom(Alice, uint128(sharesToWithdraw));
@@ -3645,6 +3646,148 @@ contract HypoVaultTest is Test {
         // Verify shares were restored
         assertEq(vault.balanceOf(Alice), aliceRemainingShares);
         assertEq(vault.balanceOf(Bob), bobRemainingShares);
+    }
+
+    function test_changeRedepositStatus_user_can_change_own_status() public {
+        // Setup: Alice deposits and requests withdrawal with redeposit=false
+        vm.prank(Alice);
+        vault.requestDeposit(1000 ether);
+
+        vm.startPrank(Manager);
+        accountant.setNav(1000 ether);
+        vault.fulfillDeposits(1000 ether, "");
+        vault.executeDeposit(Alice, 0);
+        vm.stopPrank();
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+
+        // Alice requests normal withdrawal (shouldRedeposit = false)
+        vm.prank(Alice);
+        vault.requestWithdrawal(uint128(aliceShares));
+
+        // Verify initial shouldRedeposit is false
+        (, , bool shouldRedeposit) = vault.queuedWithdrawal(Alice, 0);
+        assertFalse(shouldRedeposit);
+
+        // Alice changes her mind and wants to redeposit
+        vm.expectEmit(true, true, false, true);
+        emit RedepositStatusChanged(Alice, 0, true);
+
+        vm.prank(Alice);
+        vault.changeRedepositStatus(0, true);
+
+        // Verify shouldRedeposit is now true
+        (, , shouldRedeposit) = vault.queuedWithdrawal(Alice, 0);
+        assertTrue(shouldRedeposit);
+    }
+
+    function test_changeRedepositStatus_user_can_change_back_to_false() public {
+        // Setup: Manager requests withdrawal with redeposit=true for Alice
+        vm.prank(Alice);
+        vault.requestDeposit(1000 ether);
+
+        vm.startPrank(Manager);
+        accountant.setNav(1000 ether);
+        vault.fulfillDeposits(1000 ether, "");
+        vault.executeDeposit(Alice, 0);
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+        vault.requestWithdrawalFrom(Alice, uint128(aliceShares));
+        vm.stopPrank();
+
+        // Verify initial shouldRedeposit is true
+        (, , bool shouldRedeposit) = vault.queuedWithdrawal(Alice, 0);
+        assertTrue(shouldRedeposit);
+
+        // Alice changes her mind and wants normal withdrawal
+        vm.expectEmit(true, true, false, true);
+        emit RedepositStatusChanged(Alice, 0, false);
+
+        vm.prank(Alice);
+        vault.changeRedepositStatus(0, false);
+
+        // Verify shouldRedeposit is now false
+        (, , shouldRedeposit) = vault.queuedWithdrawal(Alice, 0);
+        assertFalse(shouldRedeposit);
+    }
+
+    function test_changeRedepositStatus_reverts_if_no_withdrawal() public {
+        // Try to change redeposit status for non-existent withdrawal
+        vm.prank(Alice);
+        vm.expectRevert(HypoVault.EpochNotFulfilled.selector);
+        vault.changeRedepositStatus(0, true);
+    }
+
+    function test_changeRedepositStatus_works_across_multiple_epochs() public {
+        // Setup: Alice deposits and requests withdrawals in different epochs
+        vm.prank(Alice);
+        vault.requestDeposit(2000 ether);
+
+        vm.startPrank(Manager);
+        accountant.setNav(2000 ether);
+        vault.fulfillDeposits(2000 ether, "");
+        vault.executeDeposit(Alice, 0);
+        vm.stopPrank();
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+        uint256 halfShares = aliceShares / 2;
+
+        // Epoch 0 withdrawal
+        vm.prank(Alice);
+        vault.requestWithdrawal(uint128(halfShares));
+
+        // Move to next epoch
+        vm.prank(Manager);
+        vault.fulfillWithdrawals(halfShares, halfShares, "");
+
+        // Epoch 1 withdrawal
+        vm.prank(Alice);
+        vault.requestWithdrawal(uint128(halfShares));
+
+        // Change redeposit status for epoch 1
+        vm.prank(Alice);
+        vault.changeRedepositStatus(1, true);
+
+        // Verify epoch 0 is still false, epoch 1 is true
+        (, , bool shouldRedeposit0) = vault.queuedWithdrawal(Alice, 0);
+        (, , bool shouldRedeposit1) = vault.queuedWithdrawal(Alice, 1);
+
+        assertFalse(shouldRedeposit0);
+        assertTrue(shouldRedeposit1);
+    }
+
+    function test_changeRedepositStatus_preserves_amount_and_basis() public {
+        // Setup: Alice deposits and requests withdrawal
+        vm.prank(Alice);
+        vault.requestDeposit(1000 ether);
+
+        vm.startPrank(Manager);
+        accountant.setNav(1000 ether);
+        vault.fulfillDeposits(1000 ether, "");
+        vault.executeDeposit(Alice, 0);
+        vm.stopPrank();
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+
+        vm.prank(Alice);
+        vault.requestWithdrawal(uint128(aliceShares));
+
+        // Get original values
+        (uint128 originalAmount, uint128 originalBasis, ) = vault.queuedWithdrawal(Alice, 0);
+
+        // Change redeposit status
+        vm.prank(Alice);
+        vault.changeRedepositStatus(0, true);
+
+        // Verify amount and basis are preserved
+        (uint128 newAmount, uint128 newBasis, bool shouldRedeposit) = vault.queuedWithdrawal(
+            Alice,
+            0
+        );
+
+        assertEq(newAmount, originalAmount);
+        assertEq(newBasis, originalBasis);
+        assertTrue(shouldRedeposit);
     }
 }
 

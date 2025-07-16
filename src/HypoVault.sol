@@ -85,7 +85,8 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @notice Emitted when a withdrawal is requested.
     /// @param user The address that requested the withdrawal
     /// @param shares The amount of shares requested
-    event WithdrawalRequested(address indexed user, uint256 shares);
+    /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
+    event WithdrawalRequested(address indexed user, uint256 shares, bool shouldRedeposit);
 
     /// @notice Emitted when a deposit is cancelled.
     /// @param user The address that requested the deposit
@@ -110,13 +111,21 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @param assets The amount of assets received
     /// @param performanceFee The amount of performance fee received
     /// @param epoch The epoch in which the withdrawal was executed
+    /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
     event WithdrawalExecuted(
         address indexed user,
         uint256 shares,
         uint256 assets,
         uint256 performanceFee,
-        uint256 epoch
+        uint256 epoch,
+        bool shouldRedeposit
     );
+
+    /// @notice Emitted when the redeposit status of a withdrawal request is changed.
+    /// @param user The address that changed the redeposit status
+    /// @param epoch The epoch of the withdrawal request
+    /// @param shouldRedeposit The new redeposit status
+    event RedepositStatusChanged(address indexed user, uint256 indexed epoch, bool shouldRedeposit);
 
     /// @notice Emitted when deposits are fulfilled.
     /// @param nextEpoch The epoch in which the deposits were fulfilled
@@ -335,7 +344,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         _burnVirtual(user, shares);
 
-        emit WithdrawalRequested(user, shares);
+        emit WithdrawalRequested(user, shares, shouldRedeposit);
     }
 
     /// @notice Cancels a deposit in the current (unfulfilled) epoch.
@@ -486,7 +495,29 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
             SafeTransferLib.safeTransfer(underlyingToken, user, assetsToWithdraw);
         }
 
-        emit WithdrawalExecuted(user, sharesToFulfill, assetsToWithdraw, performanceFee, epoch);
+        emit WithdrawalExecuted(
+            user,
+            sharesToFulfill,
+            assetsToWithdraw,
+            performanceFee,
+            epoch,
+            pendingWithdrawal.shouldRedeposit
+        );
+    }
+
+    /// @notice Changes the redeposit status of a withdrawal request for the caller.
+    /// @param epoch The epoch of the withdrawal request
+    /// @param shouldRedeposit The new redeposit status
+    function changeRedepositStatus(uint256 epoch, bool shouldRedeposit) external {
+        PendingWithdrawal memory pendingWithdrawal = queuedWithdrawal[msg.sender][epoch];
+
+        queuedWithdrawal[msg.sender][epoch] = PendingWithdrawal({
+            amount: pendingWithdrawal.amount,
+            basis: pendingWithdrawal.basis,
+            shouldRedeposit: shouldRedeposit
+        });
+
+        emit RedepositStatusChanged(msg.sender, epoch, shouldRedeposit);
     }
 
     /*//////////////////////////////////////////////////////////////
