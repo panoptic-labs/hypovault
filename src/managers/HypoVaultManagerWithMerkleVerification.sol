@@ -8,7 +8,6 @@ import "../interfaces/IHypoVault.sol";
 /// @notice Extends boring-vault's ManagerWithMerkleVerification with HypoVault-specific management functions
 /// @dev Inherits merkle tree verification for secure function calls while adding HypoVault operations
 contract HypovaultManagerWithMerkleVerification is ManagerWithMerkleVerification {
-
     /// @notice The HypoVault this manager operates on
     IHypoVault public immutable hypovault;
 
@@ -98,5 +97,4 @@ contract HypovaultManagerWithMerkleVerification is ManagerWithMerkleVerification
         return hypovault.manage(targets, data, values);
     }
     */
-    
 }
