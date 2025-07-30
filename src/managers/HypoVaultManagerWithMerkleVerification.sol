@@ -8,7 +8,6 @@ import "../interfaces/IHypoVault.sol";
 /// @notice Extends boring-vault's ManagerWithMerkleVerification with HypoVault-specific management functions
 /// @dev Inherits merkle tree verification for secure function calls while adding HypoVault operations
 contract HypovaultManagerWithMerkleVerification is ManagerWithMerkleVerification {
-
     //============================== ERRORS ===============================
 
     error HypovaultManager__Unauthorized();
@@ -76,6 +75,10 @@ contract HypovaultManagerWithMerkleVerification is ManagerWithMerkleVerification
         uint256 maxAssetsReceived,
         bytes memory managerInput
     ) external onlyStrategist {
-        IHypoVault(address(vault)).fulfillWithdrawals(sharesToFulfill, maxAssetsReceived, managerInput);
+        IHypoVault(address(vault)).fulfillWithdrawals(
+            sharesToFulfill,
+            maxAssetsReceived,
+            managerInput
+        );
     }
 }
