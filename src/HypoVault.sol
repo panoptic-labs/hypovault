@@ -239,13 +239,13 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Returns the number of decimals in the share token.
-    /// @dev If the underlying token does not implement decimals(), returns 0.
+    /// @dev If the underlying token does not implement decimals(), returns 18.
     /// @return The number of decimals in the share token
     function decimals() external view returns (uint8) {
         try IERC20Metadata(underlyingToken).decimals() returns (uint8 _decimals) {
             return _decimals;
         } catch {
-            return 0;
+            return 18;
         }
     }
 
@@ -313,8 +313,9 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @notice Requests a withdrawal of shares from any user and redeposits the assets into the vault upon withdrawal execution.
     /// @param user The user to initiate the withdrawal from
     /// @param shares The amount of shares to withdraw
-    function requestWithdrawalFrom(address user, uint128 shares) external onlyManager {
-        _requestWithdrawal(user, shares, true);
+    /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
+    function requestWithdrawalFrom(address user, uint128 shares, bool shouldRedeposit) external onlyManager {
+        _requestWithdrawal(user, shares, shouldRedeposit);
     }
 
     /// @notice Internal function to request a withdrawal of shares.
@@ -505,19 +506,18 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         );
     }
 
-    /// @notice Changes the redeposit status of a withdrawal request for the caller.
+    /// @notice Alters a caller's withdrawal request from one that redeposits to one that does not.
     /// @param epoch The epoch of the withdrawal request
-    /// @param shouldRedeposit The new redeposit status
-    function changeRedepositStatus(uint256 epoch, bool shouldRedeposit) external {
+    function optOutOfRedeposit(uint256 epoch) external {
         PendingWithdrawal memory pendingWithdrawal = queuedWithdrawal[msg.sender][epoch];
 
         queuedWithdrawal[msg.sender][epoch] = PendingWithdrawal({
             amount: pendingWithdrawal.amount,
             basis: pendingWithdrawal.basis,
-            shouldRedeposit: shouldRedeposit
+            shouldRedeposit: false
         });
 
-        emit RedepositStatusChanged(msg.sender, epoch, shouldRedeposit);
+        emit RedepositStatusChanged(msg.sender, epoch, false);
     }
 
     /*//////////////////////////////////////////////////////////////
