@@ -8,16 +8,26 @@ import "../interfaces/IHypoVault.sol";
 /// @notice Extends boring-vault's ManagerWithMerkleVerification with HypoVault-specific management functions
 /// @dev Inherits merkle tree verification for secure function calls while adding HypoVault operations
 contract HypovaultManagerWithMerkleVerification is ManagerWithMerkleVerification {
-    /// @notice The HypoVault this manager operates on
-    IHypoVault public immutable hypovault;
+
+    //============================== ERRORS ===============================
+
+    error HypovaultManager__Unauthorized();
+
+    //============================== MODIFIERS ===============================
+
+    /// @notice Modifier that restricts access to curators (addresses with merkle roots) or owner
+    modifier onlyStrategist() {
+        if (manageRoot[msg.sender] == bytes32(0) && msg.sender != owner) {
+            revert HypovaultManager__Unauthorized();
+        }
+        _;
+    }
 
     constructor(
         address _owner,
         address _hypovault,
         address _balancerVault
-    ) ManagerWithMerkleVerification(_owner, _hypovault, _balancerVault) {
-        hypovault = IHypoVault(_hypovault);
-    }
+    ) ManagerWithMerkleVerification(_owner, _hypovault, _balancerVault) {}
 
     /*//////////////////////////////////////////////////////////////
                         HYPOVAULT MANAGEMENT FUNCTIONS
@@ -25,14 +35,14 @@ contract HypovaultManagerWithMerkleVerification is ManagerWithMerkleVerification
 
     /// @notice Cancels a deposit in the current (unfulfilled) epoch
     /// @param depositor The address that requested the deposit
-    function cancelDeposit(address depositor) external requiresAuth {
-        hypovault.cancelDeposit(depositor);
+    function cancelDeposit(address depositor) external onlyStrategist {
+        IHypoVault(address(vault)).cancelDeposit(depositor);
     }
 
     /// @notice Cancels a withdrawal in the current (unfulfilled) epoch
     /// @param withdrawer The address that requested the withdrawal
-    function cancelWithdrawal(address withdrawer) external requiresAuth {
-        hypovault.cancelWithdrawal(withdrawer);
+    function cancelWithdrawal(address withdrawer) external onlyStrategist {
+        IHypoVault(address(vault)).cancelWithdrawal(withdrawer);
     }
 
     /// @notice Requests a withdrawal from any user with redeposit option
@@ -43,8 +53,8 @@ contract HypovaultManagerWithMerkleVerification is ManagerWithMerkleVerification
         address user,
         uint128 shares,
         bool shouldRedeposit
-    ) external requiresAuth {
-        hypovault.requestWithdrawalFrom(user, shares, shouldRedeposit);
+    ) external onlyStrategist {
+        IHypoVault(address(vault)).requestWithdrawalFrom(user, shares, shouldRedeposit);
     }
 
     /// @notice Fulfills deposit requests
@@ -53,8 +63,8 @@ contract HypovaultManagerWithMerkleVerification is ManagerWithMerkleVerification
     function fulfillDeposits(
         uint256 assetsToFulfill,
         bytes memory managerInput
-    ) external requiresAuth {
-        hypovault.fulfillDeposits(assetsToFulfill, managerInput);
+    ) external onlyStrategist {
+        IHypoVault(address(vault)).fulfillDeposits(assetsToFulfill, managerInput);
     }
 
     /// @notice Fulfills withdrawal requests
@@ -65,36 +75,7 @@ contract HypovaultManagerWithMerkleVerification is ManagerWithMerkleVerification
         uint256 sharesToFulfill,
         uint256 maxAssetsReceived,
         bytes memory managerInput
-    ) external requiresAuth {
-        hypovault.fulfillWithdrawals(sharesToFulfill, maxAssetsReceived, managerInput);
+    ) external onlyStrategist {
+        IHypoVault(address(vault)).fulfillWithdrawals(sharesToFulfill, maxAssetsReceived, managerInput);
     }
-
-    // TODO: If we wanted the ability to skip merkle verification, we could have these methods:
-    // though at that point, it makes less sense for this contract to be a child of ManagerWithMerkleVerification, and more sense
-    // to just fork ManagerWithMerkleVerification and remove the merkle verification parts + add the above methods
-    /*
-    /// @notice Makes an arbitrary function call from the HypoVault contract
-    /// @param target The target contract to call
-    /// @param data The calldata to send
-    /// @param value The ETH value to send
-    function manageHypovault(
-        address target,
-        bytes calldata data,
-        uint256 value
-    ) external requiresAuth returns (bytes memory result) {
-        return hypovault.manage(target, data, value);
-    }
-
-    /// @notice Makes arbitrary function calls from the HypoVault contract
-    /// @param targets The target contracts to call
-    /// @param data The calldata to send to each target
-    /// @param values The ETH values to send to each target
-    function manageHypovaultBatch(
-        address[] calldata targets,
-        bytes[] calldata data,
-        uint256[] calldata values
-    ) external requiresAuth returns (bytes[] memory results) {
-        return hypovault.manage(targets, data, values);
-    }
-    */
 }
