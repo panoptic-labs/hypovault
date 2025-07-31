@@ -170,7 +170,9 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
 
         // Unauthorized user should not be able to cancel deposit
         vm.prank(unauthorized);
-        vm.expectRevert(HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector);
+        vm.expectRevert(
+            HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector
+        );
         manager.cancelDeposit(alice);
     }
 
@@ -183,7 +185,9 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
 
         // Address with no manage root should not be able to cancel deposit
         vm.prank(noRoot);
-        vm.expectRevert(HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector);
+        vm.expectRevert(
+            HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector
+        );
         manager.cancelDeposit(alice);
     }
 
@@ -603,19 +607,29 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         // Test that all manager functions revert for unauthorized users
         vm.startPrank(unauthorized);
 
-        vm.expectRevert(HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector);
+        vm.expectRevert(
+            HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector
+        );
         manager.cancelDeposit(alice);
 
-        vm.expectRevert(HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector);
+        vm.expectRevert(
+            HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector
+        );
         manager.cancelWithdrawal(alice);
 
-        vm.expectRevert(HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector);
+        vm.expectRevert(
+            HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector
+        );
         manager.requestWithdrawalFrom(alice, 100, true);
 
-        vm.expectRevert(HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector);
+        vm.expectRevert(
+            HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector
+        );
         manager.fulfillDeposits(100 ether, "");
 
-        vm.expectRevert(HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector);
+        vm.expectRevert(
+            HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector
+        );
         manager.fulfillWithdrawals(100, 100 ether, "");
 
         vm.stopPrank();
@@ -640,7 +654,9 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
 
         // Strategist should no longer be able to cancel
         vm.prank(strategist);
-        vm.expectRevert(HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector);
+        vm.expectRevert(
+            HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector
+        );
         manager.cancelDeposit(alice);
 
         // But owner still can
