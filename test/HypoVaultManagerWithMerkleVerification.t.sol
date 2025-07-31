@@ -130,6 +130,8 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         vault.setManager(address(0x777)); // This should work - owner updating
         assertEq(vault.manager(), address(0x777), "Manager should be updated by owner");
 
+        // Undo
+        vm.prank(owner);
         vault.setManager(address(manager)); // go back to manager contract as manager
     }
 
@@ -712,8 +714,8 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
 
     function test_fulfill_with_zero_amounts() public {
         // Test fulfilling zero deposits
-        vm.prank(strategist);
         accountant.setNav(0);
+        vm.prank(strategist);
         manager.fulfillDeposits(0, "");
 
         // Should advance epoch even with zero fulfillment
