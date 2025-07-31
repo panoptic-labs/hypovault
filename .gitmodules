@@ -2,3 +2,6 @@
 	path = lib/panoptic-v1.1
 	url = https://github.com/panoptic-labs/panoptic-v1-core.git
 	branch = v1.1.x
+[submodule "lib/boring-vault"]
+	path = lib/boring-vault
+	url = https://github.com/Se7en-Seas/boring-vault
