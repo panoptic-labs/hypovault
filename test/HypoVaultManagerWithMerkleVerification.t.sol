@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import "forge-std/console2.sol";
 import "../src/HypoVault.sol";
-import "../src/HypovaultManagerWithMerkleVerification.sol";
+import {HypovaultManagerWithMerkleVerification} from "../src/managers/HypovaultManagerWithMerkleVerification.sol";
 import {ERC20S} from "lib/panoptic-v1.1/test/foundry/testUtils/ERC20S.sol";
 import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
 
