@@ -2,7 +2,9 @@
 
 The HypoVault is a smart contract that accepts funds from depositors and allows managers, permissioned by the HypovaultManagerWithMerkleVerification, to take a limited set of actions on those funds. It uses asynchronous deposits and withdrawals to control the flow of funds, where managers are required to take action & fulfill your deposit or withdrawal.
 
-In-progress docs: https://docs-git-feat-vault-section-panoptic.vercel.app/docs/vaults/overview
+Managers work with Accountant contracts to help each HypoVault arrive at a NAV and determine the share price credited to deposits & withdrawals. An Accountant specific to Panoptic can be found at `src/accountants/PanopticVaultAccountant.sol`.
+
+More information can be found at the (in-progress) docs here: https://docs-git-feat-vault-section-panoptic.vercel.app/docs/vaults/overview
 
 ## Commands
 
