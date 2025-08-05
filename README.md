@@ -1,19 +1,12 @@
-## Foundry
+## The HypoVault
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+The HypoVault is a smart contract that accepts funds from depositors and allows managers, permissioned by the HypovaultManagerWithMerkleVerification, to take a limited set of actions on those funds. It uses asynchronous deposits and withdrawals to control the flow of funds, where managers are required to take action & fulfill your deposit or withdrawal.
 
-Foundry consists of:
+Managers work with Accountant contracts to help each HypoVault arrive at a NAV and determine the share price credited to deposits & withdrawals. An Accountant specific to Panoptic can be found at `src/accountants/PanopticVaultAccountant.sol`.
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+More information can be found at the (in-progress) docs here: https://docs-git-feat-vault-section-panoptic.vercel.app/docs/vaults/overview
 
-## Documentation
-
-https://book.getfoundry.sh/
-
-## Usage
+## Commands
 
 ### Build
 
@@ -39,16 +32,12 @@ $ forge fmt
 $ forge snapshot
 ```
 
-### Anvil
-
-```shell
-$ anvil
-```
-
 ### Deploy
 
+Need to write the deploy script first, but will eventually be something like:
+
 ```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+$ forge script script/DeployHypoVault.s.sol:DeployHypoVault --rpc-url <your_rpc_url> --private-key <your_private_key>
 ```
 
 ### Cast
