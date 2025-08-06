@@ -426,8 +426,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         userBasis[user] += userAssetsDeposited;
 
-        queuedDeposit[user][epoch] = 0;
-
         uint256 assetsRemaining = queuedDepositAmount - userAssetsDeposited;
 
         // move remainder of deposit to next epoch -- unfulfilled assets in this epoch will be handled in the next epoch
@@ -643,7 +641,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         totalSupply = _totalSupply + sharesReceived;
 
-        emit DepositsFulfilled(currentEpoch, assetsToFulfill, sharesReceived);
+        emit DepositsFulfilled(currentEpoch - 1, assetsToFulfill, sharesReceived);
     }
 
     /// @notice Fulfills withdrawal requests.
@@ -694,7 +692,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         reservedWithdrawalAssets = _reservedWithdrawalAssets + assetsReceived;
 
-        emit WithdrawalsFulfilled(currentEpoch, assetsReceived, sharesToFulfill);
+        emit WithdrawalsFulfilled(currentEpoch - 1, assetsReceived, sharesToFulfill);
     }
 
     /// @notice Internal utility to mint tokens to a user's account without updating the total supply.
