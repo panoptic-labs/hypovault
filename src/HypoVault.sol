@@ -310,7 +310,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         _requestWithdrawal(msg.sender, shares, false);
     }
 
-    /// @notice Requests a withdrawal of shares from any user and redeposits the assets into the vault upon withdrawal execution.
+    /// @notice Requests a withdrawal of shares from any user and optionally redeposits the assets into the vault upon withdrawal execution.
     /// @param user The user to initiate the withdrawal from
     /// @param shares The amount of shares to withdraw
     /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
