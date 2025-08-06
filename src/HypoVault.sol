@@ -239,13 +239,13 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Returns the number of decimals in the share token.
-    /// @dev If the underlying token does not implement decimals(), returns 18.
+    /// @dev If the underlying token does not implement decimals(), returns 0.
     /// @return The number of decimals in the share token
     function decimals() external view returns (uint8) {
         try IERC20Metadata(underlyingToken).decimals() returns (uint8 _decimals) {
             return _decimals;
         } catch {
-            return 18;
+            return 0;
         }
     }
 
