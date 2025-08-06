@@ -128,21 +128,21 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     event RedepositStatusChanged(address indexed user, uint256 indexed epoch, bool shouldRedeposit);
 
     /// @notice Emitted when deposits are fulfilled.
-    /// @param nextEpoch The epoch in which the deposits were fulfilled
+    /// @param epoch The epoch in which the deposits were fulfilled
     /// @param assetsFulfilled The amount of assets fulfilled
     /// @param sharesReceived The amount of shares received
     event DepositsFulfilled(
-        uint256 indexed nextEpoch,
+        uint256 indexed epoch,
         uint256 assetsFulfilled,
         uint256 sharesReceived
     );
 
     /// @notice Emitted when withdrawals are fulfilled.
-    /// @param nextEpoch The epoch in which the next withdrawals will be fulfilled
+    /// @param epoch The epoch in which the next withdrawals were fulfilled
     /// @param assetsReceived The amount of assets received
     /// @param sharesFulfilled The amount of shares fulfilled
     event WithdrawalsFulfilled(
-        uint256 indexed nextEpoch,
+        uint256 indexed epoch,
         uint256 assetsReceived,
         uint256 sharesFulfilled
     );
