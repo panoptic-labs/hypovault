@@ -2608,7 +2608,10 @@ contract HypoVaultTest is Test {
                     REQUEST WITHDRAWAL FROM TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_requestWithdrawalFrom_only_manager(bool shouldRedeposit0, bool shouldRedeposit1) public {
+    function test_requestWithdrawalFrom_only_manager(
+        bool shouldRedeposit0,
+        bool shouldRedeposit1
+    ) public {
         // Setup: Alice deposits and gets shares
         vm.prank(Alice);
         vault.requestDeposit(1000 ether);
@@ -2673,7 +2676,10 @@ contract HypoVaultTest is Test {
         assertEq(sharesWithdrawn, sharesToWithdraw);
     }
 
-    function test_requestWithdrawalFrom_multiple_users(bool shouldRedeposit0, bool shouldRedeposit1) public {
+    function test_requestWithdrawalFrom_multiple_users(
+        bool shouldRedeposit0,
+        bool shouldRedeposit1
+    ) public {
         // Setup: Multiple users deposit
         vm.prank(Alice);
         vault.requestDeposit(1000 ether);
@@ -2715,7 +2721,9 @@ contract HypoVaultTest is Test {
         assertEq(totalSharesWithdrawn, aliceShares / 2 + bobShares / 3);
     }
 
-    function test_requestWithdrawalFrom_accumulates_with_existing_withdrawal(bool shouldRedeposit) public {
+    function test_requestWithdrawalFrom_accumulates_with_existing_withdrawal(
+        bool shouldRedeposit
+    ) public {
         // Setup: Alice deposits and gets shares
         vm.prank(Alice);
         vault.requestDeposit(2000 ether);
