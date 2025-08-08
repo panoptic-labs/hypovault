@@ -132,8 +132,8 @@ contract PanopticVaultAccountant is Ownable {
                     int256(uint256(shortPremium.rightSlot())) -
                     int256(uint256(longPremium.rightSlot()));
                 poolExposure1 =
-                    int256(uint256(longPremium.leftSlot())) -
-                    int256(uint256(shortPremium.leftSlot()));
+                    int256(uint256(shortPremium.leftSlot())) -
+                    int256(uint256(longPremium.leftSlot()));
             }
 
             uint256 numLegs;
@@ -194,12 +194,15 @@ contract PanopticVaultAccountant is Ownable {
                 }
             }
 
+            uint256 token0Exposure;
+            uint256 token1Exposure;
+
             if (!skipToken0)
-                poolExposure0 += address(pools[i].token0) ==
+                token0Exposure = address(pools[i].token0) ==
                     address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)
-                    ? int256(address(_vault).balance)
-                    : int256(pools[i].token0.balanceOf(_vault));
-            if (!skipToken1) poolExposure1 += int256(pools[i].token1.balanceOf(_vault));
+                    ? address(_vault).balance
+                    : pools[i].token0.balanceOf(_vault);
+            if (!skipToken1) token1Exposure = pools[i].token1.balanceOf(_vault);
 
             uint256 collateralBalance = pools[i].pool.collateralToken0().balanceOf(_vault);
             poolExposure0 += int256(
@@ -247,7 +250,10 @@ contract PanopticVaultAccountant is Ownable {
             }
 
             // debt in pools with negative exposure does not need to be paid back
-            nav += uint256(Math.max(poolExposure0 + poolExposure1, 0));
+            nav +=
+                token0Exposure +
+                token1Exposure +
+                uint256(Math.max(poolExposure0 + poolExposure1, 0));
         }
 
         // underlying cannot be native (0x000/0xeee)

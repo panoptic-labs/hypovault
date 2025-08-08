@@ -4,8 +4,11 @@ pragma solidity ^0.8.28;
 // Interfaces
 import {ERC20Minimal} from "lib/panoptic-v1.1/contracts/tokens/ERC20Minimal.sol";
 import {IERC20} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IVaultAccountant} from "./interfaces/IVaultAccountant.sol";
 // Base
+import {ERC721Holder} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC721/utils/ERC721Holder.sol";
+import {ERC1155Holder} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import {Multicall} from "lib/panoptic-v1.1/contracts/base/Multicall.sol";
 import {Ownable} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 // Libraries
@@ -15,7 +18,7 @@ import {SafeTransferLib} from "lib/panoptic-v1.1/contracts/libraries/SafeTransfe
 
 /// @author Axicon Labs Limited
 /// @notice A vault in which a manager allocates assets deposited by users and distributes profits asynchronously.
-contract HypoVault is ERC20Minimal, Multicall, Ownable {
+contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Holder {
     using Math for uint256;
     using Address for address;
     /*//////////////////////////////////////////////////////////////
@@ -25,9 +28,11 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     /// @notice A type that represents an unfulfilled or partially fulfilled withdrawal.
     /// @param amount The amount of shares requested
     /// @param basis The amount of assets used to mint the shares requested
+    /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
     struct PendingWithdrawal {
         uint128 amount;
         uint128 basis;
+        bool shouldRedeposit;
     }
 
     /// @notice A type that represents the state of a deposit epoch.
@@ -80,7 +85,8 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     /// @notice Emitted when a withdrawal is requested.
     /// @param user The address that requested the withdrawal
     /// @param shares The amount of shares requested
-    event WithdrawalRequested(address indexed user, uint256 shares);
+    /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
+    event WithdrawalRequested(address indexed user, uint256 shares, bool shouldRedeposit);
 
     /// @notice Emitted when a deposit is cancelled.
     /// @param user The address that requested the deposit
@@ -105,30 +111,34 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     /// @param assets The amount of assets received
     /// @param performanceFee The amount of performance fee received
     /// @param epoch The epoch in which the withdrawal was executed
+    /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
     event WithdrawalExecuted(
         address indexed user,
         uint256 shares,
         uint256 assets,
         uint256 performanceFee,
-        uint256 epoch
+        uint256 epoch,
+        bool shouldRedeposit
     );
+
+    /// @notice Emitted when the redeposit status of a withdrawal request is changed.
+    /// @param user The address that changed the redeposit status
+    /// @param epoch The epoch of the withdrawal request
+    /// @param shouldRedeposit The new redeposit status
+    event RedepositStatusChanged(address indexed user, uint256 indexed epoch, bool shouldRedeposit);
 
     /// @notice Emitted when deposits are fulfilled.
-    /// @param nextEpoch The epoch in which the deposits were fulfilled
+    /// @param epoch The epoch in which the deposits were fulfilled
     /// @param assetsFulfilled The amount of assets fulfilled
     /// @param sharesReceived The amount of shares received
-    event DepositsFulfilled(
-        uint256 indexed nextEpoch,
-        uint256 assetsFulfilled,
-        uint256 sharesReceived
-    );
+    event DepositsFulfilled(uint256 indexed epoch, uint256 assetsFulfilled, uint256 sharesReceived);
 
     /// @notice Emitted when withdrawals are fulfilled.
-    /// @param nextEpoch The epoch in which the next withdrawals will be fulfilled
+    /// @param epoch The epoch in which the next withdrawals were fulfilled
     /// @param assetsReceived The amount of assets received
     /// @param sharesFulfilled The amount of shares fulfilled
     event WithdrawalsFulfilled(
-        uint256 indexed nextEpoch,
+        uint256 indexed epoch,
         uint256 assetsReceived,
         uint256 sharesFulfilled
     );
@@ -155,6 +165,12 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
 
     /// @notice Performance fee, in basis points, taken on each profitable withdrawal.
     uint256 public immutable performanceFeeBps;
+
+    /// @notice Symbol of the share token.
+    string public symbol;
+
+    /// @notice Name of the share token.
+    string public name;
 
     /// @notice Wallet that receives the performance fee.
     address public feeWallet;
@@ -195,17 +211,38 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     /// @param _manager The account authorized to execute deposits, withdrawals, and make arbitrary function calls from the vault.
     /// @param _accountant The contract that reports the net asset value of the vault.
     /// @param _performanceFeeBps The performance fee, in basis points, taken on each profitable withdrawal.
+    /// @param _symbol The symbol of the share token.
+    /// @param _name The name of the share token.
     constructor(
         address _underlyingToken,
         address _manager,
         IVaultAccountant _accountant,
-        uint256 _performanceFeeBps
+        uint256 _performanceFeeBps,
+        string memory _symbol,
+        string memory _name
     ) {
         underlyingToken = _underlyingToken;
         manager = _manager;
         accountant = _accountant;
         performanceFeeBps = _performanceFeeBps;
         totalSupply = 1_000_000;
+        symbol = _symbol;
+        name = _name;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                             TOKEN METADATA
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns the number of decimals in the share token.
+    /// @dev If the underlying token does not implement decimals(), returns 0.
+    /// @return The number of decimals in the share token
+    function decimals() external view returns (uint8) {
+        try IERC20Metadata(underlyingToken).decimals() returns (uint8 _decimals) {
+            return _decimals;
+        } catch {
+            return 0;
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -266,28 +303,49 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
     /// @notice Requests a withdrawal of shares.
     /// @param shares The amount of shares to withdraw
     function requestWithdrawal(uint128 shares) external {
+        _requestWithdrawal(msg.sender, shares, false);
+    }
+
+    /// @notice Requests a withdrawal of shares from any user and optionally redeposits the assets into the vault upon withdrawal execution.
+    /// @param user The user to initiate the withdrawal from
+    /// @param shares The amount of shares to withdraw
+    /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
+    function requestWithdrawalFrom(
+        address user,
+        uint128 shares,
+        bool shouldRedeposit
+    ) external onlyManager {
+        _requestWithdrawal(user, shares, shouldRedeposit);
+    }
+
+    /// @notice Internal function to request a withdrawal of shares.
+    /// @param user The user to initiate the withdrawal
+    /// @param shares The amount of shares to withdraw
+    /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
+    function _requestWithdrawal(address user, uint128 shares, bool shouldRedeposit) internal {
         uint256 _withdrawalEpoch = withdrawalEpoch;
 
-        PendingWithdrawal memory pendingWithdrawal = queuedWithdrawal[msg.sender][_withdrawalEpoch];
+        PendingWithdrawal memory pendingWithdrawal = queuedWithdrawal[user][_withdrawalEpoch];
 
-        uint256 previousBasis = userBasis[msg.sender];
+        uint256 previousBasis = userBasis[user];
 
-        uint256 userBalance = balanceOf[msg.sender];
+        uint256 userBalance = balanceOf[user];
 
         uint256 withdrawalBasis = (previousBasis * shares) / userBalance;
 
-        userBasis[msg.sender] = previousBasis - withdrawalBasis;
+        userBasis[user] = previousBasis - withdrawalBasis;
 
-        queuedWithdrawal[msg.sender][_withdrawalEpoch] = PendingWithdrawal({
+        queuedWithdrawal[user][_withdrawalEpoch] = PendingWithdrawal({
             amount: pendingWithdrawal.amount + shares,
-            basis: uint128(pendingWithdrawal.basis + withdrawalBasis)
+            basis: uint128(pendingWithdrawal.basis + withdrawalBasis),
+            shouldRedeposit: pendingWithdrawal.shouldRedeposit || shouldRedeposit
         });
 
         withdrawalEpochState[_withdrawalEpoch].sharesWithdrawn += shares;
 
-        _burnVirtual(msg.sender, shares);
+        _burnVirtual(user, shares);
 
-        emit WithdrawalRequested(msg.sender, shares);
+        emit WithdrawalRequested(user, shares, shouldRedeposit);
     }
 
     /// @notice Cancels a deposit in the current (unfulfilled) epoch.
@@ -318,10 +376,18 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
             currentEpoch
         ];
 
-        queuedWithdrawal[withdrawer][currentEpoch] = PendingWithdrawal({amount: 0, basis: 0});
+        queuedWithdrawal[withdrawer][currentEpoch] = PendingWithdrawal({
+            amount: 0,
+            basis: 0,
+            shouldRedeposit: false
+        });
         userBasis[withdrawer] += currentPendingWithdrawal.basis;
 
-        withdrawalEpochState[currentEpoch].sharesWithdrawn -= currentPendingWithdrawal.amount;
+        uint256 epochSharesWithdrawn = withdrawalEpochState[currentEpoch].sharesWithdrawn;
+        withdrawalEpochState[currentEpoch].sharesWithdrawn = epochSharesWithdrawn >
+            currentPendingWithdrawal.amount
+            ? uint128(epochSharesWithdrawn - currentPendingWithdrawal.amount)
+            : 0;
 
         _mintVirtual(withdrawer, currentPendingWithdrawal.amount);
 
@@ -348,15 +414,13 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
         uint256 sharesReceived = Math.mulDiv(
             userAssetsDeposited,
             _depositEpochState.sharesReceived,
-            _depositEpochState.assetsFulfilled
+            _depositEpochState.assetsFulfilled == 0 ? 1 : _depositEpochState.assetsFulfilled
         );
 
         // shares from pending deposits are already added to the supply at the start of every new epoch
         _mintVirtual(user, sharesReceived);
 
         userBasis[user] += userAssetsDeposited;
-
-        queuedDeposit[user][epoch] = 0;
 
         uint256 assetsRemaining = queuedDepositAmount - userAssetsDeposited;
 
@@ -383,7 +447,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
         uint256 assetsToWithdraw = Math.mulDiv(
             sharesToFulfill,
             _withdrawalEpochState.assetsReceived,
-            _withdrawalEpochState.sharesFulfilled
+            _withdrawalEpochState.sharesFulfilled == 0 ? 1 : _withdrawalEpochState.sharesFulfilled
         );
 
         reservedWithdrawalAssets -= assetsToWithdraw;
@@ -394,7 +458,11 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
             Math.max(0, int256(assetsToWithdraw) - int256(withdrawnBasis))
         ) * performanceFeeBps) / 10_000;
 
-        queuedWithdrawal[user][epoch] = PendingWithdrawal({amount: 0, basis: 0});
+        queuedWithdrawal[user][epoch] = PendingWithdrawal({
+            amount: 0,
+            basis: 0,
+            shouldRedeposit: false
+        });
 
         uint256 sharesRemaining = pendingWithdrawal.amount - sharesToFulfill;
 
@@ -405,7 +473,8 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
             PendingWithdrawal memory nextQueuedWithdrawal = queuedWithdrawal[user][epoch + 1];
             queuedWithdrawal[user][epoch + 1] = PendingWithdrawal({
                 amount: uint128(nextQueuedWithdrawal.amount + sharesRemaining),
-                basis: uint128(nextQueuedWithdrawal.basis + basisRemaining)
+                basis: uint128(nextQueuedWithdrawal.basis + basisRemaining),
+                shouldRedeposit: pendingWithdrawal.shouldRedeposit
             });
         }
 
@@ -414,9 +483,39 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
             SafeTransferLib.safeTransfer(underlyingToken, feeWallet, uint256(performanceFee));
         }
 
-        SafeTransferLib.safeTransfer(underlyingToken, user, assetsToWithdraw);
+        if (pendingWithdrawal.shouldRedeposit) {
+            uint256 _depositEpoch = depositEpoch;
 
-        emit WithdrawalExecuted(user, sharesToFulfill, assetsToWithdraw, performanceFee, epoch);
+            queuedDeposit[user][_depositEpoch] += uint128(assetsToWithdraw);
+            depositEpochState[_depositEpoch].assetsDeposited += uint128(assetsToWithdraw);
+
+            emit DepositRequested(user, assetsToWithdraw);
+        } else {
+            SafeTransferLib.safeTransfer(underlyingToken, user, assetsToWithdraw);
+        }
+
+        emit WithdrawalExecuted(
+            user,
+            sharesToFulfill,
+            assetsToWithdraw,
+            performanceFee,
+            epoch,
+            pendingWithdrawal.shouldRedeposit
+        );
+    }
+
+    /// @notice Alters a caller's withdrawal request from one that redeposits to one that does not.
+    /// @param epoch The epoch of the withdrawal request
+    function optOutOfRedeposit(uint256 epoch) external {
+        PendingWithdrawal memory pendingWithdrawal = queuedWithdrawal[msg.sender][epoch];
+
+        queuedWithdrawal[msg.sender][epoch] = PendingWithdrawal({
+            amount: pendingWithdrawal.amount,
+            basis: pendingWithdrawal.basis,
+            shouldRedeposit: false
+        });
+
+        emit RedepositStatusChanged(msg.sender, epoch, false);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -455,10 +554,19 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
         if (fromBalance == 0) return;
 
         uint256 fromBasis = userBasis[from];
+
         uint256 basisToTransfer = (fromBasis * amount) / fromBalance;
 
         userBasis[from] = fromBasis - basisToTransfer;
-        userBasis[to] += basisToTransfer;
+
+        // Handle the case where recipient has zero balance to avoid division by zero
+        uint256 toBalance = balanceOf[to];
+        if (toBalance == 0) {
+            userBasis[to] += basisToTransfer;
+        } else {
+            // reset basis to the lowest average between the sender and receiver to ensure performance fee is not deflated
+            userBasis[to] += Math.min(basisToTransfer, (userBasis[to] * amount) / toBalance);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -529,7 +637,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
 
         totalSupply = _totalSupply + sharesReceived;
 
-        emit DepositsFulfilled(currentEpoch, assetsToFulfill, sharesReceived);
+        emit DepositsFulfilled(currentEpoch - 1, assetsToFulfill, sharesReceived);
     }
 
     /// @notice Fulfills withdrawal requests.
@@ -580,7 +688,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
 
         reservedWithdrawalAssets = _reservedWithdrawalAssets + assetsReceived;
 
-        emit WithdrawalsFulfilled(currentEpoch, assetsReceived, sharesToFulfill);
+        emit WithdrawalsFulfilled(currentEpoch - 1, assetsReceived, sharesToFulfill);
     }
 
     /// @notice Internal utility to mint tokens to a user's account without updating the total supply.
@@ -604,4 +712,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable {
 
         emit Transfer(from, address(0), amount);
     }
+
+    receive() external payable {}
 }
