@@ -255,10 +255,10 @@ contract PanopticVaultAccountant is Ownable {
                 );
             }
 
-            // debt in pools with negative exposure does not need to be paid back
             nav +=
                 token0Exposure +
                 token1Exposure +
+                // debt in pools with negative exposure does not need to be paid back
                 uint256(Math.max(poolExposure0 + poolExposure1, 0));
         }
 
