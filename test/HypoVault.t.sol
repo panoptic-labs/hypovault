@@ -83,6 +83,7 @@ contract HypoVaultTest is Test {
     VaultAccountantMock public accountant;
     HypoVault public vault;
     ERC20S public token;
+    ERC20S public proceeds;
 
     address Manager = address(0x1234);
     address FeeWallet = address(0x5678);
@@ -143,8 +144,10 @@ contract HypoVaultTest is Test {
     function setUp() public {
         accountant = new VaultAccountantMock();
         token = new ERC20S("Test Token", "TEST", 18);
+        proceeds = new ERC20S("Proceeds Token", "PROC", 18);
         vault = new HypoVault(
             address(token),
+            address(proceeds),
             Manager,
             IVaultAccountant(address(accountant)),
             100,
@@ -171,6 +174,7 @@ contract HypoVaultTest is Test {
 
     function test_vaultParameters() public view {
         assertEq(vault.depositToken(), address(token));
+        assertEq(vault.proceedsToken(), address(proceeds));
         assertEq(vault.manager(), Manager);
         assertEq(address(vault.accountant()), address(accountant));
         assertEq(vault.performanceFeeBps(), 100);
@@ -2215,6 +2219,7 @@ contract HypoVaultTest is Test {
 
         HypoVault vault6 = new HypoVault(
             address(token6),
+            address(token8),
             Manager,
             IVaultAccountant(address(accountant)),
             100,
@@ -2223,6 +2228,7 @@ contract HypoVaultTest is Test {
         );
         HypoVault vault8 = new HypoVault(
             address(token8),
+            address(token12),
             Manager,
             IVaultAccountant(address(accountant)),
             100,
@@ -2231,6 +2237,7 @@ contract HypoVaultTest is Test {
         );
         HypoVault vault12 = new HypoVault(
             address(token12),
+            address(token6),
             Manager,
             IVaultAccountant(address(accountant)),
             100,
@@ -2247,6 +2254,7 @@ contract HypoVaultTest is Test {
         MockTokenWithoutDecimals badToken = new MockTokenWithoutDecimals();
         HypoVault vaultBad = new HypoVault(
             address(badToken),
+            address(0),
             Manager,
             IVaultAccountant(address(accountant)),
             100,
@@ -2559,6 +2567,7 @@ contract HypoVaultTest is Test {
         // Create new vault for comparison
         HypoVault vault2 = new HypoVault(
             address(token),
+            address(0),
             Manager,
             IVaultAccountant(address(accountant)),
             100,

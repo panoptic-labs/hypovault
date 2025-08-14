@@ -72,6 +72,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         vm.prank(owner);
         vault = new HypoVault(
             address(token),
+            address(0),
             address(0x999), // Dummy manager address
             IVaultAccountant(address(accountant)),
             100, // 1% performance fee
