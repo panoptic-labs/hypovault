@@ -214,7 +214,7 @@ contract PanopticVaultAccountant is Ownable {
                 pools[i].pool.collateralToken1().previewRedeem(collateralBalance)
             );
 
-            // convert position values to underlying
+            // convert position & token values to underlying
             if (address(pools[i].token0) != underlyingToken) {
                 int24 conversionTick = PanopticMath.twapFilter(
                     pools[i].oracle0,
@@ -230,6 +230,7 @@ contract PanopticVaultAccountant is Ownable {
                 );
 
                 poolExposure0 = PanopticMath.convert0to1(poolExposure0, conversionPrice);
+                token0Exposure = PanopticMath.convert0to1(token0Exposure, conversionPrice);
             }
 
             if (address(pools[i].token1) != underlyingToken) {
@@ -247,6 +248,7 @@ contract PanopticVaultAccountant is Ownable {
                 );
 
                 poolExposure1 = PanopticMath.convert1to0(poolExposure1, conversionPrice);
+                token1Exposure = PanopticMath.convert1to0(token1Exposure, conversionPrice);
             }
 
             // debt in pools with negative exposure does not need to be paid back
