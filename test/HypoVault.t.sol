@@ -170,7 +170,7 @@ contract HypoVaultTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_vaultParameters() public view {
-        assertEq(vault.underlyingToken(), address(token));
+        assertEq(vault.depositToken(), address(token));
         assertEq(vault.manager(), Manager);
         assertEq(address(vault.accountant()), address(accountant));
         assertEq(vault.performanceFeeBps(), 100);
@@ -2202,13 +2202,13 @@ contract HypoVaultTest is Test {
                             DECIMALS TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_decimals_returns_underlying_token_decimals() public view {
-        // The underlying token (TEST) has 18 decimals
-        assertEq(vault.decimals(), 18, "Vault should return underlying token decimals");
-        assertEq(token.decimals(), 18, "Underlying token should have 18 decimals");
+    function test_decimals_returns_deposit_token_decimals() public view {
+        // The deposit token (TEST) has 18 decimals
+        assertEq(vault.decimals(), 18, "Vault should return deposit token decimals");
+        assertEq(token.decimals(), 18, "Deposit token should have 18 decimals");
     }
 
-    function test_decimals_with_different_underlying_decimals() public {
+    function test_decimals_with_different_deposit_decimals() public {
         ERC20S token6 = new ERC20S("6 Decimal Token", "T6", 6);
         ERC20S token8 = new ERC20S("8 Decimal Token", "T8", 8);
         ERC20S token12 = new ERC20S("12 Decimal Token", "T12", 12);
