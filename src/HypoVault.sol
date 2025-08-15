@@ -733,8 +733,29 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         WithdrawalEpochState memory epochState = withdrawalEpochState[currentEpoch];
         uint256 _totalSupply = totalSupply;
 
-        uint256 assetsReceived = Math.mulDiv(sharesToFulfill, totalAssets, _totalSupply);
+        uint256 proceedsDepositRatioX128;
 
+        if (maxProceedsAssetsReceived > 0) {
+            proceedsDepositRatioX128 = Math.mulDiv(
+                maxProceedsAssetsReceived,
+                type(uint128).max,
+                maxDepositAssetsReceived + maxProceedsAssetsReceived
+            );
+        }
+
+        uint256 depositAssetsReceived = Math.mulDiv(
+            Math.mulDiv128(sharesToFulfill, 2 ** 128 - proceedsDepositRatioX128),
+            totalAssets,
+            _totalSupply
+        );
+
+        uint256 proceedsAssetsReceived = Math.mulDiv(
+            Math.mulDiv128(sharesToFulfill, proceedsDepositRatioX128),
+            totalAssets,
+            _totalSupply
+        );
+
+        /*
         (uint256 depositAssetsReceived, uint256 proceedsAssetsReceived) = accountant
             .getTokenAmountsFromPrice(
                 address(this),
@@ -743,10 +764,10 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
                 assetsReceived,
                 managerInput
             );
+        */
 
         if (depositAssetsReceived > maxDepositAssetsReceived) revert WithdrawalNotFulfillable();
         if (proceedsAssetsReceived > maxProceedsAssetsReceived) revert WithdrawalNotFulfillable();
-
         uint256 sharesRemaining = epochState.sharesWithdrawn - sharesToFulfill;
 
         withdrawalEpochState[currentEpoch] = WithdrawalEpochState({

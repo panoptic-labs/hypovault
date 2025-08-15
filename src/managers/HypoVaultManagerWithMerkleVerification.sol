@@ -47,15 +47,13 @@ contract HypovaultManagerWithMerkleVerification is ManagerWithMerkleVerification
     /// @notice Requests a withdrawal from any user with redeposit option
     /// @param user The user to initiate the withdrawal from
     /// @param shares The amount of shares to withdraw
-    /// @param ratioX64 The fraction of the requested shares that will be distributed in proceeds tokens
     /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
     function requestWithdrawalFrom(
         address user,
         uint128 shares,
-        uint128 ratioX64,
         bool shouldRedeposit
     ) external onlyStrategist {
-        IHypoVault(address(vault)).requestWithdrawalFrom(user, shares, ratioX64, shouldRedeposit);
+        IHypoVault(address(vault)).requestWithdrawalFrom(user, shares, shouldRedeposit);
     }
 
     /// @notice Fulfills deposit requests

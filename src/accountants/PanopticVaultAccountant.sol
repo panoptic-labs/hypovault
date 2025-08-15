@@ -270,23 +270,25 @@ contract PanopticVaultAccountant is Ownable {
     /// @param proceedsToken The proceeds token of the vault
     /// @param assetsRequested The total amount of assets to be converted
     /// @param managerInput Input calldata from the vault manager consisting of price quotes from the manager, pool information, and a position lsit for each pool
-    /// @return depositTokenAmount The amount of deposit token to distribute based on the `ManagerPrices`
-    /// @return proceedsTokenAmount The amount of proceeds token to distrubute based on the `ManagerPrices`
+    /// @return depositAssetsReceived The amount of deposit token to distribute based on the `ManagerPrices`
+    /// @return proceedsAssetsReceived The amount of proceeds token to distrubute based on the `ManagerPrices`
     function getTokenAmountsFromPrice(
         address vault,
         address depositToken,
         address proceedsToken,
         uint256 assetsRequested,
         bytes calldata managerInput
-    ) external view returns (uint256 depositTokenAmount, uint256 proceedsTokenAmount) {
-        (ManagerPrices[] memory managerPrices, PoolInfo[] memory pools, ) = abi.decode(
-            managerInput,
-            (ManagerPrices[], PoolInfo[], TokenId[][])
-        );
-
+    ) external view returns (uint256 depositAssetsReceived, uint256 proceedsAssetsReceived) {
+        /*
+        (
+            ManagerPrices[] memory managerPrices,
+            PoolInfo[] memory pools,
+            TokenId[][] memory tokenIds
+        ) = abi.decode(managerInput, (ManagerPrices[], PoolInfo[], TokenId[][]));
+        */
         // compute conversion price here, matching the PoolInfo with deposit/proceeds token
 
-        depositTokenAmount = assetsRequested;
-        proceedsTokenAmount = 0;
+        depositAssetsReceived = assetsRequested;
+        proceedsAssetsReceived = 0;
     }
 }

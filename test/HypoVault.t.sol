@@ -38,6 +38,23 @@ contract VaultAccountantMock {
         }
         return nav;
     }
+
+    function getTokenAmountsFromPrice(
+        address vault,
+        address,
+        address,
+        uint256,
+        bytes memory managerInput
+    ) external view returns (uint256 depositTokenAmount, uint256 proceedsTokenAmount) {
+        require(vault == expectedVault, "Invalid vault");
+        if (managerInput.length > 0) {
+            require(
+                keccak256(managerInput) == keccak256(expectedManagerInput),
+                "Invalid manager input"
+            );
+        }
+        return (depositTokenAmount, proceedsTokenAmount);
+    }
 }
 
 // Mock contract to test manage function calldata passing
