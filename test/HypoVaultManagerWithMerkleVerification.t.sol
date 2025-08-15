@@ -446,7 +446,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         assertEq(vault.withdrawalEpoch(), 1);
 
         // Verify epoch state
-        (uint128 sharesWithdrawn, uint128 assetsReceived, uint128 sharesFulfilled) = vault
+        (uint128 sharesWithdrawn, uint128 assetsReceived, , uint128 sharesFulfilled) = vault
             .withdrawalEpochState(0);
         assertEq(sharesWithdrawn, aliceShares);
         assertEq(sharesFulfilled, aliceShares);

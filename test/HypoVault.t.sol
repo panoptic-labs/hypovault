@@ -910,7 +910,7 @@ contract HypoVaultTest is Test {
         assertEq(bobQueuedBasisAfter, 0);
 
         // Withdrawal epoch state should be updated
-        (uint128 sharesWithdrawn, , ) = vault.withdrawalEpochState(0);
+        (uint128 sharesWithdrawn, , , ) = vault.withdrawalEpochState(0);
         assertEq(sharesWithdrawn, 0); // Both withdrawals cancelled
     }
 
@@ -1470,7 +1470,7 @@ contract HypoVaultTest is Test {
         vault.fulfillWithdrawals(sharesToFulfill, 1000 ether, "");
 
         // Before executeWithdrawal, check epoch state
-        (uint128 sharesWithdrawn, , uint128 sharesFulfilled) = vault.withdrawalEpochState(0);
+        (uint128 sharesWithdrawn, , , uint128 sharesFulfilled) = vault.withdrawalEpochState(0);
         assertEq(sharesWithdrawn, sharesToWithdraw);
         assertEq(sharesFulfilled, sharesToFulfill);
 
@@ -1590,7 +1590,7 @@ contract HypoVaultTest is Test {
         vault.fulfillWithdrawals(sharesToFulfill, expectedAssetsFor75Shares, "");
 
         // Check epoch state
-        (uint128 sharesWithdrawn, uint128 assetsReceived, uint128 sharesFulfilled) = vault
+        (uint128 sharesWithdrawn, uint128 assetsReceived, , uint128 sharesFulfilled) = vault
             .withdrawalEpochState(0);
         assertEq(sharesWithdrawn, sharesToWithdraw);
         assertEq(sharesFulfilled, sharesToFulfill);
@@ -2340,7 +2340,7 @@ contract HypoVaultTest is Test {
 
         // Check that epoch advanced but no assets were reserved
         assertEq(vault.withdrawalEpoch(), 1);
-        (uint128 sharesWithdrawn, uint128 assetsReceived, uint128 sharesFulfilled) = vault
+        (uint128 sharesWithdrawn, uint128 assetsReceived, , uint128 sharesFulfilled) = vault
             .withdrawalEpochState(0);
         assertEq(sharesWithdrawn, aliceShares / 2);
         assertEq(assetsReceived, 0);
@@ -2690,7 +2690,7 @@ contract HypoVaultTest is Test {
         assertEq(basis, expectedBasisReduction);
 
         // Verify withdrawal epoch state was updated
-        (uint128 sharesWithdrawn, , ) = vault.withdrawalEpochState(0);
+        (uint128 sharesWithdrawn, , , ) = vault.withdrawalEpochState(0);
         assertEq(sharesWithdrawn, sharesToWithdraw);
     }
 
@@ -2735,7 +2735,7 @@ contract HypoVaultTest is Test {
         assertEq(bobBasisQueued, bobBasis / 3);
 
         // Verify total shares withdrawn in epoch
-        (uint128 totalSharesWithdrawn, , ) = vault.withdrawalEpochState(0);
+        (uint128 totalSharesWithdrawn, , , ) = vault.withdrawalEpochState(0);
         assertEq(totalSharesWithdrawn, aliceShares / 2 + bobShares / 3);
     }
 
@@ -3509,7 +3509,7 @@ contract HypoVaultTest is Test {
         vault.requestWithdrawal(uint128((bobRemainingShares * 10 ether) / (200 ether - 10 ether))); // Proportional to 10 ether
 
         // Check withdrawal epoch state before cancellation
-        (uint128 sharesWithdrawnBefore, , ) = vault.withdrawalEpochState(1);
+        (uint128 sharesWithdrawnBefore, , , ) = vault.withdrawalEpochState(1);
 
         // Cancel withdrawals - this should not cause underflow
         vm.startPrank(Manager);
@@ -3518,7 +3518,7 @@ contract HypoVaultTest is Test {
         vm.stopPrank();
 
         // Verify epoch state was updated correctly (should not underflow)
-        (uint128 sharesWithdrawnAfter, , ) = vault.withdrawalEpochState(1);
+        (uint128 sharesWithdrawnAfter, , , ) = vault.withdrawalEpochState(1);
         assertEq(sharesWithdrawnAfter, 0); // Should be zero after cancelling all withdrawals
     }
 

@@ -48,10 +48,12 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @notice A type that represents the state of a withdrawal epoch.
     /// @param sharesWithdrawn The amount of shares withdrawn
     /// @param depositAssetsReceived The amount of depositAssets received over `sharesFulfilled`
+    /// @param proceedsAssetsReceived The amount of proceedsAssets received over `sharesFulfilled`
     /// @param sharesFulfilled The amount of shares fulfilled (out of `sharesWithdrawn`)
     struct WithdrawalEpochState {
         uint128 sharesWithdrawn;
         uint128 depositAssetsReceived;
+        uint128 proceedsAssetsReceived;
         uint128 sharesFulfilled;
     }
 
@@ -675,8 +677,9 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         uint256 sharesRemaining = epochState.sharesWithdrawn - sharesToFulfill;
 
         withdrawalEpochState[currentEpoch] = WithdrawalEpochState({
-            depositAssetsReceived: uint128(depositAssetsReceived),
             sharesWithdrawn: uint128(epochState.sharesWithdrawn),
+            depositAssetsReceived: uint128(depositAssetsReceived),
+            proceedsAssetsReceived: 0,
             sharesFulfilled: uint128(sharesToFulfill)
         });
 
@@ -686,6 +689,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         withdrawalEpochState[currentEpoch] = WithdrawalEpochState({
             depositAssetsReceived: 0,
+            proceedsAssetsReceived: 0,
             sharesWithdrawn: uint128(sharesRemaining),
             sharesFulfilled: 0
         });
