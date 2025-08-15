@@ -89,13 +89,11 @@ contract PanopticVaultAccountant is Ownable {
     /// @notice Returns the NAV of the portfolio contained in `vault` in terms of its deposit token.
     /// @param vault The address of the vault to value
     /// @param depositToken The deposit token of the vault
-    /// @param depositToken The proceeds token of the vault
     /// @param managerInput Input calldata from the vault manager consisting of price quotes from the manager, pool information, and a position lsit for each pool
     /// @return nav The NAV of the portfolio contained in `vault` in terms of its deposit token
     function computeNAV(
         address vault,
         address depositToken,
-        address proceedsToken,
         bytes calldata managerInput
     ) external view returns (uint256 nav) {
         (

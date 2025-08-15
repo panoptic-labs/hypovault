@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
-import "forge-std/console2.sol";
 
 // Interfaces
 import {ERC20Minimal} from "lib/panoptic-v1.1/contracts/tokens/ERC20Minimal.sol";
@@ -680,12 +679,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         DepositEpochState memory epochState = depositEpochState[currentEpoch];
 
-        uint256 totalAssets = accountant.computeNAV(
-            address(this),
-            depositToken,
-            proceedsToken,
-            managerInput
-        ) +
+        uint256 totalAssets = accountant.computeNAV(address(this), depositToken, managerInput) +
             1 -
             epochState.assetsDeposited -
             reservedWithdrawalDepositAssets;
@@ -729,15 +723,13 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         bytes memory managerInput
     ) external onlyManager {
         uint256 _reservedWithdrawalDepositAssets = reservedWithdrawalDepositAssets;
-        uint256 totalAssets = accountant.computeNAV(
-            address(this),
-            depositToken,
-            proceedsToken,
-            managerInput
-        ) +
+        uint256 _reservedWithdrawalProceedsAssets = reservedWithdrawalProceedsAssets;
+
+        uint256 totalAssets = accountant.computeNAV(address(this), depositToken, managerInput) +
             1 -
             depositEpochState[depositEpoch].assetsDeposited -
             _reservedWithdrawalDepositAssets;
+
         uint256 currentEpoch = withdrawalEpoch;
 
         WithdrawalEpochState memory epochState = withdrawalEpochState[currentEpoch];

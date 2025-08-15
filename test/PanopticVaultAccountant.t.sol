@@ -268,7 +268,6 @@ contract PanopticVaultAccountantTest is Test {
     MockERC20Partial public token0;
     MockERC20Partial public token1;
     MockERC20Partial public depositToken;
-    MockERC20Partial public proceedsToken;
     MockV3CompatibleOracle public poolOracle;
     MockV3CompatibleOracle public oracle0;
     MockV3CompatibleOracle public oracle1;
@@ -288,7 +287,6 @@ contract PanopticVaultAccountantTest is Test {
         token0 = new MockERC20Partial("Token0", "T0");
         token1 = new MockERC20Partial("Token1", "T1");
         depositToken = new MockERC20Partial("Deposit", "DEP");
-        proceedsToken = new MockERC20Partial("Proceeds", "PRO");
         poolOracle = new MockV3CompatibleOracle();
         oracle0 = new MockV3CompatibleOracle();
         oracle1 = new MockV3CompatibleOracle();
@@ -383,7 +381,7 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
 
         vm.expectRevert(PanopticVaultAccountant.InvalidPools.selector);
-        accountant.computeNAV(vault, address(depositToken), address(proceedsToken), managerInput);
+        accountant.computeNAV(vault, address(depositToken), managerInput);
     }
 
     function test_computeNAV_staleOraclePrice_pool() public {
@@ -402,7 +400,7 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
 
         vm.expectRevert(PanopticVaultAccountant.StaleOraclePrice.selector);
-        accountant.computeNAV(vault, address(depositToken), address(proceedsToken), managerInput);
+        accountant.computeNAV(vault, address(depositToken), managerInput);
     }
 
     function test_computeNAV_incorrectPositionList_zeroBalance() public {
@@ -425,7 +423,7 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = createManagerInput(pools, tokenIds);
 
         vm.expectRevert(PanopticVaultAccountant.IncorrectPositionList.selector);
-        accountant.computeNAV(vault, address(depositToken), address(proceedsToken), managerInput);
+        accountant.computeNAV(vault, address(depositToken), managerInput);
     }
 
     function test_computeNAV_incorrectPositionList_wrongLegsCount() public {
@@ -446,7 +444,7 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = createManagerInput(pools, tokenIds);
 
         vm.expectRevert(PanopticVaultAccountant.IncorrectPositionList.selector);
-        accountant.computeNAV(vault, address(depositToken), address(proceedsToken), managerInput);
+        accountant.computeNAV(vault, address(depositToken), managerInput);
     }
 
     function test_computeNAV_basicScenario() public {
@@ -458,12 +456,7 @@ contract PanopticVaultAccountantTest is Test {
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected: token0(100) + token1(200) + collateral0(50) + collateral1(75) + deposit(1000) = 1425
         uint256 expectedNav = 100e18 + 200e18 + 50e18 + 75e18 + 1000e18;
@@ -508,12 +501,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected: deposit(1000) + token1_converted + collateral0(50) + collateral1(75) ≈ 1325+
         // Token1 conversion introduces precision differences, so use tolerance
@@ -558,12 +546,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // When both tokens equal deposit, they get added to the skip list but still contribute to exposure
         // The actual calculation includes: deposit + token exposures + collateral
@@ -621,12 +604,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setMockPositionBalanceArray(new uint256[2][](0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Premium calculation involves conversion and may not be exactly as expected
         // The actual result shows ~1099, suggesting token1 conversion affects the calculation
@@ -680,12 +658,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setMockPositionBalanceArray(new uint256[2][](0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // The result shows 900, which suggests: deposit(500) + Math.max(0, premiums(-100) + tokens(500)) = 900
         // Net exposure = premiums(-100) + deposit_token_balance(500) = 400
@@ -711,12 +684,7 @@ contract PanopticVaultAccountantTest is Test {
 
         bytes memory managerInput = createManagerInput(pools, tokenIds);
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected base: token0(100) + token1(200) + collateral0(50) + collateral1(75) + deposit(1000) = 1425
         // Plus premiums: shortPremium0(5) - longPremium0(3) + longPremium1(8) - shortPremium1(10) = 0
@@ -753,12 +721,7 @@ contract PanopticVaultAccountantTest is Test {
 
         bytes memory managerInput = abi.encode(managerPrices, pools, tokenIds);
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected: token0(200) + token1(400) + collateral0(50) + collateral1(75) + deposit(1000) = 1725
         // Note: tokens are counted once despite multiple pools due to skipToken logic
@@ -783,12 +746,7 @@ contract PanopticVaultAccountantTest is Test {
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected: ETH(1) + token1(200) + collateral0(50) + collateral1(75) + deposit(1000) = 1326
         uint256 expectedNav = 1e18 + 200e18 + 50e18 + 75e18 + 1000e18;
@@ -805,12 +763,7 @@ contract PanopticVaultAccountantTest is Test {
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected: token0(100) + token1(200) + collateral0(50) + collateral1(75) + deposit(1000) = 1425
         // Tokens are converted but at similar rates, so approximately same value
@@ -834,12 +787,7 @@ contract PanopticVaultAccountantTest is Test {
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected: token0(100) + token1(200) + collateral0(50) + collateral1(75) + deposit(1000) = 1425
         // Flipped tokens should still convert to similar values
@@ -862,12 +810,7 @@ contract PanopticVaultAccountantTest is Test {
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Should handle negative exposure gracefully with Math.max(0, exposure)
         assertEq(nav, 1000 ether); // Only deposit token balance
@@ -1275,12 +1218,7 @@ contract PanopticVaultAccountantTest is Test {
             new TokenId[][](0)
         );
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         assertEq(nav, 500 ether); // Only deposit balance
     }
@@ -1309,12 +1247,7 @@ contract PanopticVaultAccountantTest is Test {
         // Create manager input with empty token list (no positions)
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         assertEq(nav, 0);
     }
@@ -1337,12 +1270,7 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
 
         // Should not revert at exact boundary
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
         assertGt(nav, 0);
     }
 
@@ -1363,12 +1291,7 @@ contract PanopticVaultAccountantTest is Test {
 
         bytes memory managerInput = createManagerInput(pools, tokenIds);
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected NAV should be base balances: 100 + 200 + 50 + 75 + 1000 = 1425 ether
         // OTM short positions should not contribute much to NAV
@@ -1395,12 +1318,7 @@ contract PanopticVaultAccountantTest is Test {
 
         bytes memory managerInput = createManagerInput(pools, tokenIds);
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected NAV should be base balances: 100 + 200 + 50 + 75 + 1000 = 1425 ether
         // OTM short positions should not contribute much to NAV
@@ -1427,12 +1345,7 @@ contract PanopticVaultAccountantTest is Test {
 
         bytes memory managerInput = createManagerInput(pools, tokenIds);
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected NAV should be base balances plus intrinsic value from long position
         uint256 expectedBaseNAV = 100 ether + 200 ether + 50 ether + 75 ether + 1000 ether; // 1425 ether
@@ -1459,12 +1372,7 @@ contract PanopticVaultAccountantTest is Test {
 
         bytes memory managerInput = createManagerInput(pools, tokenIds);
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected NAV should be base balances plus intrinsic value from long position
         uint256 expectedBaseNAV = 100 ether + 200 ether + 50 ether + 75 ether + 1000 ether; // 1425 ether
@@ -1510,12 +1418,7 @@ contract PanopticVaultAccountantTest is Test {
 
         bytes memory managerInput = createManagerInput(pools, tokenIds);
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected NAV: token0(100) + token1(200) + collateral0(50) + collateral1(75) + deposit(1000) = 1425 ether
         // Plus premium contributions: shortPremium0(5) - longPremium0(3) + longPremium1(8) - shortPremium1(10) = 0
@@ -1547,7 +1450,7 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
 
         vm.expectRevert(PanopticVaultAccountant.StaleOraclePrice.selector);
-        accountant.computeNAV(vault, address(depositToken), address(proceedsToken), managerInput);
+        accountant.computeNAV(vault, address(depositToken), managerInput);
     }
 
     function test_computeNAV_staleOraclePrice_token1() public {
@@ -1568,7 +1471,7 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
 
         vm.expectRevert(PanopticVaultAccountant.StaleOraclePrice.selector);
-        accountant.computeNAV(vault, address(depositToken), address(proceedsToken), managerInput);
+        accountant.computeNAV(vault, address(depositToken), managerInput);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -1602,12 +1505,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected NAV = token0 + token1 + collateral0 + collateral1 + deposit
         // Since token0/token1 != deposit, they get converted (slight differences due to price conversion)
@@ -1642,12 +1540,7 @@ contract PanopticVaultAccountantTest is Test {
         );
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected premium contribution: shortPremium0 - longPremium0 + longPremium1 - shortPremium1
         int256 premiumContribution0 = int256(shortPremium0) - int256(longPremium0);
@@ -1678,20 +1571,10 @@ contract PanopticVaultAccountantTest is Test {
         tokenIds[0][0] = createOutOfRangeTokenId(TWAP_TICK, true, false); // OTM short call
 
         bytes memory managerInput = createManagerInput(pools, tokenIds);
-        uint256 navBefore = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 navBefore = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Verify the calculation is deterministic
-        uint256 navAfter = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 navAfter = accountant.computeNAV(vault, address(depositToken), managerInput);
         assertEq(navBefore, navAfter, "NAV calculation should be deterministic");
 
         // Expected base: token0(100) + token1(200) + collateral0(50) + collateral1(75) + deposit(1000) = 1425
@@ -1726,12 +1609,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(differentDeposit),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(differentDeposit), managerInput);
 
         // Expected: token0(100) + token1(200) converted to different deposit = ~300 (varies by conversion)
         uint256 expectedNavMin = 250e18; // Conservative minimum after conversion
@@ -1763,12 +1641,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setMockPositionBalanceArray(new uint256[2][](0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Should use Math.max(0, negative_exposure) + deposit_balance
         assertEq(nav, 1000e18, "NAV should handle negative exposure with Math.max(0, exposure)");
@@ -1807,12 +1680,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setMockPositionBalanceArray(new uint256[2][](0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // CRITICAL ISSUE DOCUMENTATION:
         // The current implementation incorrectly nets token balances against negative position exposure
@@ -1882,12 +1750,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setMockPositionBalanceArray(new uint256[2][](0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Document the actual behavior: the implementation includes token conversion effects
         // which can significantly affect the final NAV calculation
@@ -1929,12 +1792,7 @@ contract PanopticVaultAccountantTest is Test {
         managerPrices[1] = managerPrices[0];
 
         bytes memory managerInput = abi.encode(managerPrices, pools, tokenIds);
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Should aggregate from both pools without double counting deposit
         uint256 expectedNav = 200e18 + 400e18 + 50e18 + 75e18 + 1000e18; // token0 + token1 + collaterals + deposit
@@ -1959,7 +1817,7 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
 
         vm.expectRevert(PanopticVaultAccountant.InvalidPools.selector);
-        accountant.computeNAV(vault, address(depositToken), address(proceedsToken), managerInput);
+        accountant.computeNAV(vault, address(depositToken), managerInput);
     }
 
     function test_computeNAV_revert_stalePoolPrice() public {
@@ -1979,7 +1837,7 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
 
         vm.expectRevert(PanopticVaultAccountant.StaleOraclePrice.selector);
-        accountant.computeNAV(vault, address(depositToken), address(proceedsToken), managerInput);
+        accountant.computeNAV(vault, address(depositToken), managerInput);
     }
 
     function test_computeNAV_revert_zeroPositionBalance() public {
@@ -2001,7 +1859,7 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = createManagerInput(pools, tokenIds);
 
         vm.expectRevert(PanopticVaultAccountant.IncorrectPositionList.selector);
-        accountant.computeNAV(vault, address(depositToken), address(proceedsToken), managerInput);
+        accountant.computeNAV(vault, address(depositToken), managerInput);
     }
 
     function test_computeNAV_revert_incorrectLegsCount() public {
@@ -2018,7 +1876,7 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = createManagerInput(pools, tokenIds);
 
         vm.expectRevert(PanopticVaultAccountant.IncorrectPositionList.selector);
-        accountant.computeNAV(vault, address(depositToken), address(proceedsToken), managerInput);
+        accountant.computeNAV(vault, address(depositToken), managerInput);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -2043,12 +1901,7 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
 
         // Should not revert at exact boundary
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected: token0(100) + token1(200) + collateral0(50) + collateral1(75) + deposit(1000) = 1425
         uint256 expectedNav = 100e18 + 200e18 + 50e18 + 75e18 + 1000e18;
@@ -2079,12 +1932,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         assertEq(nav, 0, "NAV should be exactly zero when all balances are zero");
     }
@@ -2114,12 +1962,7 @@ contract PanopticVaultAccountantTest is Test {
             new TokenId[][](0)
         );
 
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
         assertEq(nav, balance);
     }
 
@@ -2142,12 +1985,7 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
 
         // Should not revert within bounds
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected: token0(100) + token1(200) + collateral0(50) + collateral1(75) + deposit(1000) = 1425
         uint256 expectedNav = 100e18 + 200e18 + 50e18 + 75e18 + 1000e18;
@@ -2186,12 +2024,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // NAV should be at least the deposit balance
         assertGe(nav, deposit, "NAV should include at least the deposit balance");
@@ -2232,12 +2065,7 @@ contract PanopticVaultAccountantTest is Test {
         tokenIds[0][0] = createStraddlePosition(TWAP_TICK);
 
         bytes memory managerInput = createManagerInput(pools, tokenIds);
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Calculate expected NAV manually
         // Premium contribution: (15 - 8) + (20 - 5) = 7 + 15 = 22e18
@@ -2281,12 +2109,7 @@ contract PanopticVaultAccountantTest is Test {
         tokenIds[0][0] = createIronCondorPosition(TWAP_TICK);
 
         bytes memory managerInput = createManagerInput(pools, tokenIds);
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected base: token0(100) + token1(150) + collateral0(30) + collateral1(40) + deposit(500) = 820
         // Plus premiums: (20-12) + (25-10) = 8 + 15 = 23
@@ -2328,12 +2151,7 @@ contract PanopticVaultAccountantTest is Test {
         tokenIds[0][1] = createMultiLegTokenId(TWAP_TICK); // Multi-leg position (2 legs)
 
         bytes memory managerInput = createManagerInput(pools, tokenIds);
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected base: token0(200) + token1(300) + collateral0(60) + collateral1(80) + deposit(800) = 1440
         // Plus premiums: (30-20) + (40-15) = 10 + 25 = 35
@@ -2366,12 +2184,7 @@ contract PanopticVaultAccountantTest is Test {
         );
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected: largeBalance*4 (token0+token1+collateral0+collateral1) + largeBalance (deposit)
         // Plus premiums: (largeBalance/10 - largeBalance/20) * 2 = largeBalance/20 * 2 = largeBalance/10
@@ -2405,12 +2218,7 @@ contract PanopticVaultAccountantTest is Test {
         );
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected: smallAmount*3.833 (token0+token1*2+collateral0/2+collateral1/3) + smallAmount*10 (deposit)
         // Plus premiums: (smallAmount - smallAmount/2) * 2 = smallAmount
@@ -2459,12 +2267,7 @@ contract PanopticVaultAccountantTest is Test {
         });
 
         bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected: token0(100) + token1(200) + collateral0(50) + collateral1(75) + deposit(1000) = 1425
         uint256 expectedNav = 100e18 + 200e18 + 50e18 + 75e18 + 1000e18;
@@ -2504,12 +2307,7 @@ contract PanopticVaultAccountantTest is Test {
             bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
 
             // Should succeed at exact boundary
-            uint256 nav = accountant.computeNAV(
-                vault,
-                address(depositToken),
-                address(proceedsToken),
-                managerInput
-            );
+            uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
             // Expected: token0(100) + token1(200) + collateral0(50) + collateral1(75) + deposit(1000) = 1425
             uint256 expectedNav = 100e18 + 200e18 + 50e18 + 75e18 + 1000e18;
@@ -2549,12 +2347,7 @@ contract PanopticVaultAccountantTest is Test {
         );
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(flippedDeposit),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(flippedDeposit), managerInput);
 
         // Expected: token0(100) + token1(200) converted with flipped oracles = ~300 (varies by conversion)
         uint256 expectedNavMin = 250e18; // Conservative minimum after flipped conversion
@@ -2597,12 +2390,7 @@ contract PanopticVaultAccountantTest is Test {
         tokenIds[0][1] = createMultiLegTokenId(TWAP_TICK); // Spread
 
         bytes memory managerInput = createManagerInput(pools, tokenIds);
-        uint256 nav = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Expected base: token0(1000) + token1(0.5) + collateral0(100) + collateral1(0.1) + deposit(500) = ~1600.6
         // Plus premiums: (200-150) + (50-20) = 50 + 30 = 80
@@ -2617,12 +2405,7 @@ contract PanopticVaultAccountantTest is Test {
         );
 
         // Test determinism
-        uint256 nav2 = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 nav2 = accountant.computeNAV(vault, address(depositToken), managerInput);
         assertEq(nav, nav2, "NAV calculation should be deterministic");
     }
 
@@ -2659,12 +2442,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setMockPositionBalanceArray(new uint256[2][](0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 navNormal = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 navNormal = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // === SCENARIO 2: Same balances but with large negative exposure ===
         // Reset the same balances
@@ -2684,7 +2462,6 @@ contract PanopticVaultAccountantTest is Test {
         uint256 navWithNegativeExposure = accountant.computeNAV(
             vault,
             address(depositToken),
-            address(proceedsToken),
             managerInput
         );
 
@@ -2765,12 +2542,7 @@ contract PanopticVaultAccountantTest is Test {
         // Test 1: No position exposure - tokens should be fully counted
         mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 navNoPositions = accountant.computeNAV(
-            vault,
-            address(depositToken),
-            address(proceedsToken),
-            managerInput
-        );
+        uint256 navNoPositions = accountant.computeNAV(vault, address(depositToken), managerInput);
 
         // Test 2: Massive negative position exposure that exceeds token balances
         uint256 hugeNegativeExposure = 10000e18; // Much larger than total token balances
@@ -2781,7 +2553,6 @@ contract PanopticVaultAccountantTest is Test {
         uint256 navNegativePositions = accountant.computeNAV(
             vault,
             address(depositToken),
-            address(proceedsToken),
             managerInput
         );
 

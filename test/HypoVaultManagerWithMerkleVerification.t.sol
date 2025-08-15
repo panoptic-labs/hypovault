@@ -28,7 +28,6 @@ contract MockVaultAccountant {
     function computeNAV(
         address vault,
         address,
-        address,
         bytes memory managerInput
     ) external view returns (uint256) {
         require(vault == expectedVault, "Invalid vault");
