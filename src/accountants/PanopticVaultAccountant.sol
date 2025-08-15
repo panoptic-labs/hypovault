@@ -24,9 +24,9 @@ contract PanopticVaultAccountant is Ownable {
     /// @param token1 The token1 of the pool
     /// @param poolOracle The oracle for the pool
     /// @param oracle0 The oracle for token0-underlying
-    /// @param isDepositToken0InOracle0 Whether token0 in oracle0 is the deposit token
+    /// @param isUnderlyingToken0InOracle0 Whether token0 in oracle0 is the underlying token
     /// @param oracle1 The oracle for token1-underlying
-    /// @param isDepositToken0InOracle1 Whether token0 in oracle1 is the deposit token
+    /// @param isUnderlyingToken0InOracle1 Whether token0 in oracle1 is the underlying token
     /// @param maxPriceDeviation The maximum price deviation allowed for the oracle prices
     /// @param twapWindow The time window (in seconds)to compute the TWAP over
     struct PoolInfo {
@@ -35,17 +35,17 @@ contract PanopticVaultAccountant is Ownable {
         IERC20Partial token1;
         IV3CompatibleOracle poolOracle;
         IV3CompatibleOracle oracle0;
-        bool isDepositToken0InOracle0;
+        bool isUnderlyingToken0InOracle0;
         IV3CompatibleOracle oracle1;
-        bool isDepositToken0InOracle1;
+        bool isUnderlyingToken0InOracle1;
         int24 maxPriceDeviation;
         uint32 twapWindow;
     }
 
     /// @notice Holds the prices provided by the vault manager
     /// @param poolPrice The price of the pool
-    /// @param token0Price The price of token0 relative to the depositToken
-    /// @param token1Price The price of token1 relative to the depositToken
+    /// @param token0Price The price of token0 relative to the underlying
+    /// @param token1Price The price of token1 relative to the underlying
     struct ManagerPrices {
         int24 poolPrice;
         int24 token0Price;
@@ -86,14 +86,14 @@ contract PanopticVaultAccountant is Ownable {
         vaultLocked[vault] = true;
     }
 
-    /// @notice Returns the NAV of the portfolio contained in `vault` in terms of its deposit token.
+    /// @notice Returns the NAV of the portfolio contained in `vault` in terms of its underlying token.
     /// @param vault The address of the vault to value
-    /// @param depositToken The deposit token of the vault
+    /// @param underlyingToken The underlying token of the vault
     /// @param managerInput Input calldata from the vault manager consisting of price quotes from the manager, pool information, and a position lsit for each pool
-    /// @return nav The NAV of the portfolio contained in `vault` in terms of its deposit token
+    /// @return nav The NAV of the portfolio contained in `vault` in terms of its underlying token
     function computeNAV(
         address vault,
-        address depositToken,
+        address underlyingToken,
         bytes calldata managerInput
     ) external view returns (uint256 nav) {
         (
@@ -104,7 +104,6 @@ contract PanopticVaultAccountant is Ownable {
 
         if (keccak256(abi.encode(pools)) != vaultPools[vault]) revert InvalidPools();
 
-        // an array of all tokens in the pools
         address[] memory underlyingTokens = new address[](pools.length * 2);
 
         // resolves stack too deep error
@@ -215,8 +214,8 @@ contract PanopticVaultAccountant is Ownable {
                 pools[i].pool.collateralToken1().previewRedeem(collateralBalance)
             );
 
-            // convert position values to deposit token
-            if (address(pools[i].token0) != depositToken) {
+            // convert position values to underlying
+            if (address(pools[i].token0) != underlyingToken) {
                 int24 conversionTick = PanopticMath.twapFilter(
                     pools[i].oracle0,
                     pools[i].twapWindow
@@ -227,13 +226,13 @@ contract PanopticVaultAccountant is Ownable {
                 ) revert StaleOraclePrice();
 
                 uint160 conversionPrice = Math.getSqrtRatioAtTick(
-                    pools[i].isDepositToken0InOracle0 ? -conversionTick : conversionTick
+                    pools[i].isUnderlyingToken0InOracle0 ? -conversionTick : conversionTick
                 );
 
                 poolExposure0 = PanopticMath.convert0to1(poolExposure0, conversionPrice);
             }
 
-            if (address(pools[i].token1) != depositToken) {
+            if (address(pools[i].token1) != underlyingToken) {
                 int24 conversionTick = PanopticMath.twapFilter(
                     pools[i].oracle1,
                     pools[i].twapWindow
@@ -244,7 +243,7 @@ contract PanopticVaultAccountant is Ownable {
                 ) revert StaleOraclePrice();
 
                 uint160 conversionPrice = Math.getSqrtRatioAtTick(
-                    pools[i].isDepositToken0InOracle1 ? conversionTick : -conversionTick
+                    pools[i].isUnderlyingToken0InOracle1 ? conversionTick : -conversionTick
                 );
 
                 poolExposure1 = PanopticMath.convert1to0(poolExposure1, conversionPrice);
@@ -257,11 +256,11 @@ contract PanopticVaultAccountant is Ownable {
                 uint256(Math.max(poolExposure0 + poolExposure1, 0));
         }
 
-        // deposit token cannot be native (0x000/0xeee)
-        bool skipDepositToken = false;
+        // underlying cannot be native (0x000/0xeee)
+        bool skipUnderlying = false;
         for (uint256 i = 0; i < underlyingTokens.length; i++) {
-            if (underlyingTokens[i] == depositToken) skipDepositToken = true;
+            if (underlyingTokens[i] == underlyingToken) skipUnderlying = true;
         }
-        if (!skipDepositToken) nav += IERC20Partial(depositToken).balanceOf(_vault);
+        if (!skipUnderlying) nav += IERC20Partial(underlyingToken).balanceOf(_vault);
     }
 }

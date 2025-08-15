@@ -476,8 +476,8 @@ contract PanopticVaultAccountantTest is Test {
             pool: PanopticPool(address(mockPool)),
             token0: depositToken, // Same as deposit - no conversion
             token1: token1,
-            isDepositToken0InOracle0: false,
-            isDepositToken0InOracle1: false,
+            isUnderlyingToken0InOracle0: false,
+            isUnderlyingToken0InOracle1: false,
             oracle0: oracle0,
             oracle1: oracle1,
             poolOracle: poolOracle,
@@ -524,9 +524,9 @@ contract PanopticVaultAccountantTest is Test {
             token1: depositToken, // Same as deposit
             poolOracle: poolOracle,
             oracle0: oracle0,
-            isDepositToken0InOracle0: true,
+            isUnderlyingToken0InOracle0: true,
             oracle1: oracle1,
-            isDepositToken0InOracle1: true,
+            isUnderlyingToken0InOracle1: true,
             maxPriceDeviation: MAX_PRICE_DEVIATION,
             twapWindow: TWAP_WINDOW
         });
@@ -568,9 +568,9 @@ contract PanopticVaultAccountantTest is Test {
             token1: token1,
             poolOracle: poolOracle,
             oracle0: oracle0,
-            isDepositToken0InOracle0: true,
+            isUnderlyingToken0InOracle0: true,
             oracle1: oracle1,
-            isDepositToken0InOracle1: false,
+            isUnderlyingToken0InOracle1: false,
             maxPriceDeviation: MAX_PRICE_DEVIATION,
             twapWindow: TWAP_WINDOW
         });
@@ -628,9 +628,9 @@ contract PanopticVaultAccountantTest is Test {
             token1: depositToken, // Same as deposit - no conversion
             poolOracle: poolOracle,
             oracle0: oracle0,
-            isDepositToken0InOracle0: true,
+            isUnderlyingToken0InOracle0: true,
             oracle1: oracle1,
-            isDepositToken0InOracle1: true,
+            isUnderlyingToken0InOracle1: true,
             maxPriceDeviation: MAX_PRICE_DEVIATION,
             twapWindow: TWAP_WINDOW
         });
@@ -779,8 +779,8 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_flippedTokens() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        pools[0].isDepositToken0InOracle0 = true;
-        pools[0].isDepositToken0InOracle1 = true;
+        pools[0].isUnderlyingToken0InOracle0 = true;
+        pools[0].isUnderlyingToken0InOracle1 = true;
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
 
         setupBasicScenario();
@@ -943,9 +943,9 @@ contract PanopticVaultAccountantTest is Test {
             token1: token1,
             poolOracle: poolOracle,
             oracle0: oracle0,
-            isDepositToken0InOracle0: false,
+            isUnderlyingToken0InOracle0: false,
             oracle1: oracle1,
-            isDepositToken0InOracle1: false,
+            isUnderlyingToken0InOracle1: false,
             maxPriceDeviation: MAX_PRICE_DEVIATION,
             twapWindow: TWAP_WINDOW
         });
@@ -2329,8 +2329,8 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_flippedOracles_conversion() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        pools[0].isDepositToken0InOracle0 = true;
-        pools[0].isDepositToken0InOracle1 = true;
+        pools[0].isUnderlyingToken0InOracle0 = true;
+        pools[0].isUnderlyingToken0InOracle1 = true;
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
 
         // Create different deposit to force conversion with flipped oracles
