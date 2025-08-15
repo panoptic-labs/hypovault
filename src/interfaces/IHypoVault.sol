@@ -7,7 +7,12 @@ interface IHypoVault {
 
     function cancelWithdrawal(address withdrawer) external;
 
-    function requestWithdrawalFrom(address user, uint128 shares, bool shouldRedeposit) external;
+    function requestWithdrawalFrom(
+        address user,
+        uint128 shares,
+        uint128 ratioX64,
+        bool shouldRedeposit
+    ) external;
 
     function fulfillDeposits(uint256 assetsToFulfill, bytes memory managerInput) external;
 

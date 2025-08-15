@@ -323,16 +323,25 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         _requestWithdrawal(msg.sender, shares, 0, false);
     }
 
+    /// @notice Requests a withdrawal of shares.
+    /// @param shares The amount of shares to withdraw
+    /// @param ratioX64 The fraction of the requested shares that will be distributed in proceeds tokens
+    function requestWithdrawal(uint128 shares, uint128 ratioX64) external {
+        _requestWithdrawal(msg.sender, shares, ratioX64, false);
+    }
+
     /// @notice Requests a withdrawal of shares from any user and optionally redeposits the assets into the vault upon withdrawal execution.
     /// @param user The user to initiate the withdrawal from
     /// @param shares The amount of shares to withdraw
+    /// @param ratioX64 The fraction of the requested shares that will be distributed in proceeds tokens
     /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
     function requestWithdrawalFrom(
         address user,
         uint128 shares,
+        uint128 ratioX64,
         bool shouldRedeposit
     ) external onlyManager {
-        _requestWithdrawal(user, shares, 0, shouldRedeposit);
+        _requestWithdrawal(user, shares, ratioX64, shouldRedeposit);
     }
 
     /// @notice Internal function to request a withdrawal of shares.
@@ -699,24 +708,24 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         WithdrawalEpochState memory epochState = withdrawalEpochState[currentEpoch];
         uint256 _totalSupply = totalSupply;
-        uint256 depositProceedsRatioX128 = 2 ** 128;
+        uint256 proceedsDepositRatioX128;
 
         if (maxProceedsAssetsReceived > 0) {
-            depositProceedsRatioX128 = Math.mulDiv(
-                maxDepositAssetsReceived,
+            proceedsDepositRatioX128 = Math.mulDiv(
+                maxProceedsAssetsReceived,
                 type(uint128).max,
                 maxDepositAssetsReceived + maxProceedsAssetsReceived
             );
         }
 
         uint256 depositAssetsReceived = Math.mulDiv(
-            Math.mulDiv128(sharesToFulfill, depositProceedsRatioX128),
+            Math.mulDiv128(sharesToFulfill, 2 ** 128 - proceedsDepositRatioX128),
             totalAssets,
             _totalSupply
         );
 
         uint256 proceedsAssetsReceived = Math.mulDiv(
-            Math.mulDiv128(sharesToFulfill, 2 ** 128 - depositProceedsRatioX128),
+            Math.mulDiv128(sharesToFulfill, proceedsDepositRatioX128),
             totalAssets,
             _totalSupply
         );

@@ -305,7 +305,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
 
         // Strategist requests withdrawal from Alice with redeposit
         vm.prank(strategist);
-        manager.requestWithdrawalFrom(alice, uint128(sharesToWithdraw), true);
+        manager.requestWithdrawalFrom(alice, uint128(sharesToWithdraw), 0, true);
 
         // Verify withdrawal was requested with redeposit flag
         (uint128 amount, uint128 basis, , bool shouldRedeposit) = vault.queuedWithdrawal(alice, 0);
@@ -332,7 +332,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
 
         // Strategist requests withdrawal from Alice without redeposit
         vm.prank(strategist);
-        manager.requestWithdrawalFrom(alice, uint128(sharesToWithdraw), false);
+        manager.requestWithdrawalFrom(alice, uint128(sharesToWithdraw), 0, false);
 
         // Verify withdrawal was requested without redeposit flag
         (uint128 amount, uint128 basis, , bool shouldRedeposit) = vault.queuedWithdrawal(alice, 0);
@@ -546,7 +546,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
 
         // 4. Strategist requests withdrawal from Alice with redeposit
         vm.prank(strategist);
-        manager.requestWithdrawalFrom(alice, uint128(aliceShares / 2), true);
+        manager.requestWithdrawalFrom(alice, uint128(aliceShares / 2), 0, true);
 
         // 5. Strategist fulfills withdrawal
         vm.startPrank(strategist);
@@ -624,7 +624,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         vm.expectRevert(
             HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector
         );
-        manager.requestWithdrawalFrom(alice, 100, true);
+        manager.requestWithdrawalFrom(alice, 100, 0, true);
 
         vm.expectRevert(
             HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector
@@ -708,7 +708,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
 
         // Test zero shares withdrawal request
         vm.prank(strategist);
-        manager.requestWithdrawalFrom(alice, 0, true);
+        manager.requestWithdrawalFrom(alice, 0, 0, true);
 
         // Should not revert and should result in no change
         assertEq(vault.balanceOf(alice), vault.balanceOf(alice)); // Unchanged
