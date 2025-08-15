@@ -617,7 +617,12 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         DepositEpochState memory epochState = depositEpochState[currentEpoch];
 
-        uint256 totalAssets = accountant.computeNAV(address(this), depositToken, managerInput) +
+        uint256 totalAssets = accountant.computeNAV(
+            address(this),
+            depositToken,
+            proceedsToken,
+            managerInput
+        ) +
             1 -
             epochState.assetsDeposited -
             reservedWithdrawalDepositAssets;
@@ -661,7 +666,12 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         bytes memory managerInput
     ) external onlyManager {
         uint256 _reservedWithdrawalDepositAssets = reservedWithdrawalDepositAssets;
-        uint256 totalAssets = accountant.computeNAV(address(this), depositToken, managerInput) +
+        uint256 totalAssets = accountant.computeNAV(
+            address(this),
+            depositToken,
+            proceedsToken,
+            managerInput
+        ) +
             1 -
             depositEpochState[depositEpoch].assetsDeposited -
             _reservedWithdrawalDepositAssets;
