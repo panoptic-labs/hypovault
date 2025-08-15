@@ -203,7 +203,7 @@ contract HypoVaultTest is Test {
         // Calculate expected values before fulfillment
         uint256 totalSupplyBefore = vault.totalSupply();
         uint256 nav = depositAmount;
-        uint256 totalAssets = nav + 1 - depositAmount - vault.reservedWithdrawalAssets(); // = 1
+        uint256 totalAssets = nav + 1 - depositAmount - vault.reservedWithdrawalDepositAssets(); // = 1
         uint256 expectedShares = calculateExpectedShares(
             depositAmount,
             totalAssets,
@@ -248,7 +248,10 @@ contract HypoVaultTest is Test {
 
         // Calculate expected shares before fulfillment
         uint256 totalSupplyBefore = vault.totalSupply();
-        uint256 totalAssets = depositAmount + 1 - depositAmount - vault.reservedWithdrawalAssets(); // = 1
+        uint256 totalAssets = depositAmount +
+            1 -
+            depositAmount -
+            vault.reservedWithdrawalDepositAssets(); // = 1
         uint256 expectedShares = calculateExpectedShares(
             depositAmount,
             totalAssets,
@@ -291,7 +294,7 @@ contract HypoVaultTest is Test {
         // Calculate expected values
         uint256 totalSupplyBefore = vault.totalSupply();
         uint256 nav = totalDeposits;
-        uint256 totalAssets = nav + 1 - totalDeposits - vault.reservedWithdrawalAssets(); // = 1
+        uint256 totalAssets = nav + 1 - totalDeposits - vault.reservedWithdrawalDepositAssets(); // = 1
         uint256 expectedTotalShares = calculateExpectedShares(
             totalDeposits,
             totalAssets,
@@ -348,7 +351,7 @@ contract HypoVaultTest is Test {
         // Calculate expected values
         uint256 totalSupplyBefore = vault.totalSupply();
         uint256 nav = 200 ether;
-        uint256 totalAssets = nav + 1 - depositAmount - vault.reservedWithdrawalAssets(); // = 101
+        uint256 totalAssets = nav + 1 - depositAmount - vault.reservedWithdrawalDepositAssets(); // = 101
         uint256 expectedShares = calculateExpectedShares(
             fulfillAmount,
             totalAssets,
@@ -394,7 +397,7 @@ contract HypoVaultTest is Test {
         // Calculate expected values
         uint256 totalSupplyBefore = vault.totalSupply();
         uint256 nav = 500 ether;
-        uint256 totalAssets = nav + 1 - totalDeposits - vault.reservedWithdrawalAssets(); // = 201
+        uint256 totalAssets = nav + 1 - totalDeposits - vault.reservedWithdrawalDepositAssets(); // = 201
         uint256 expectedTotalShares = calculateExpectedShares(
             fulfillAmount,
             totalAssets,
@@ -480,7 +483,7 @@ contract HypoVaultTest is Test {
 
         // First partial fulfillment (100 out of 300)
         uint256 totalSupplyBefore1 = vault.totalSupply();
-        uint256 totalAssets1 = 400 ether + 1 - 300 ether - vault.reservedWithdrawalAssets(); // = 101 ether
+        uint256 totalAssets1 = 400 ether + 1 - 300 ether - vault.reservedWithdrawalDepositAssets(); // = 101 ether
         uint256 expectedShares1 = calculateExpectedShares(
             100 ether,
             totalAssets1,
@@ -499,7 +502,7 @@ contract HypoVaultTest is Test {
 
         // Second partial fulfillment (150 out of 200 remaining)
         uint256 totalSupplyBefore2 = vault.totalSupply();
-        uint256 totalAssets2 = 350 ether + 1 - 200 ether - vault.reservedWithdrawalAssets(); // = 151 ether
+        uint256 totalAssets2 = 350 ether + 1 - 200 ether - vault.reservedWithdrawalDepositAssets(); // = 151 ether
         uint256 expectedShares2 = calculateExpectedShares(
             150 ether,
             totalAssets2,
@@ -568,7 +571,7 @@ contract HypoVaultTest is Test {
         // Calculate expected withdrawal amounts before fulfillment
         uint256 totalSupplyBeforeFulfill = vault.totalSupply() + sharesToWithdraw; // Add back burned shares
         (uint128 assetsDeposited, , ) = vault.depositEpochState(vault.depositEpoch());
-        uint256 totalAssets = nav + 1 - assetsDeposited - vault.reservedWithdrawalAssets();
+        uint256 totalAssets = nav + 1 - assetsDeposited - vault.reservedWithdrawalDepositAssets();
         uint256 expectedAssetsToWithdraw = calculateExpectedAssets(
             sharesToWithdraw,
             totalAssets,
@@ -1054,7 +1057,7 @@ contract HypoVaultTest is Test {
         vault.requestDeposit(uint128(depositAmount));
 
         // Calculate expected shares to be minted
-        uint256 totalAssets = 200 ether + 1 - 200 ether - vault.reservedWithdrawalAssets(); // = 1
+        uint256 totalAssets = 200 ether + 1 - 200 ether - vault.reservedWithdrawalDepositAssets(); // = 1
         uint256 expectedSharesAdded = calculateExpectedShares(
             200 ether,
             totalAssets,
@@ -1232,7 +1235,7 @@ contract HypoVaultTest is Test {
         uint256 totalAssetsBeforeSecondDeposit = 250 ether +
             1 -
             100 ether -
-            vault.reservedWithdrawalAssets();
+            vault.reservedWithdrawalDepositAssets();
         uint256 expectedSharesFromSecondDeposit = calculateExpectedShares(
             100 ether,
             totalAssetsBeforeSecondDeposit,
@@ -1279,13 +1282,13 @@ contract HypoVaultTest is Test {
         vault.fulfillWithdrawals(aliceShares / 2, 100 ether, "");
 
         // Check reserved assets increased
-        assertEq(vault.reservedWithdrawalAssets(), 100 ether);
+        assertEq(vault.reservedWithdrawalDepositAssets(), 100 ether);
 
         // Execute withdrawal
         vault.executeWithdrawal(Alice, 0);
 
         // Check reserved assets decreased
-        assertEq(vault.reservedWithdrawalAssets(), 0);
+        assertEq(vault.reservedWithdrawalDepositAssets(), 0);
         vm.stopPrank();
     }
 
@@ -1346,7 +1349,10 @@ contract HypoVaultTest is Test {
 
         // Calculate expected shares for large amount
         uint256 totalSupplyBefore = vault.totalSupply();
-        uint256 totalAssets = largeAmount + 1 - largeAmount - vault.reservedWithdrawalAssets(); // = 1
+        uint256 totalAssets = largeAmount +
+            1 -
+            largeAmount -
+            vault.reservedWithdrawalDepositAssets(); // = 1
         uint256 expectedShares = calculateExpectedShares(
             largeAmount,
             totalAssets,
@@ -1378,7 +1384,10 @@ contract HypoVaultTest is Test {
 
         // Calculate expected shares for small amount
         uint256 totalSupplyBefore = vault.totalSupply();
-        uint256 totalAssets = smallDeposit + 1 - smallDeposit - vault.reservedWithdrawalAssets(); // = 1
+        uint256 totalAssets = smallDeposit +
+            1 -
+            smallDeposit -
+            vault.reservedWithdrawalDepositAssets(); // = 1
         uint256 expectedShares = calculateExpectedShares(
             smallDeposit,
             totalAssets,
