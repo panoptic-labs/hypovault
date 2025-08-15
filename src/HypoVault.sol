@@ -672,16 +672,33 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         uint256 _totalSupply = totalSupply;
 
-        uint256 depositAssetsReceived = Math.mulDiv(sharesToFulfill, totalAssets, _totalSupply);
+        uint256 depositProceedsRatioX128 = Math.mulDiv(
+            maxDepositAssetsReceived,
+            type(uint128).max,
+            maxDepositAssetsReceived + maxProceedsAssetsReceived
+        );
+
+        uint256 depositAssetsReceived = Math.mulDiv(
+            Math.mulDiv128(sharesToFulfill, depositProceedsRatioX128),
+            totalAssets,
+            _totalSupply
+        );
+
+        uint256 proceedsAssetsReceived = Math.mulDiv(
+            Math.mulDiv128(sharesToFulfill, 2 ** 128 - depositProceedsRatioX128),
+            totalAssets,
+            _totalSupply
+        );
 
         if (depositAssetsReceived > maxDepositAssetsReceived) revert WithdrawalNotFulfillable();
+        if (proceedsAssetsReceived > maxProceedsAssetsReceived) revert WithdrawalNotFulfillable();
 
         uint256 sharesRemaining = epochState.sharesWithdrawn - sharesToFulfill;
 
         withdrawalEpochState[currentEpoch] = WithdrawalEpochState({
             sharesWithdrawn: uint128(epochState.sharesWithdrawn),
             depositAssetsReceived: uint128(depositAssetsReceived),
-            proceedsAssetsReceived: 0,
+            proceedsAssetsReceived: uint128(proceedsAssetsReceived),
             sharesFulfilled: uint128(sharesToFulfill)
         });
 
