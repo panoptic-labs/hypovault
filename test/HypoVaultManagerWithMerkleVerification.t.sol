@@ -77,6 +77,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
             address(0x999), // Dummy manager address
             IVaultAccountant(address(accountant)),
             100, // 1% performance fee
+            20, // 1% performance fee
             "HVAULT",
             "HypoVault Token"
         );

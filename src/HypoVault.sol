@@ -120,7 +120,8 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @param user The address that requested the withdrawal
     /// @param shares The amount of shares executed
     /// @param assets The amount of assets received
-    /// @param performanceFee The amount of performance fee received
+    /// @param performanceFee The amount of performance fee received from the deposit token
+    /// @param performanceFeeProceeds The amount of performance fee received from the proceeds token
     /// @param epoch The epoch in which the withdrawal was executed
     /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
     event WithdrawalExecuted(
@@ -128,6 +129,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         uint256 shares,
         uint256 assets,
         uint256 performanceFee,
+        uint256 performanceFeeProceeds,
         uint256 epoch,
         bool shouldRedeposit
     );
@@ -180,6 +182,9 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @notice Performance fee, in basis points, taken on each profitable withdrawal.
     uint256 public immutable performanceFeeBps;
 
+    /// @notice Performance fee for proceeds token, in basis points, taken on each profitable withdrawal.
+    uint256 public immutable performanceFeeProceedsBps;
+
     /// @notice Symbol of the share token.
     string public symbol;
 
@@ -226,6 +231,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @param _manager The account authorized to execute deposits, withdrawals, and make arbitrary function calls from the vault.
     /// @param _accountant The contract that reports the net asset value of the vault.
     /// @param _performanceFeeBps The performance fee, in basis points, taken on each profitable withdrawal.
+    /// @param _performanceFeeProceedsBps The performance fee for proceeds tokens, in basis points, taken on each profitable withdrawal.
     /// @param _symbol The symbol of the share token.
     /// @param _name The name of the share token.
     constructor(
@@ -234,6 +240,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         address _manager,
         IVaultAccountant _accountant,
         uint256 _performanceFeeBps,
+        uint256 _performanceFeeProceedsBps,
         string memory _symbol,
         string memory _name
     ) {
@@ -242,6 +249,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         manager = _manager;
         accountant = _accountant;
         performanceFeeBps = _performanceFeeBps;
+        performanceFeeProceedsBps = _performanceFeeProceedsBps;
         totalSupply = 1_000_000;
         symbol = _symbol;
         name = _name;
@@ -478,19 +486,21 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         uint256 sharesToFulfill = (uint256(pendingWithdrawal.amount) *
             _withdrawalEpochState.sharesFulfilled) / _withdrawalEpochState.sharesWithdrawn;
         // assets to withdraw = prorated shares to withdraw * assets fulfilled / total shares fulfilled
-        uint256 assetsToWithdraw = Math.mulDiv(
+        uint256 depositAssetsToWithdraw = Math.mulDiv(
             sharesToFulfill,
             _withdrawalEpochState.depositAssetsReceived,
             _withdrawalEpochState.sharesFulfilled == 0 ? 1 : _withdrawalEpochState.sharesFulfilled
         );
 
-        reservedWithdrawalDepositAssets -= assetsToWithdraw;
+        reservedWithdrawalDepositAssets -= depositAssetsToWithdraw;
 
         uint256 withdrawnBasis = (uint256(pendingWithdrawal.basis) *
             _withdrawalEpochState.sharesFulfilled) / _withdrawalEpochState.sharesWithdrawn;
         uint256 performanceFee = (uint256(
-            Math.max(0, int256(assetsToWithdraw) - int256(withdrawnBasis))
+            Math.max(0, int256(depositAssetsToWithdraw) - int256(withdrawnBasis))
         ) * performanceFeeBps) / 10_000;
+
+        uint256 performanceFeeProceeds;
 
         queuedWithdrawal[user][epoch] = PendingWithdrawal({
             amount: 0,
@@ -515,26 +525,27 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         }
 
         if (performanceFee > 0) {
-            assetsToWithdraw -= performanceFee;
+            depositAssetsToWithdraw -= performanceFee;
             SafeTransferLib.safeTransfer(depositToken, feeWallet, uint256(performanceFee));
         }
 
         if (pendingWithdrawal.shouldRedeposit) {
             uint256 _depositEpoch = depositEpoch;
 
-            queuedDeposit[user][_depositEpoch] += uint128(assetsToWithdraw);
-            depositEpochState[_depositEpoch].assetsDeposited += uint128(assetsToWithdraw);
+            queuedDeposit[user][_depositEpoch] += uint128(depositAssetsToWithdraw);
+            depositEpochState[_depositEpoch].assetsDeposited += uint128(depositAssetsToWithdraw);
 
-            emit DepositRequested(user, assetsToWithdraw);
+            emit DepositRequested(user, depositAssetsToWithdraw);
         } else {
-            SafeTransferLib.safeTransfer(depositToken, user, assetsToWithdraw);
+            SafeTransferLib.safeTransfer(depositToken, user, depositAssetsToWithdraw);
         }
 
         emit WithdrawalExecuted(
             user,
             sharesToFulfill,
-            assetsToWithdraw,
+            depositAssetsToWithdraw,
             performanceFee,
+            performanceFeeProceeds,
             epoch,
             pendingWithdrawal.shouldRedeposit
         );

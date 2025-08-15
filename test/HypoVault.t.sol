@@ -157,6 +157,7 @@ contract HypoVaultTest is Test {
             Manager,
             IVaultAccountant(address(accountant)),
             100,
+            20,
             "TEST",
             "Test Token"
         ); // 1% performance fee
@@ -2239,6 +2240,7 @@ contract HypoVaultTest is Test {
             Manager,
             IVaultAccountant(address(accountant)),
             100,
+            20,
             "V6",
             "6 Decimal Vault"
         );
@@ -2248,6 +2250,7 @@ contract HypoVaultTest is Test {
             Manager,
             IVaultAccountant(address(accountant)),
             100,
+            20,
             "V8",
             "8 Decimal Vault"
         );
@@ -2257,6 +2260,7 @@ contract HypoVaultTest is Test {
             Manager,
             IVaultAccountant(address(accountant)),
             100,
+            20,
             "V12",
             "12 Decimal Vault"
         );
@@ -2274,6 +2278,7 @@ contract HypoVaultTest is Test {
             Manager,
             IVaultAccountant(address(accountant)),
             100,
+            20,
             "VB",
             "Bad Token Vault"
         );
@@ -2587,6 +2592,7 @@ contract HypoVaultTest is Test {
             Manager,
             IVaultAccountant(address(accountant)),
             100,
+            20,
             "TEST2",
             "Test Token 2"
         );
