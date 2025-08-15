@@ -263,4 +263,30 @@ contract PanopticVaultAccountant is Ownable {
         }
         if (!skipUnderlying) nav += IERC20Partial(underlyingToken).balanceOf(_vault);
     }
+
+    /// @notice Returns the correct price of the proceedsToken in terms of the depositToken.
+    /// @param vault The address of the vault to value
+    /// @param depositToken The deposit token of the vault
+    /// @param proceedsToken The proceeds token of the vault
+    /// @param assetsRequested The total amount of assets to be converted
+    /// @param managerInput Input calldata from the vault manager consisting of price quotes from the manager, pool information, and a position lsit for each pool
+    /// @return depositTokenAmount The amount of deposit token to distribute based on the `ManagerPrices`
+    /// @return proceedsTokenAmount The amount of proceeds token to distrubute based on the `ManagerPrices`
+    function getTokenAmountsFromPrice(
+        address vault,
+        address depositToken,
+        address proceedsToken,
+        uint256 assetsRequested,
+        bytes calldata managerInput
+    ) external view returns (uint256 depositTokenAmount, uint256 proceedsTokenAmount) {
+        (ManagerPrices[] memory managerPrices, PoolInfo[] memory pools, ) = abi.decode(
+            managerInput,
+            (ManagerPrices[], PoolInfo[], TokenId[][])
+        );
+
+        // compute conversion price here, matching the PoolInfo with deposit/proceeds token
+
+        depositTokenAmount = assetsRequested;
+        proceedsTokenAmount = 0;
+    }
 }
