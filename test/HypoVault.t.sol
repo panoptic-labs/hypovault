@@ -578,7 +578,7 @@ contract HypoVaultTest is Test {
             totalSupplyBeforeFulfill
         );
 
-        vault.fulfillWithdrawals(sharesToWithdraw, expectedAssetsToWithdraw + 10 ether, "");
+        vault.fulfillWithdrawals(sharesToWithdraw, expectedAssetsToWithdraw + 10 ether, 0, "");
 
         // Execute withdrawal
         uint256 aliceBalanceBefore = token.balanceOf(Alice);
@@ -617,7 +617,7 @@ contract HypoVaultTest is Test {
         vm.startPrank(Manager);
         accountant.setNav(300 ether); // Vault appreciated
         // Use a high max to avoid WithdrawalNotFulfillable - we'll verify exact amounts in execution
-        vault.fulfillWithdrawals(sharesToWithdraw, 200 ether, "");
+        vault.fulfillWithdrawals(sharesToWithdraw, 200 ether, 0, "");
 
         // Execute withdrawal and verify exact amounts
         uint256 aliceBalanceBefore = token.balanceOf(Alice);
@@ -669,7 +669,7 @@ contract HypoVaultTest is Test {
         vm.startPrank(Manager);
         accountant.setNav(240 ether); // Vault depreciated
         // Use high max to avoid WithdrawalNotFulfillable
-        vault.fulfillWithdrawals(sharesToWithdraw, 100 ether, "");
+        vault.fulfillWithdrawals(sharesToWithdraw, 100 ether, 0, "");
 
         // Execute withdrawal
         uint256 aliceBalanceBefore = token.balanceOf(Alice);
@@ -723,7 +723,7 @@ contract HypoVaultTest is Test {
         uint256 sharesToFulfill = (sharesToWithdraw * 60) / 100;
         vm.startPrank(Manager);
         accountant.setNav(700 ether);
-        vault.fulfillWithdrawals(sharesToFulfill, 80 ether, "");
+        vault.fulfillWithdrawals(sharesToFulfill, 80 ether, 0, "");
 
         // Execute withdrawal
         uint256 aliceBalanceBefore = token.balanceOf(Alice);
@@ -926,7 +926,7 @@ contract HypoVaultTest is Test {
         vault.fulfillDeposits(0, "");
 
         vm.expectRevert(HypoVault.NotManager.selector);
-        vault.fulfillWithdrawals(0, 0, "");
+        vault.fulfillWithdrawals(0, 0, 0, "");
 
         vm.expectRevert(HypoVault.NotManager.selector);
         vault.cancelDeposit(Alice);
@@ -942,7 +942,7 @@ contract HypoVaultTest is Test {
         // Test that manager can call these functions
         vm.startPrank(Manager);
         vault.fulfillDeposits(0, "");
-        vault.fulfillWithdrawals(0, 0, "");
+        vault.fulfillWithdrawals(0, 0, 0, "");
         vault.cancelDeposit(Alice);
         vault.cancelWithdrawal(Alice);
         vm.stopPrank();
@@ -989,11 +989,11 @@ contract HypoVaultTest is Test {
         assertEq(vault.withdrawalEpoch(), 0);
 
         vm.prank(Manager);
-        vault.fulfillWithdrawals(0, 0, "");
+        vault.fulfillWithdrawals(0, 0, 0, "");
         assertEq(vault.withdrawalEpoch(), 1);
 
         vm.prank(Manager);
-        vault.fulfillWithdrawals(0, 0, "");
+        vault.fulfillWithdrawals(0, 0, 0, "");
         assertEq(vault.withdrawalEpoch(), 2);
     }
 
@@ -1042,7 +1042,7 @@ contract HypoVaultTest is Test {
         vm.startPrank(Manager);
         accountant.setNav(200 ether);
         vm.expectRevert(HypoVault.WithdrawalNotFulfillable.selector);
-        vault.fulfillWithdrawals(aliceShares / 2, 25 ether, ""); // Max 25 but needs ~50
+        vault.fulfillWithdrawals(aliceShares / 2, 25 ether, 0, ""); // Max 25 but needs ~50
         vm.stopPrank();
     }
 
@@ -1087,7 +1087,7 @@ contract HypoVaultTest is Test {
         // Fulfill withdrawal - total supply should decrease by exact amount withdrawn
         vm.startPrank(Manager);
         accountant.setNav(200 ether);
-        vault.fulfillWithdrawals(aliceShares / 2, 50 ether, "");
+        vault.fulfillWithdrawals(aliceShares / 2, 50 ether, 0, "");
         assertEq(vault.totalSupply(), supplyAfterFulfill - aliceShares / 2);
         vm.stopPrank();
     }
@@ -1220,7 +1220,7 @@ contract HypoVaultTest is Test {
 
         vm.startPrank(Manager);
         accountant.setNav(200 ether);
-        vault.fulfillWithdrawals(aliceShares / 2, 50 ether, "");
+        vault.fulfillWithdrawals(aliceShares / 2, 50 ether, 0, "");
         vault.executeWithdrawal(Alice, 0);
 
         uint256 aliceBasisAfterWithdrawal = vault.userBasis(Alice);
@@ -1279,7 +1279,7 @@ contract HypoVaultTest is Test {
 
         vm.startPrank(Manager);
         accountant.setNav(300 ether);
-        vault.fulfillWithdrawals(aliceShares / 2, 100 ether, "");
+        vault.fulfillWithdrawals(aliceShares / 2, 100 ether, 0, "");
 
         // Check reserved assets increased
         assertEq(vault.reservedWithdrawalDepositAssets(), 100 ether);
@@ -1467,7 +1467,7 @@ contract HypoVaultTest is Test {
         uint256 sharesToFulfill = (sharesToWithdraw * 50) / 100;
         vm.startPrank(Manager);
         accountant.setNav(2000 ether);
-        vault.fulfillWithdrawals(sharesToFulfill, 1000 ether, "");
+        vault.fulfillWithdrawals(sharesToFulfill, 1000 ether, 0, "");
 
         // Before executeWithdrawal, check epoch state
         (uint128 sharesWithdrawn, , , uint128 sharesFulfilled) = vault.withdrawalEpochState(0);
@@ -1587,7 +1587,7 @@ contract HypoVaultTest is Test {
         // Calculate expected assets for 75e18 shares
         uint256 expectedAssetsFor75Shares = (75e18 * 1 ether) / aliceShares;
 
-        vault.fulfillWithdrawals(sharesToFulfill, expectedAssetsFor75Shares, "");
+        vault.fulfillWithdrawals(sharesToFulfill, expectedAssetsFor75Shares, 0, "");
 
         // Check epoch state
         (uint128 sharesWithdrawn, uint128 assetsReceived, , uint128 sharesFulfilled) = vault
@@ -1652,7 +1652,7 @@ contract HypoVaultTest is Test {
         // Calculate what 75 shares should be worth: 75% of that
         uint256 expectedAssetsFor75Shares = (75 * 100 ether) / aliceShares;
 
-        vault.fulfillWithdrawals(sharesToFulfill, expectedAssetsFor75Shares, "");
+        vault.fulfillWithdrawals(sharesToFulfill, expectedAssetsFor75Shares, 0, "");
 
         // Execute Alice's withdrawal
         uint256 aliceBalanceBefore = token.balanceOf(Alice);
@@ -2336,7 +2336,7 @@ contract HypoVaultTest is Test {
         // Manager fulfills 0 withdrawals (advances epoch but doesn't process any)
         vm.startPrank(Manager);
         accountant.setNav(100 ether);
-        vault.fulfillWithdrawals(0, 0, "");
+        vault.fulfillWithdrawals(0, 0, 0, "");
 
         // Check that epoch advanced but no assets were reserved
         assertEq(vault.withdrawalEpoch(), 1);
@@ -2534,7 +2534,7 @@ contract HypoVaultTest is Test {
 
         // Test withdrawal with lower but reasonable NAV
         accountant.setNav(800 ether);
-        vault.fulfillWithdrawals(aliceShares / 2, 400 ether, "");
+        vault.fulfillWithdrawals(aliceShares / 2, 400 ether, 0, "");
         vault.executeWithdrawal(Alice, 0);
 
         // Verify withdrawal completed successfully
@@ -3278,7 +3278,7 @@ contract HypoVaultTest is Test {
         // Fulfill the withdrawal
         vm.startPrank(Manager);
         accountant.setNav(1000 ether);
-        vault.fulfillWithdrawals(sharesToWithdraw, 500 ether, "");
+        vault.fulfillWithdrawals(sharesToWithdraw, 500 ether, 0, "");
         vm.stopPrank();
 
         // Check initial state before execution
@@ -3321,7 +3321,7 @@ contract HypoVaultTest is Test {
         // Fulfill the withdrawal with profit (higher NAV)
         vm.startPrank(Manager);
         accountant.setNav(1200 ether); // 20% profit
-        vault.fulfillWithdrawals(sharesToWithdraw, 600 ether, "");
+        vault.fulfillWithdrawals(sharesToWithdraw, 600 ether, 0, "");
         vm.stopPrank();
 
         uint256 feeWalletBalanceBefore = token.balanceOf(FeeWallet);
@@ -3362,7 +3362,7 @@ contract HypoVaultTest is Test {
         // Fulfill the withdrawal
         vm.startPrank(Manager);
         accountant.setNav(1000 ether);
-        vault.fulfillWithdrawals(sharesToWithdraw, 500 ether, "");
+        vault.fulfillWithdrawals(sharesToWithdraw, 500 ether, 0, "");
         vm.stopPrank();
 
         // Expect DepositRequested event for redeposit
@@ -3400,7 +3400,7 @@ contract HypoVaultTest is Test {
         // Fulfill both withdrawals
         vm.startPrank(Manager);
         accountant.setNav(2000 ether);
-        vault.fulfillWithdrawals(sharesToWithdraw * 2, 1000 ether, "");
+        vault.fulfillWithdrawals(sharesToWithdraw * 2, 1000 ether, 0, "");
         vm.stopPrank();
 
         uint256 aliceBalanceBefore = token.balanceOf(Alice);
@@ -3442,7 +3442,7 @@ contract HypoVaultTest is Test {
         // Partially fulfill the withdrawal (should move remainder to next epoch)
         vm.startPrank(Manager);
         accountant.setNav(1000 ether);
-        vault.fulfillWithdrawals(sharesToWithdraw / 2, 250 ether, "");
+        vault.fulfillWithdrawals(sharesToWithdraw / 2, 250 ether, 0, "");
         vm.stopPrank();
 
         // Execute partial withdrawal
@@ -3489,7 +3489,7 @@ contract HypoVaultTest is Test {
         accountant.setNav(500 ether);
         uint256 totalFirstWithdrawal = ((aliceShares * 20 ether) / 300 ether) +
             ((bobShares * 10 ether) / 200 ether);
-        vault.fulfillWithdrawals(totalFirstWithdrawal, 30 ether, "");
+        vault.fulfillWithdrawals(totalFirstWithdrawal, 30 ether, 0, "");
         vm.stopPrank();
 
         // Execute first withdrawals
@@ -3639,7 +3639,7 @@ contract HypoVaultTest is Test {
         accountant.setNav(500 ether);
         uint256 totalRequestedShares = ((aliceShares * 20 ether) / 300 ether) +
             ((bobShares * 10 ether) / 200 ether);
-        vault.fulfillWithdrawals(totalRequestedShares, 100 ether, "");
+        vault.fulfillWithdrawals(totalRequestedShares, 100 ether, 0, "");
         vm.stopPrank();
 
         vm.prank(Alice);
@@ -3724,7 +3724,7 @@ contract HypoVaultTest is Test {
 
         // Move to next epoch
         vm.prank(Manager);
-        vault.fulfillWithdrawals(halfShares, halfShares, "");
+        vault.fulfillWithdrawals(halfShares, halfShares, 0, "");
 
         // Epoch 1 withdrawal
         vm.prank(Manager);

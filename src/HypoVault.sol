@@ -652,10 +652,12 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @dev Can only be called by the manager.
     /// @param sharesToFulfill The amount of shares to fulfill
     /// @param maxDepositAssetsReceived The maximum amount of deposit assets the manager is willing to disburse
+    /// @param maxProceedsAssetsReceived The maximum amount of proceeds assets the manager is willing to disburse
     /// @param managerInput If provided, an arbitrary input to the accountant contract
     function fulfillWithdrawals(
         uint256 sharesToFulfill,
         uint256 maxDepositAssetsReceived,
+        uint256 maxProceedsAssetsReceived,
         bytes memory managerInput
     ) external onlyManager {
         uint256 _reservedWithdrawalDepositAssets = reservedWithdrawalDepositAssets;
