@@ -206,8 +206,11 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @notice Epoch number for which deposits are currently being executed.
     uint128 public depositEpoch;
 
-    /// @notice Assets in the vault reserved for fulfilled withdrawal requests.
+    /// @notice Deposit assets in the vault reserved for fulfilled withdrawal requests.
     uint256 public reservedWithdrawalDepositAssets;
+
+    /// @notice Proceeds assets in the vault reserved for fulfilled withdrawal requests.
+    uint256 public reservedWithdrawalProceedsAssets;
 
     /// @notice Contains information about the quantity of assets requested and fulfilled for deposits in each epoch.
     mapping(uint256 epoch => DepositEpochState) public depositEpochState;
@@ -485,22 +488,35 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         // prorated shares to fulfill = amount * fulfilled shares / total shares withdrawn
         uint256 sharesToFulfill = (uint256(pendingWithdrawal.amount) *
             _withdrawalEpochState.sharesFulfilled) / _withdrawalEpochState.sharesWithdrawn;
-        // assets to withdraw = prorated shares to withdraw * assets fulfilled / total shares fulfilled
+
+        // deposit assets to withdraw = prorated shares to withdraw * assets fulfilled / total shares fulfilled
         uint256 depositAssetsToWithdraw = Math.mulDiv(
-            sharesToFulfill,
+            Math.mulDiv64(sharesToFulfill, 2 ** 64 - pendingWithdrawal.ratioX64),
             _withdrawalEpochState.depositAssetsReceived,
             _withdrawalEpochState.sharesFulfilled == 0 ? 1 : _withdrawalEpochState.sharesFulfilled
         );
 
         reservedWithdrawalDepositAssets -= depositAssetsToWithdraw;
 
+        // proceeds assets to withdraw = prorated shares to withdraw * assets fulfilled / total shares fulfilled
+        uint256 proceedsAssetsToWithdraw = Math.mulDiv(
+            Math.mulDiv64(sharesToFulfill, pendingWithdrawal.ratioX64),
+            _withdrawalEpochState.proceedsAssetsReceived,
+            _withdrawalEpochState.sharesFulfilled == 0 ? 1 : _withdrawalEpochState.sharesFulfilled
+        );
+
+        reservedWithdrawalProceedsAssets -= proceedsAssetsToWithdraw;
+
         uint256 withdrawnBasis = (uint256(pendingWithdrawal.basis) *
             _withdrawalEpochState.sharesFulfilled) / _withdrawalEpochState.sharesWithdrawn;
+
         uint256 performanceFee = (uint256(
             Math.max(0, int256(depositAssetsToWithdraw) - int256(withdrawnBasis))
         ) * performanceFeeBps) / 10_000;
 
-        uint256 performanceFeeProceeds;
+        uint256 performanceFeeProceeds = (uint256(
+            Math.max(0, int256(proceedsAssetsToWithdraw) - int256(0))
+        ) * performanceFeeProceedsBps) / 10_000;
 
         queuedWithdrawal[user][epoch] = PendingWithdrawal({
             amount: 0,
@@ -528,6 +544,10 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
             depositAssetsToWithdraw -= performanceFee;
             SafeTransferLib.safeTransfer(depositToken, feeWallet, uint256(performanceFee));
         }
+        if (performanceFeeProceeds > 0) {
+            proceedsAssetsToWithdraw -= performanceFeeProceeds;
+            SafeTransferLib.safeTransfer(proceedsToken, feeWallet, uint256(performanceFeeProceeds));
+        }
 
         if (pendingWithdrawal.shouldRedeposit) {
             uint256 _depositEpoch = depositEpoch;
@@ -538,6 +558,9 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
             emit DepositRequested(user, depositAssetsToWithdraw);
         } else {
             SafeTransferLib.safeTransfer(depositToken, user, depositAssetsToWithdraw);
+            if (proceedsAssetsToWithdraw > 0) {
+                SafeTransferLib.safeTransfer(proceedsToken, user, proceedsAssetsToWithdraw);
+            }
         }
 
         emit WithdrawalExecuted(
