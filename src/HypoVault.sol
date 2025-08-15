@@ -734,6 +734,8 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         WithdrawalEpochState memory epochState = withdrawalEpochState[currentEpoch];
         uint256 _totalSupply = totalSupply;
+
+        // placeholder logic, need to compute average (?) price from the managerInput prices for the deposit/proceeds tokens
         uint256 proceedsDepositRatioX128;
 
         if (maxProceedsAssetsReceived > 0) {
