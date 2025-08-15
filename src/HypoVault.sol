@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
+import "forge-std/console2.sol";
 
 // Interfaces
 import {ERC20Minimal} from "lib/panoptic-v1.1/contracts/tokens/ERC20Minimal.sol";
@@ -28,10 +29,12 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @notice A type that represents an unfulfilled or partially fulfilled withdrawal.
     /// @param amount The amount of shares requested
     /// @param basis The amount of assets used to mint the shares requested
+    /// @param ratioX64 The fraction of the requested shares that will be distributed in proceeds tokens
     /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
     struct PendingWithdrawal {
         uint128 amount;
         uint128 basis;
+        uint128 ratioX64;
         bool shouldRedeposit;
     }
 
@@ -87,8 +90,14 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @notice Emitted when a withdrawal is requested.
     /// @param user The address that requested the withdrawal
     /// @param shares The amount of shares requested
+    /// @param ratioX64 The fraction of the requested shares that will be distributed in proceeds tokens
     /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
-    event WithdrawalRequested(address indexed user, uint256 shares, bool shouldRedeposit);
+    event WithdrawalRequested(
+        address indexed user,
+        uint256 shares,
+        uint128 ratioX64,
+        bool shouldRedeposit
+    );
 
     /// @notice Emitted when a deposit is cancelled.
     /// @param user The address that requested the deposit
@@ -311,7 +320,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @notice Requests a withdrawal of shares.
     /// @param shares The amount of shares to withdraw
     function requestWithdrawal(uint128 shares) external {
-        _requestWithdrawal(msg.sender, shares, false);
+        _requestWithdrawal(msg.sender, shares, 0, false);
     }
 
     /// @notice Requests a withdrawal of shares from any user and optionally redeposits the assets into the vault upon withdrawal execution.
@@ -323,14 +332,20 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         uint128 shares,
         bool shouldRedeposit
     ) external onlyManager {
-        _requestWithdrawal(user, shares, shouldRedeposit);
+        _requestWithdrawal(user, shares, 0, shouldRedeposit);
     }
 
     /// @notice Internal function to request a withdrawal of shares.
     /// @param user The user to initiate the withdrawal
     /// @param shares The amount of shares to withdraw
+    /// @param ratioX64 The fraction of the requested shares that will be distributed in proceeds tokens
     /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
-    function _requestWithdrawal(address user, uint128 shares, bool shouldRedeposit) internal {
+    function _requestWithdrawal(
+        address user,
+        uint128 shares,
+        uint128 ratioX64,
+        bool shouldRedeposit
+    ) internal {
         uint256 _withdrawalEpoch = withdrawalEpoch;
 
         PendingWithdrawal memory pendingWithdrawal = queuedWithdrawal[user][_withdrawalEpoch];
@@ -346,6 +361,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         queuedWithdrawal[user][_withdrawalEpoch] = PendingWithdrawal({
             amount: pendingWithdrawal.amount + shares,
             basis: uint128(pendingWithdrawal.basis + withdrawalBasis),
+            ratioX64: ratioX64,
             shouldRedeposit: pendingWithdrawal.shouldRedeposit || shouldRedeposit
         });
 
@@ -353,7 +369,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         _burnVirtual(user, shares);
 
-        emit WithdrawalRequested(user, shares, shouldRedeposit);
+        emit WithdrawalRequested(user, shares, ratioX64, shouldRedeposit);
     }
 
     /// @notice Cancels a deposit in the current (unfulfilled) epoch.
@@ -387,6 +403,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         queuedWithdrawal[withdrawer][currentEpoch] = PendingWithdrawal({
             amount: 0,
             basis: 0,
+            ratioX64: 0,
             shouldRedeposit: false
         });
         userBasis[withdrawer] += currentPendingWithdrawal.basis;
@@ -469,6 +486,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         queuedWithdrawal[user][epoch] = PendingWithdrawal({
             amount: 0,
             basis: 0,
+            ratioX64: 0,
             shouldRedeposit: false
         });
 
@@ -482,6 +500,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
             queuedWithdrawal[user][epoch + 1] = PendingWithdrawal({
                 amount: uint128(nextQueuedWithdrawal.amount + sharesRemaining),
                 basis: uint128(nextQueuedWithdrawal.basis + basisRemaining),
+                ratioX64: pendingWithdrawal.ratioX64,
                 shouldRedeposit: pendingWithdrawal.shouldRedeposit
             });
         }
@@ -520,6 +539,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         queuedWithdrawal[msg.sender][epoch] = PendingWithdrawal({
             amount: pendingWithdrawal.amount,
             basis: pendingWithdrawal.basis,
+            ratioX64: pendingWithdrawal.ratioX64,
             shouldRedeposit: false
         });
 
@@ -675,18 +695,19 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
             1 -
             depositEpochState[depositEpoch].assetsDeposited -
             _reservedWithdrawalDepositAssets;
-
         uint256 currentEpoch = withdrawalEpoch;
 
         WithdrawalEpochState memory epochState = withdrawalEpochState[currentEpoch];
-
         uint256 _totalSupply = totalSupply;
+        uint256 depositProceedsRatioX128 = 2 ** 128;
 
-        uint256 depositProceedsRatioX128 = Math.mulDiv(
-            maxDepositAssetsReceived,
-            type(uint128).max,
-            maxDepositAssetsReceived + maxProceedsAssetsReceived
-        );
+        if (maxProceedsAssetsReceived > 0) {
+            depositProceedsRatioX128 = Math.mulDiv(
+                maxDepositAssetsReceived,
+                type(uint128).max,
+                maxDepositAssetsReceived + maxProceedsAssetsReceived
+            );
+        }
 
         uint256 depositAssetsReceived = Math.mulDiv(
             Math.mulDiv128(sharesToFulfill, depositProceedsRatioX128),

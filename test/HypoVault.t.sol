@@ -98,7 +98,12 @@ contract HypoVaultTest is Test {
     uint256 constant BOOTSTRAP_SHARES = 1_000_000;
 
     // Events
-    event WithdrawalRequested(address indexed user, uint256 shares, bool shouldRedeposit);
+    event WithdrawalRequested(
+        address indexed user,
+        uint256 shares,
+        uint128 ratioX64,
+        bool shouldRedeposit
+    );
     event DepositRequested(address indexed user, uint256 amount);
     event RedepositStatusChanged(address indexed user, uint256 indexed epoch, bool shouldRedeposit);
 
@@ -740,7 +745,7 @@ contract HypoVaultTest is Test {
 
         // Check remaining shares moved to next epoch
         uint256 remainingShares = sharesToWithdraw - sharesToFulfill;
-        (uint128 amount, , ) = vault.queuedWithdrawal(Alice, 1);
+        (uint128 amount, , , ) = vault.queuedWithdrawal(Alice, 1);
         assertEq(amount, remainingShares);
     }
 
@@ -799,7 +804,7 @@ contract HypoVaultTest is Test {
         vault.cancelWithdrawal(Alice);
 
         // Check withdrawal was cancelled and shares restored
-        (uint128 amount, , ) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 amount, , , ) = vault.queuedWithdrawal(Alice, 0);
         assertEq(amount, 0);
         assertEq(vault.balanceOf(Alice), aliceShares);
         // Note: basis is not restored in cancellation
@@ -867,8 +872,11 @@ contract HypoVaultTest is Test {
         );
 
         // Check withdrawal queue state
-        (uint128 aliceQueuedAmount, uint128 aliceQueuedBasis, ) = vault.queuedWithdrawal(Alice, 0);
-        (uint128 bobQueuedAmount, uint128 bobQueuedBasis, ) = vault.queuedWithdrawal(Bob, 0);
+        (uint128 aliceQueuedAmount, uint128 aliceQueuedBasis, , ) = vault.queuedWithdrawal(
+            Alice,
+            0
+        );
+        (uint128 bobQueuedAmount, uint128 bobQueuedBasis, , ) = vault.queuedWithdrawal(Bob, 0);
 
         assertEq(aliceQueuedAmount, aliceSharesToWithdraw);
         assertEq(bobQueuedAmount, bobSharesToWithdraw);
@@ -896,11 +904,9 @@ contract HypoVaultTest is Test {
         assertEq(vault.userBasis(Bob), bobBasisInitial);
 
         // Withdrawal queues should be cleared
-        (uint128 aliceQueuedAmountAfter, uint128 aliceQueuedBasisAfter, ) = vault.queuedWithdrawal(
-            Alice,
-            0
-        );
-        (uint128 bobQueuedAmountAfter, uint128 bobQueuedBasisAfter, ) = vault.queuedWithdrawal(
+        (uint128 aliceQueuedAmountAfter, uint128 aliceQueuedBasisAfter, , ) = vault
+            .queuedWithdrawal(Alice, 0);
+        (uint128 bobQueuedAmountAfter, uint128 bobQueuedBasisAfter, , ) = vault.queuedWithdrawal(
             Bob,
             0
         );
@@ -1490,7 +1496,7 @@ contract HypoVaultTest is Test {
 
         // Remaining shares should move to next epoch
         uint256 expectedRemaining = sharesToWithdraw - sharesToFulfill;
-        (uint128 remainingAmount, , ) = vault.queuedWithdrawal(Alice, 1);
+        (uint128 remainingAmount, , , ) = vault.queuedWithdrawal(Alice, 1);
         assertEq(remainingAmount, expectedRemaining);
     }
 
@@ -1614,7 +1620,7 @@ contract HypoVaultTest is Test {
         );
 
         // Verify remaining 25e18 shares moved to next epoch
-        (uint128 remainingAmount, , ) = vault.queuedWithdrawal(Alice, 1);
+        (uint128 remainingAmount, , , ) = vault.queuedWithdrawal(Alice, 1);
         assertEq(
             remainingAmount,
             sharesToWithdraw - sharesToFulfill,
@@ -1679,7 +1685,7 @@ contract HypoVaultTest is Test {
         );
 
         // Verify remaining 25 shares moved to next epoch
-        (uint128 remainingAmount, , ) = vault.queuedWithdrawal(Alice, 1);
+        (uint128 remainingAmount, , , ) = vault.queuedWithdrawal(Alice, 1);
         assertEq(remainingAmount, 25, "Exactly 25 shares should remain unfulfilled");
     }
 
@@ -2355,11 +2361,11 @@ contract HypoVaultTest is Test {
         assertEq(token.balanceOf(Alice), aliceBalanceBefore);
 
         // All her withdrawal should have moved to epoch 1
-        (uint128 remainingAmount, uint128 remainingBasis, ) = vault.queuedWithdrawal(Alice, 1);
+        (uint128 remainingAmount, uint128 remainingBasis, , ) = vault.queuedWithdrawal(Alice, 1);
         assertEq(remainingAmount, aliceShares / 2);
         assertEq(remainingBasis, aliceBasisBefore / 2);
 
-        (uint128 currentAmount, uint128 currentBasis, ) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 currentAmount, uint128 currentBasis, , ) = vault.queuedWithdrawal(Alice, 0);
         assertEq(currentAmount, 0);
         assertEq(currentBasis, 0);
 
@@ -2654,7 +2660,7 @@ contract HypoVaultTest is Test {
         vault.requestWithdrawalFrom(Alice, uint128(sharesToWithdraw), shouldRedeposit1);
 
         // Verify withdrawal was requested
-        (uint128 amount, uint128 basis, ) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 amount, uint128 basis, , ) = vault.queuedWithdrawal(Alice, 0);
         assertEq(amount, sharesToWithdraw);
         assertEq(basis, 500 ether); // Half of Alice's original basis
     }
@@ -2686,7 +2692,7 @@ contract HypoVaultTest is Test {
         assertEq(vault.userBasis(Alice), aliceBasisBefore - expectedBasisReduction);
 
         // Verify withdrawal was queued
-        (uint128 amount, uint128 basis, ) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 amount, uint128 basis, , ) = vault.queuedWithdrawal(Alice, 0);
         assertEq(amount, sharesToWithdraw);
         assertEq(basis, expectedBasisReduction);
 
@@ -2727,8 +2733,8 @@ contract HypoVaultTest is Test {
         vm.stopPrank();
 
         // Verify both withdrawals were queued
-        (uint128 aliceAmount, uint128 aliceBasisQueued, ) = vault.queuedWithdrawal(Alice, 0);
-        (uint128 bobAmount, uint128 bobBasisQueued, ) = vault.queuedWithdrawal(Bob, 0);
+        (uint128 aliceAmount, uint128 aliceBasisQueued, , ) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 bobAmount, uint128 bobBasisQueued, , ) = vault.queuedWithdrawal(Bob, 0);
 
         assertEq(aliceAmount, aliceShares / 2);
         assertEq(bobAmount, bobShares / 3);
@@ -2761,7 +2767,7 @@ contract HypoVaultTest is Test {
         vault.requestWithdrawal(uint128(aliceShares / 4));
 
         // Check initial withdrawal state
-        (uint128 initialAmount, uint128 initialBasis, ) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 initialAmount, uint128 initialBasis, , ) = vault.queuedWithdrawal(Alice, 0);
         assertEq(initialAmount, aliceShares / 4);
 
         // Manager requests additional withdrawal from Alice
@@ -2770,7 +2776,7 @@ contract HypoVaultTest is Test {
         vault.requestWithdrawalFrom(Alice, uint128(additionalShares), shouldRedeposit);
 
         // Verify withdrawals accumulated
-        (uint128 finalAmount, uint128 finalBasis, ) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 finalAmount, uint128 finalBasis, , ) = vault.queuedWithdrawal(Alice, 0);
         assertEq(finalAmount, initialAmount + additionalShares);
         assertEq(finalBasis, initialBasis + (aliceBasis * additionalShares) / aliceShares);
     }
@@ -2788,10 +2794,10 @@ contract HypoVaultTest is Test {
 
         uint256 aliceShares = vault.balanceOf(Alice);
         uint256 sharesToWithdraw = aliceShares / 2;
-
+        uint128 ratioX64 = 0;
         // Expect WithdrawalRequested event
         vm.expectEmit(true, false, false, true);
-        emit WithdrawalRequested(Alice, sharesToWithdraw, shouldRedeposit);
+        emit WithdrawalRequested(Alice, sharesToWithdraw, ratioX64, shouldRedeposit);
 
         vm.prank(Manager);
         vault.requestWithdrawalFrom(Alice, uint128(sharesToWithdraw), shouldRedeposit);
@@ -3017,7 +3023,7 @@ contract HypoVaultTest is Test {
         assertEq(vault.userBasis(Alice), aliceBasisBefore);
 
         // Verify no withdrawal was queued
-        (uint128 amount, uint128 basis, ) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 amount, uint128 basis, , ) = vault.queuedWithdrawal(Alice, 0);
         assertEq(amount, 0);
         assertEq(basis, 0);
     }
@@ -3045,7 +3051,7 @@ contract HypoVaultTest is Test {
         assertEq(vault.userBasis(Alice), 0);
 
         // Verify all shares and basis were queued for withdrawal
-        (uint128 amount, uint128 basis, ) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 amount, uint128 basis, , ) = vault.queuedWithdrawal(Alice, 0);
         assertEq(amount, aliceShares);
         assertEq(basis, aliceBasis);
     }
@@ -3227,7 +3233,7 @@ contract HypoVaultTest is Test {
         vault.requestWithdrawalFrom(Alice, uint128(sharesToWithdraw), fuzzed_shouldRedeposit);
 
         // Verify withdrawal was requested with redeposit flag
-        (uint128 amount, uint128 basis, bool shouldRedeposit) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 amount, uint128 basis, , bool shouldRedeposit) = vault.queuedWithdrawal(Alice, 0);
         assertEq(amount, sharesToWithdraw);
         assertEq(basis, 500 ether);
         assertEq(shouldRedeposit, fuzzed_shouldRedeposit);
@@ -3252,7 +3258,7 @@ contract HypoVaultTest is Test {
         vault.requestWithdrawal(uint128(sharesToWithdraw));
 
         // Verify withdrawal was requested without redeposit flag
-        (uint128 amount, uint128 basis, bool shouldRedeposit) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 amount, uint128 basis, , bool shouldRedeposit) = vault.queuedWithdrawal(Alice, 0);
         assertEq(amount, sharesToWithdraw);
         assertEq(basis, 500 ether);
         assertFalse(shouldRedeposit); // Should be false for requestWithdrawal
@@ -3450,7 +3456,7 @@ contract HypoVaultTest is Test {
         vault.executeWithdrawal(Alice, 0);
 
         // Check that remainder in next epoch still has redeposit flag
-        (uint128 remainingAmount, uint128 remainingBasis, bool shouldRedeposit) = vault
+        (uint128 remainingAmount, uint128 remainingBasis, , bool shouldRedeposit) = vault
             .queuedWithdrawal(Alice, 1);
         assertGt(remainingAmount, 0);
         assertGt(remainingBasis, 0);
@@ -3542,7 +3548,7 @@ contract HypoVaultTest is Test {
         vault.requestWithdrawalFrom(Alice, uint128(sharesToWithdraw), fuzzed_shouldRedeposit);
 
         // Verify withdrawal was requested with redeposit flag
-        (uint128 amount, uint128 basis, bool shouldRedeposit) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 amount, uint128 basis, , bool shouldRedeposit) = vault.queuedWithdrawal(Alice, 0);
         assertEq(shouldRedeposit, fuzzed_shouldRedeposit);
 
         // Cancel the withdrawal
@@ -3550,7 +3556,7 @@ contract HypoVaultTest is Test {
         vault.cancelWithdrawal(Alice);
 
         // Verify withdrawal was cancelled (redeposit flag should be reset to false)
-        (uint128 amountAfter, uint128 basisAfter, bool shouldRedepositAfter) = vault
+        (uint128 amountAfter, uint128 basisAfter, , bool shouldRedepositAfter) = vault
             .queuedWithdrawal(Alice, 0);
         assertEq(amountAfter, 0);
         assertEq(basisAfter, 0);
@@ -3580,7 +3586,10 @@ contract HypoVaultTest is Test {
         vault.requestWithdrawalFrom(Alice, uint128(firstWithdrawalShares), true);
 
         // Verify first withdrawal has redeposit flag set
-        (uint128 amount1, uint128 basis1, bool shouldRedeposit1) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 amount1, uint128 basis1, , bool shouldRedeposit1) = vault.queuedWithdrawal(
+            Alice,
+            0
+        );
         assertEq(amount1, firstWithdrawalShares);
         assertTrue(shouldRedeposit1);
 
@@ -3589,7 +3598,10 @@ contract HypoVaultTest is Test {
         vault.requestWithdrawal(uint128(secondWithdrawalShares));
 
         // Verify combined withdrawal still has redeposit flag set to true
-        (uint128 amount2, uint128 basis2, bool shouldRedeposit2) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 amount2, uint128 basis2, , bool shouldRedeposit2) = vault.queuedWithdrawal(
+            Alice,
+            0
+        );
         assertEq(amount2, firstWithdrawalShares + secondWithdrawalShares);
         assertTrue(shouldRedeposit2); // Should remain true due to OR logic
 
@@ -3599,7 +3611,10 @@ contract HypoVaultTest is Test {
         vault.requestWithdrawal(uint128(thirdWithdrawalShares));
 
         // Verify the redeposit flag is still true after the third withdrawal
-        (uint128 amount3, uint128 basis3, bool shouldRedeposit3) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 amount3, uint128 basis3, , bool shouldRedeposit3) = vault.queuedWithdrawal(
+            Alice,
+            0
+        );
         assertEq(amount3, firstWithdrawalShares + secondWithdrawalShares + thirdWithdrawalShares);
         assertTrue(shouldRedeposit3); // Should still be true
 
@@ -3665,8 +3680,8 @@ contract HypoVaultTest is Test {
         vm.stopPrank();
 
         // Verify the cancellations succeeded without underflow
-        (uint128 aliceAmount, , ) = vault.queuedWithdrawal(Alice, 1);
-        (uint128 bobAmount, , ) = vault.queuedWithdrawal(Bob, 1);
+        (uint128 aliceAmount, , , ) = vault.queuedWithdrawal(Alice, 1);
+        (uint128 bobAmount, , , ) = vault.queuedWithdrawal(Bob, 1);
         assertEq(aliceAmount, 0);
         assertEq(bobAmount, 0);
 
@@ -3690,7 +3705,7 @@ contract HypoVaultTest is Test {
         vm.stopPrank();
 
         // Verify initial shouldRedeposit is true
-        (, , bool shouldRedeposit) = vault.queuedWithdrawal(Alice, 0);
+        (, , , bool shouldRedeposit) = vault.queuedWithdrawal(Alice, 0);
         assertTrue(shouldRedeposit);
 
         // Alice changes her mind and wants normal withdrawal
@@ -3701,7 +3716,7 @@ contract HypoVaultTest is Test {
         vault.optOutOfRedeposit(0);
 
         // Verify shouldRedeposit is now false
-        (, , shouldRedeposit) = vault.queuedWithdrawal(Alice, 0);
+        (, , , shouldRedeposit) = vault.queuedWithdrawal(Alice, 0);
         assertFalse(shouldRedeposit);
     }
 
@@ -3732,8 +3747,8 @@ contract HypoVaultTest is Test {
         vault.requestWithdrawalFrom(Alice, uint128(halfShares), true);
 
         // Verify epoch 0 is still false, epoch 1 is true per manager's request
-        (, , bool before_optout_shouldRedeposit0) = vault.queuedWithdrawal(Alice, 0);
-        (, , bool before_optout_shouldRedeposit1) = vault.queuedWithdrawal(Alice, 1);
+        (, , , bool before_optout_shouldRedeposit0) = vault.queuedWithdrawal(Alice, 0);
+        (, , , bool before_optout_shouldRedeposit1) = vault.queuedWithdrawal(Alice, 1);
 
         assertFalse(before_optout_shouldRedeposit0);
         assertTrue(before_optout_shouldRedeposit1);
@@ -3743,8 +3758,8 @@ contract HypoVaultTest is Test {
         vault.optOutOfRedeposit(1);
 
         // Verify epoch 0 is still false, epoch 1 is now false
-        (, , bool after_optout_shouldRedeposit0) = vault.queuedWithdrawal(Alice, 0);
-        (, , bool after_optout_shouldRedeposit1) = vault.queuedWithdrawal(Alice, 1);
+        (, , , bool after_optout_shouldRedeposit0) = vault.queuedWithdrawal(Alice, 0);
+        (, , , bool after_optout_shouldRedeposit1) = vault.queuedWithdrawal(Alice, 1);
 
         assertFalse(after_optout_shouldRedeposit0);
         assertFalse(after_optout_shouldRedeposit1);
@@ -3767,14 +3782,14 @@ contract HypoVaultTest is Test {
         vault.requestWithdrawalFrom(Alice, uint128(aliceShares), true);
 
         // Get original values
-        (uint128 originalAmount, uint128 originalBasis, ) = vault.queuedWithdrawal(Alice, 0);
+        (uint128 originalAmount, uint128 originalBasis, , ) = vault.queuedWithdrawal(Alice, 0);
 
         // Change redeposit status
         vm.prank(Alice);
         vault.optOutOfRedeposit(0);
 
         // Verify amount and basis are preserved
-        (uint128 newAmount, uint128 newBasis, bool shouldRedeposit) = vault.queuedWithdrawal(
+        (uint128 newAmount, uint128 newBasis, , bool shouldRedeposit) = vault.queuedWithdrawal(
             Alice,
             0
         );
