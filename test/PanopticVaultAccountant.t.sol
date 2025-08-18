@@ -1609,12 +1609,24 @@ contract PanopticVaultAccountantTest is Test {
 
         uint256 underlyingTokenBalance = 1000 ether;
 
-        uint256 baseBalance = uint256(PanopticMath.convert0to1(int256(token0Balance + collateralTracker0ValueInToken0), underlyingToToken0ConversionPrice)) +
-          uint256(PanopticMath.convert0to1(int256(token1Balance + collateralTracker1ValueInToken1), underlyingToToken1ConversionPrice)) +
-          underlyingTokenBalance;
+        uint256 baseBalance = uint256(
+            PanopticMath.convert0to1(
+                int256(token0Balance + collateralTracker0ValueInToken0),
+                underlyingToToken0ConversionPrice
+            )
+        ) +
+            uint256(
+                PanopticMath.convert0to1(
+                    int256(token1Balance + collateralTracker1ValueInToken1),
+                    underlyingToToken1ConversionPrice
+                )
+            ) +
+            underlyingTokenBalance;
 
         uint256 expectedNav = uint256(
-            int256(baseBalance) + PanopticMath.convert0to1(premiumContribution0, underlyingToToken0ConversionPrice) + PanopticMath.convert0to1(premiumContribution1, underlyingToToken1ConversionPrice)
+            int256(baseBalance) +
+                PanopticMath.convert0to1(premiumContribution0, underlyingToToken0ConversionPrice) +
+                PanopticMath.convert0to1(premiumContribution1, underlyingToToken1ConversionPrice)
         );
 
         uint256 tolerance = 1; // Allow only tolerance of rounding 1 wei - we know exact amounts
