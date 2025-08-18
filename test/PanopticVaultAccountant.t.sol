@@ -1565,6 +1565,26 @@ contract PanopticVaultAccountantTest is Test {
         uint256 longPremium0 = 5e18;
         uint256 longPremium1 = 8e18;
 
+        /* setupBasicScenario does the following:
+        // Setup token balances
+        token0.setBalance(vault, 100 ether);
+        token1.setBalance(vault, 200 ether);
+        underlyingToken.setBalance(vault, 1000 ether);
+
+        // Setup collateral tokens
+        mockPool.collateralToken0().setBalance(vault, 50 ether);
+        mockPool.collateralToken0().setPreviewRedeemReturn(50 ether);
+        mockPool.collateralToken1().setBalance(vault, 75 ether);
+        mockPool.collateralToken1().setPreviewRedeemReturn(75 ether);
+
+        // Setup empty position data
+        mockPool.setNumberOfLegs(vault, 0);
+        uint256[2][] memory emptyPositions = new uint256[2][](0);
+        mockPool.setMockPositionBalanceArray(emptyPositions);
+
+        // Setup premiums
+        mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
+        */
         setupBasicScenario();
         mockPool.setMockPremiums(
             LeftRightUnsigned.wrap((shortPremium1 << 128) | shortPremium0),
@@ -1578,12 +1598,26 @@ contract PanopticVaultAccountantTest is Test {
         int256 premiumContribution0 = int256(shortPremium0) - int256(longPremium0); // 5e18 token0s
         int256 premiumContribution1 = int256(shortPremium1) - int256(longPremium1); // 7e18 token1s
 
-        uint256 baseBalance = 100e18 + 200e18 + 50e18 + 75e18 + 1000e18; // token balances + collateral + underlying
+        // Get baseBalance based on the hard-coded values in setupBasicScenario
+        uint160 underlyingToToken0ConversionPrice = Math.getSqrtRatioAtTick(TWAP_TICK);
+        uint256 token0Balance = 100 ether;
+        uint256 collateralTracker0ValueInToken0 = 50 ether;
+
+        uint160 underlyingToToken1ConversionPrice = Math.getSqrtRatioAtTick(TWAP_TICK);
+        uint256 token1Balance = 200 ether;
+        uint256 collateralTracker1ValueInToken1 = 75 ether;
+
+        uint256 underlyingTokenBalance = 1000 ether;
+
+        uint256 baseBalance = uint256(PanopticMath.convert0to1(int256(token0Balance + collateralTracker0ValueInToken0), underlyingToToken0ConversionPrice)) +
+          uint256(PanopticMath.convert0to1(int256(token1Balance + collateralTracker1ValueInToken1), underlyingToToken1ConversionPrice)) +
+          underlyingTokenBalance;
+
         uint256 expectedNav = uint256(
-            int256(baseBalance) + premiumContribution0 + premiumContribution1
+            int256(baseBalance) + PanopticMath.convert0to1(premiumContribution0, underlyingToToken0ConversionPrice) + PanopticMath.convert0to1(premiumContribution1, underlyingToToken1ConversionPrice)
         );
 
-        uint256 tolerance = 5e18; // Allow tolerance for conversion calculations
+        uint256 tolerance = 1; // Allow only tolerance of rounding 1 wei - we know exact amounts
         assertApproxEqAbs(
             nav,
             expectedNav,
