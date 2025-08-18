@@ -13,7 +13,8 @@ interface IHypoVault {
 
     function fulfillWithdrawals(
         uint256 sharesToFulfill,
-        uint256 maxAssetsReceived,
+        uint256 maxDepositAssetsReceived,
+        uint256 maxProceedsAssetsReceived,
         bytes memory managerInput
     ) external;
 

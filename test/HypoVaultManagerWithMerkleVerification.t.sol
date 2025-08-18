@@ -39,6 +39,23 @@ contract MockVaultAccountant {
         }
         return nav;
     }
+
+    function getProceedsFromDeposit(
+        address vault,
+        address,
+        address,
+        uint256,
+        bytes memory managerInput
+    ) external view returns (uint256 proceedsTokenAmount) {
+        require(vault == expectedVault, "Invalid vault");
+        if (managerInput.length > 0) {
+            require(
+                keccak256(managerInput) == keccak256(expectedManagerInput),
+                "Invalid manager input"
+            );
+        }
+        return proceedsTokenAmount;
+    }
 }
 
 // Mock BalancerVault for testing
@@ -72,9 +89,11 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         vm.prank(owner);
         vault = new HypoVault(
             address(token),
+            address(0),
             address(0x999), // Dummy manager address
             IVaultAccountant(address(accountant)),
             100, // 1% performance fee
+            20, // 1% performance fee
             "HVAULT",
             "HypoVault Token"
         );
@@ -277,7 +296,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
 
         // Verify withdrawal was cancelled and shares restored
         assertEq(vault.balanceOf(alice), aliceShares);
-        (uint128 amount, , ) = vault.queuedWithdrawal(alice, 0);
+        (uint128 amount, , , ) = vault.queuedWithdrawal(alice, 0);
         assertEq(amount, 0);
     }
 
@@ -306,7 +325,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         manager.requestWithdrawalFrom(alice, uint128(sharesToWithdraw), true);
 
         // Verify withdrawal was requested with redeposit flag
-        (uint128 amount, uint128 basis, bool shouldRedeposit) = vault.queuedWithdrawal(alice, 0);
+        (uint128 amount, uint128 basis, , bool shouldRedeposit) = vault.queuedWithdrawal(alice, 0);
         assertEq(amount, sharesToWithdraw);
         assertEq(basis, 500 ether);
         assertTrue(shouldRedeposit);
@@ -333,7 +352,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         manager.requestWithdrawalFrom(alice, uint128(sharesToWithdraw), false);
 
         // Verify withdrawal was requested without redeposit flag
-        (uint128 amount, uint128 basis, bool shouldRedeposit) = vault.queuedWithdrawal(alice, 0);
+        (uint128 amount, uint128 basis, , bool shouldRedeposit) = vault.queuedWithdrawal(alice, 0);
         assertEq(amount, sharesToWithdraw);
         assertEq(basis, 500 ether);
         assertFalse(shouldRedeposit);
@@ -438,14 +457,14 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         // Strategist fulfills withdrawal
         vm.startPrank(strategist);
         accountant.setNav(100 ether);
-        manager.fulfillWithdrawals(aliceShares, 100 ether, "");
+        manager.fulfillWithdrawals(aliceShares, 100 ether, 0, "");
         vm.stopPrank();
 
         // Verify withdrawal epoch advanced
         assertEq(vault.withdrawalEpoch(), 1);
 
         // Verify epoch state
-        (uint128 sharesWithdrawn, uint128 assetsReceived, uint128 sharesFulfilled) = vault
+        (uint128 sharesWithdrawn, uint128 assetsReceived, , uint128 sharesFulfilled) = vault
             .withdrawalEpochState(0);
         assertEq(sharesWithdrawn, aliceShares);
         assertEq(sharesFulfilled, aliceShares);
@@ -478,7 +497,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
 
         vm.startPrank(strategist);
         accountant.setNav(200 ether);
-        manager.fulfillWithdrawals(sharesToFulfill, assetsToGive, "");
+        manager.fulfillWithdrawals(sharesToFulfill, assetsToGive, 0, "");
         vm.stopPrank();
 
         // Execute withdrawal
@@ -486,7 +505,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         vault.executeWithdrawal(alice, 0);
 
         // Verify partial fulfillment - Alice should have remaining shares in next epoch
-        (uint128 remainingAmount, , ) = vault.queuedWithdrawal(alice, 1);
+        (uint128 remainingAmount, , , ) = vault.queuedWithdrawal(alice, 1);
         assertEq(remainingAmount, sharesToWithdraw - sharesToFulfill);
     }
 
@@ -513,7 +532,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         vm.startPrank(strategist);
         accountant.setNav(100 ether);
         vm.expectRevert(HypoVault.WithdrawalNotFulfillable.selector);
-        manager.fulfillWithdrawals(aliceShares, 50 ether, ""); // Too low max
+        manager.fulfillWithdrawals(aliceShares, 50 ether, 0, ""); // Too low max
         vm.stopPrank();
     }
 
@@ -549,7 +568,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         // 5. Strategist fulfills withdrawal
         vm.startPrank(strategist);
         accountant.setNav(depositAmount);
-        manager.fulfillWithdrawals(aliceShares / 2, 250 ether, "");
+        manager.fulfillWithdrawals(aliceShares / 2, 250 ether, 0, "");
         vm.stopPrank();
 
         // 6. Alice executes withdrawal (should redeposit)
@@ -594,7 +613,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         // Second strategist fulfills withdrawal
         vm.startPrank(strategist2);
         accountant.setNav(100 ether);
-        manager.fulfillWithdrawals(aliceShares, 100 ether, "");
+        manager.fulfillWithdrawals(aliceShares, 100 ether, 0, "");
         vm.stopPrank();
 
         // Verify second strategist could fulfill
@@ -632,7 +651,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         vm.expectRevert(
             HypovaultManagerWithMerkleVerification.HypovaultManager__Unauthorized.selector
         );
-        manager.fulfillWithdrawals(100, 100 ether, "");
+        manager.fulfillWithdrawals(100, 100 ether, 0, "");
 
         vm.stopPrank();
     }
@@ -723,7 +742,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
 
         // Test fulfilling zero withdrawals
         vm.prank(strategist);
-        manager.fulfillWithdrawals(0, 0, "");
+        manager.fulfillWithdrawals(0, 0, 0, "");
 
         // Should advance epoch even with zero fulfillment
         assertEq(vault.withdrawalEpoch(), 1);

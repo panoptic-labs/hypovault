@@ -68,16 +68,19 @@ contract HypovaultManagerWithMerkleVerification is ManagerWithMerkleVerification
 
     /// @notice Fulfills withdrawal requests
     /// @param sharesToFulfill The amount of shares to fulfill
-    /// @param maxAssetsReceived The maximum amount of assets willing to disburse
+    /// @param maxDepositAssetsReceived The maximum amount of deposit assets the manager is willing to disburse
+    /// @param maxProceedsAssetsReceived The maximum amount of proceeds assets the manager is willing to disburse
     /// @param managerInput Arbitrary input to the accountant contract
     function fulfillWithdrawals(
         uint256 sharesToFulfill,
-        uint256 maxAssetsReceived,
+        uint256 maxDepositAssetsReceived,
+        uint256 maxProceedsAssetsReceived,
         bytes memory managerInput
     ) external onlyStrategist {
         IHypoVault(address(vault)).fulfillWithdrawals(
             sharesToFulfill,
-            maxAssetsReceived,
+            maxDepositAssetsReceived,
+            maxProceedsAssetsReceived,
             managerInput
         );
     }
