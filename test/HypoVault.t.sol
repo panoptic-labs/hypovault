@@ -845,6 +845,7 @@ contract HypoVaultTest is Test {
     }
 
     function test_withdrawal_partial_proceeds() public {
+        uint256 price = 10;
         // Setup: Multiple users to avoid division by zero
         vm.prank(Alice);
         vault.requestDeposit(300 ether);
@@ -867,25 +868,35 @@ contract HypoVaultTest is Test {
 
         vm.stopPrank();
         vm.prank(Alice);
-        vault.requestWithdrawal(uint128(sharesToWithdraw));
+
+        vault.requestWithdrawal(uint128(sharesToWithdraw), uint128(36 ether * price)); // Request a withdrawal, 40% of it in proceeds
 
         // Partially fulfill withdrawal (60% of requested shares)
         uint256 sharesToFulfill = (sharesToWithdraw * 60) / 100;
         vm.startPrank(Manager);
         accountant.setNav(700 ether);
-        vault.fulfillWithdrawals(sharesToFulfill, 80 ether, 0, "");
+        accountant.setPrice(price);
+
+        uint256 swapAmount = 54 ether;
+        token.transfer(address(0xdead), swapAmount);
+        proceeds.mint(address(vault), swapAmount * price);
+
+        vault.fulfillWithdrawals(sharesToFulfill, 54 ether, 540 ether, "");
 
         // Execute withdrawal
         uint256 aliceBalanceBefore = token.balanceOf(Alice);
+        uint256 aliceProceedsBefore = proceeds.balanceOf(Alice);
         vault.executeWithdrawal(Alice, 0);
         vm.stopPrank();
 
         // Check partial withdrawal amount
         uint256 actualAssetsReceived = token.balanceOf(Alice) - aliceBalanceBefore;
+        uint256 actualProceedsReceived = proceeds.balanceOf(Alice) - aliceProceedsBefore;
 
         // For partial withdrawal, Alice should receive 54 ether
-        // Alice withdraws 30% of shares (90e25), fulfills 60% of that (54e25 shares)
-        assertEq(actualAssetsReceived, 54000000000000000000); // 54 ether
+        // Alice withdraws 30% of shares (90e25), fulfills 60% of that (54e25 shares), distributed 40% in proceeds (216 ether) and 60% in asset (32.4 ether)
+        assertEq(actualProceedsReceived, 216000000000000000000, "proceeds"); // 216 ether in proceeds
+        assertEq(actualAssetsReceived, 32400000000000000000, "asset"); // 40 ether
 
         // Check remaining shares moved to next epoch
         uint256 remainingShares = sharesToWithdraw - sharesToFulfill;

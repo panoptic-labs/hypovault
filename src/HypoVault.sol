@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
-
 // Interfaces
 import {ERC20Minimal} from "lib/panoptic-v1.1/contracts/tokens/ERC20Minimal.sol";
 import {IERC20} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -482,14 +481,12 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         // prorated shares to fulfill = amount * fulfilled shares / total shares withdrawn
         uint256 sharesToFulfill = (uint256(pendingWithdrawal.amount) *
             _withdrawalEpochState.sharesFulfilled) / _withdrawalEpochState.sharesWithdrawn;
-
         // deposit assets to withdraw = prorated shares to withdraw * assets fulfilled / total shares fulfilled
         uint256 depositAssetsToWithdraw = Math.mulDiv(
             sharesToFulfill,
             _withdrawalEpochState.depositAssetsReceived,
             _withdrawalEpochState.sharesFulfilled == 0 ? 1 : _withdrawalEpochState.sharesFulfilled
         );
-
         reservedWithdrawalDepositAssets -= depositAssetsToWithdraw;
 
         // calculate corresponding value in proceeds token
@@ -500,11 +497,14 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
                 ? 1
                 : _withdrawalEpochState.depositAssetsReceived
         );
-
-        // compute the amount of proceeds token requested
+        // compute the amount of proceeds token requested, prorating the maxProceedsAmount specific by the user
         proceedsAssetsToWithdraw = Math.min(
             proceedsAssetsToWithdraw,
-            pendingWithdrawal.maxProceedsAmount
+            Math.mulDiv(
+                pendingWithdrawal.maxProceedsAmount,
+                _withdrawalEpochState.sharesFulfilled,
+                _withdrawalEpochState.sharesWithdrawn
+            )
         );
 
         // deduct that amount from the depositAssets amount
