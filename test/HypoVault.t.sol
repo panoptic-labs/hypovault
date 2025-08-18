@@ -1657,14 +1657,12 @@ contract HypoVaultTest is Test {
         vault.executeDeposit(Alice, 0);
 
         uint256 aliceShares = vault.balanceOf(Alice);
-
         // Alice withdraws 100 shares
         uint256 sharesToWithdraw = 100;
         vm.stopPrank();
 
         vm.prank(Alice);
         vault.requestWithdrawal(uint128(sharesToWithdraw));
-
         // Manager fulfills only 75 shares (75% fulfillment)
         uint256 sharesToFulfill = 75;
         vm.startPrank(Manager);

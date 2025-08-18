@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
-import "forge-std/console2.sol";
 
 // Interfaces
 import {ERC20Minimal} from "lib/panoptic-v1.1/contracts/tokens/ERC20Minimal.sol";
@@ -498,7 +497,9 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         uint256 proceedsAssetsToWithdraw = Math.mulDiv(
             depositAssetsToWithdraw,
             _withdrawalEpochState.proceedsAssetsReceived,
-            _withdrawalEpochState.depositAssetsReceived
+            _withdrawalEpochState.depositAssetsReceived == 0
+                ? 1
+                : _withdrawalEpochState.depositAssetsReceived
         );
 
         // compute the amount of proceeds token requested
@@ -507,14 +508,14 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
             pendingWithdrawal.maxProceedsAmount
         );
 
-        if (proceedsAssetsToWithdraw > 0) {
-            // deduct that amount from the depositAssets amount
-            depositAssetsToWithdraw -= Math.mulDivRoundingUp(
-                proceedsAssetsToWithdraw,
-                _withdrawalEpochState.depositAssetsReceived,
-                _withdrawalEpochState.proceedsAssetsReceived
-            );
-        }
+        // deduct that amount from the depositAssets amount
+        depositAssetsToWithdraw -= Math.mulDivRoundingUp(
+            proceedsAssetsToWithdraw,
+            _withdrawalEpochState.depositAssetsReceived,
+            _withdrawalEpochState.proceedsAssetsReceived == 0
+                ? 1
+                : _withdrawalEpochState.proceedsAssetsReceived
+        );
 
         uint256 withdrawnBasis = (uint256(pendingWithdrawal.basis) *
             _withdrawalEpochState.sharesFulfilled) / _withdrawalEpochState.sharesWithdrawn;

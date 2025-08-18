@@ -39,6 +39,23 @@ contract MockVaultAccountant {
         }
         return nav;
     }
+
+    function getProceedsFromDeposit(
+        address vault,
+        address,
+        address,
+        uint256,
+        bytes memory managerInput
+    ) external view returns (uint256 proceedsTokenAmount) {
+        require(vault == expectedVault, "Invalid vault");
+        if (managerInput.length > 0) {
+            require(
+                keccak256(managerInput) == keccak256(expectedManagerInput),
+                "Invalid manager input"
+            );
+        }
+        return proceedsTokenAmount;
+    }
 }
 
 // Mock BalancerVault for testing
