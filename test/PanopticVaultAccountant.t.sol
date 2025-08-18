@@ -268,6 +268,7 @@ contract PanopticVaultAccountantTest is Test {
     MockERC20Partial public token0;
     MockERC20Partial public token1;
     MockERC20Partial public depositToken;
+    MockERC20Partial public proceedsToken;
     MockV3CompatibleOracle public poolOracle;
     MockV3CompatibleOracle public oracle0;
     MockV3CompatibleOracle public oracle1;
@@ -287,6 +288,7 @@ contract PanopticVaultAccountantTest is Test {
         token0 = new MockERC20Partial("Token0", "T0");
         token1 = new MockERC20Partial("Token1", "T1");
         depositToken = new MockERC20Partial("Deposit", "DEP");
+        proceedsToken = new MockERC20Partial("Proceeds", "PRO");
         poolOracle = new MockV3CompatibleOracle();
         oracle0 = new MockV3CompatibleOracle();
         oracle1 = new MockV3CompatibleOracle();
@@ -817,6 +819,120 @@ contract PanopticVaultAccountantTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
+                        GET PROCEEDS TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_getProceedsFromDeposit_wrongTokens() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+
+        // Setup basic scenario with no positions
+        setupBasicScenario();
+
+        bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
+
+        uint256 proceedsAssetsReceived = accountant.getProceedsFromDeposit(
+            vault,
+            address(depositToken),
+            address(proceedsToken),
+            1 ether,
+            managerInput
+        );
+
+        uint256 expectedProceeds = 0;
+        assertEq(proceedsAssetsReceived, expectedProceeds);
+
+        proceedsAssetsReceived = accountant.getProceedsFromDeposit(
+            vault,
+            address(depositToken),
+            address(token1),
+            1 ether,
+            managerInput
+        );
+        assertEq(proceedsAssetsReceived, expectedProceeds);
+
+        proceedsAssetsReceived = accountant.getProceedsFromDeposit(
+            vault,
+            address(token0),
+            address(proceedsToken),
+            1 ether,
+            managerInput
+        );
+        assertEq(proceedsAssetsReceived, expectedProceeds);
+    }
+
+    function test_getProceedsFromDeposit_basicScenario() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+
+        // Setup basic scenario with no positions
+        setupBasicScenario();
+
+        bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
+
+        uint256 proceedsAssetsReceived = accountant.getProceedsFromDeposit(
+            vault,
+            address(token0),
+            address(token1),
+            1 ether,
+            managerInput
+        );
+
+        // Expected: 1.0001 ** 100 * 1e18 = 1010049662092876568
+        uint256 expectedProceeds = 1010049662092876568;
+        assertEq(proceedsAssetsReceived, expectedProceeds);
+
+        proceedsAssetsReceived = accountant.getProceedsFromDeposit(
+            vault,
+            address(token1),
+            address(token0),
+            1 ether,
+            managerInput
+        );
+        expectedProceeds = 990050328741209481;
+        assertEq(proceedsAssetsReceived, expectedProceeds);
+    }
+
+    function test_getProceedsFromDeposit_multiplePoolsScenario() public {
+        // Create scenario with multiple pools
+        PanopticVaultAccountant.PoolInfo[] memory pools = createMultiplePools();
+
+        setupMultiplePoolsScenario();
+
+        TokenId[][] memory tokenIds = new TokenId[][](2);
+        tokenIds[0] = new TokenId[](0); // No positions in first pool
+        tokenIds[1] = new TokenId[](0); // No positions in second pool
+
+        PanopticVaultAccountant.ManagerPrices[]
+            memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](2);
+        managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
+            poolPrice: TWAP_TICK,
+            token0Price: TWAP_TICK,
+            token1Price: TWAP_TICK
+        });
+        managerPrices[1] = managerPrices[0];
+
+        bytes memory managerInput = abi.encode(managerPrices, pools, tokenIds);
+        uint256 proceedsAssetsReceived = accountant.getProceedsFromDeposit(
+            vault,
+            address(token0),
+            address(token1),
+            1 ether,
+            managerInput
+        );
+        uint256 expectedProceeds = 1010049662092876568;
+        assertEq(proceedsAssetsReceived, expectedProceeds);
+
+        proceedsAssetsReceived = accountant.getProceedsFromDeposit(
+            vault,
+            address(token1),
+            address(token0),
+            1 ether,
+            managerInput
+        );
+        expectedProceeds = 990050328741209481;
+        assertEq(proceedsAssetsReceived, expectedProceeds);
+    }
+
+    /*//////////////////////////////////////////////////////////////
                         HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
@@ -943,7 +1059,7 @@ contract PanopticVaultAccountantTest is Test {
             token1: token1,
             poolOracle: poolOracle,
             oracle0: oracle0,
-            isUnderlyingToken0InOracle0: false,
+            isUnderlyingToken0InOracle0: true,
             oracle1: oracle1,
             isUnderlyingToken0InOracle1: false,
             maxPriceDeviation: MAX_PRICE_DEVIATION,
@@ -986,6 +1102,7 @@ contract PanopticVaultAccountantTest is Test {
         token0.setBalance(vault, 100 ether);
         token1.setBalance(vault, 200 ether);
         depositToken.setBalance(vault, 1000 ether);
+        proceedsToken.setBalance(vault, 10000 ether);
 
         // Setup collateral tokens
         mockPool.collateralToken0().setBalance(vault, 50 ether);

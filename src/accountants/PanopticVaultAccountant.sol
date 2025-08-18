@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
-import "forge-std/console2.sol";
 // Base
 import {Ownable} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 // Libraries
@@ -283,11 +282,10 @@ contract PanopticVaultAccountant is Ownable {
         if (proceedsToken == address(0)) {
             return 0;
         }
-        (
-            ManagerPrices[] memory managerPrices,
-            PoolInfo[] memory pools,
-            TokenId[][] memory tokenIds
-        ) = abi.decode(managerInput, (ManagerPrices[], PoolInfo[], TokenId[][]));
+        (, PoolInfo[] memory pools, ) = abi.decode(
+            managerInput,
+            (ManagerPrices[], PoolInfo[], TokenId[][])
+        );
         // compute conversion price here, matching the PoolInfo with deposit/proceeds token
 
         uint256 numberOfOracles;
