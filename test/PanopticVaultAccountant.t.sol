@@ -615,12 +615,12 @@ contract PanopticVaultAccountantTest is Test {
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
         // Expected NAV: underlyingToken balance, plus 150e18 of underlyingToken in net premium, plus convert1To0(50e18 token1s) in net premia
-        uint160 conversionPrice = Math.getSqrtRatioAtTick(TWAP_TICK);
+        uint160 conversionPrice = Math.getSqrtRatioAtTick(-TWAP_TICK);
         uint256 netPremium1 = 50e18;
         uint256 expectedNavInUnderlyingToken = 1000e18 +
             150e18 +
             PanopticMath.convert1to0(netPremium1, conversionPrice);
-        uint256 tolerance = 100e18; // Large tolerance for premium conversion calculations
+        uint256 tolerance = 0e18; // No tolerance, we know exact amounts
         assertApproxEqAbs(
             nav,
             expectedNavInUnderlyingToken,
