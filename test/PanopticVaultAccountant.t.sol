@@ -1059,7 +1059,7 @@ contract PanopticVaultAccountantTest is Test {
             token1: token1,
             poolOracle: poolOracle,
             oracle0: oracle0,
-            isUnderlyingToken0InOracle0: true,
+            isUnderlyingToken0InOracle0: false,
             oracle1: oracle1,
             isUnderlyingToken0InOracle1: false,
             maxPriceDeviation: MAX_PRICE_DEVIATION,

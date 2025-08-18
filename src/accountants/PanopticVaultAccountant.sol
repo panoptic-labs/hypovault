@@ -288,8 +288,7 @@ contract PanopticVaultAccountant is Ownable {
         );
         // compute conversion price here, matching the PoolInfo with deposit/proceeds token
 
-        uint256 numberOfOracles;
-
+        uint256 matched;
         for (uint256 i = 0; i < pools.length; i++) {
             if (
                 (address(pools[i].token0) == depositToken) &&
@@ -306,11 +305,11 @@ contract PanopticVaultAccountant is Ownable {
                     depositAssetsReceived,
                     conversionPrice
                 );
-                ++numberOfOracles;
+                matched++;
             }
             if (
-                (address(pools[i].token1) == depositToken) &&
-                (address(pools[i].token0) == proceedsToken)
+                (address(pools[i].token0) == proceedsToken) &&
+                (address(pools[i].token1) == depositToken)
             ) {
                 int24 conversionTick = PanopticMath.twapFilter(
                     pools[i].oracle0,
@@ -319,18 +318,16 @@ contract PanopticVaultAccountant is Ownable {
                 uint160 conversionPrice = Math.getSqrtRatioAtTick(
                     pools[i].isUnderlyingToken0InOracle0 ? conversionTick : -conversionTick
                 );
-                proceedsAssetsReceived += PanopticMath.convert1to0(
+                proceedsAssetsReceived += PanopticMath.convert0to1(
                     depositAssetsReceived,
                     conversionPrice
                 );
-                ++numberOfOracles;
-            }
-
-            if (numberOfOracles == 0) {
-                proceedsAssetsReceived = 0;
-            } else {
-                proceedsAssetsReceived = proceedsAssetsReceived / numberOfOracles;
+                matched++;
             }
         }
+
+        if (matched == 0) return 0;
+
+        proceedsAssetsReceived = proceedsAssetsReceived / matched;
     }
 }
