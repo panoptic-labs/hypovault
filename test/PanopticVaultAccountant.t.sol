@@ -604,8 +604,8 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setNumberOfLegs(vault, 0);
         mockPool.setMockPositionBalanceArray(new uint256[2][](0));
 
-        PanopticVaultAccountant.ManagerPrices[] memory managerPrices =
-            new PanopticVaultAccountant.ManagerPrices[](1);
+        PanopticVaultAccountant.ManagerPrices[]
+            memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
         managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
             poolPrice: TWAP_TICK, // token1 to token0 (aka underlyingToken)
             token0Price: 0, // token0 == underlyingToken
@@ -617,7 +617,9 @@ contract PanopticVaultAccountantTest is Test {
         // Expected NAV: underlyingToken balance, plus 150e18 of underlyingToken in net premium, plus convert1To0(50e18 token1s) in net premia
         uint160 conversionPrice = Math.getSqrtRatioAtTick(TWAP_TICK);
         uint256 netPremium1 = 50e18;
-        uint256 expectedNavInUnderlyingToken = 1000e18 + 150e18 + PanopticMath.convert1to0(netPremium1, conversionPrice);
+        uint256 expectedNavInUnderlyingToken = 1000e18 +
+            150e18 +
+            PanopticMath.convert1to0(netPremium1, conversionPrice);
         uint256 tolerance = 100e18; // Large tolerance for premium conversion calculations
         assertApproxEqAbs(
             nav,
@@ -638,7 +640,7 @@ contract PanopticVaultAccountantTest is Test {
             oracle0: oracle0,
             isUnderlyingToken0InOracle0: false, // underlying is token1 in oracle0 (so convert0->1 yields underlying)
             oracle1: oracle1,
-            isUnderlyingToken0InOracle1: true,  // underlying is token0 in oracle1 (so convert1->0 yields underlying)
+            isUnderlyingToken0InOracle1: true, // underlying is token0 in oracle1 (so convert1->0 yields underlying)
             maxPriceDeviation: MAX_PRICE_DEVIATION,
             twapWindow: TWAP_WINDOW
         });
@@ -651,7 +653,9 @@ contract PanopticVaultAccountantTest is Test {
         uint32 intervalDuration = TWAP_WINDOW / 20; // matches setupDefaultOracles()
         int56[] memory convTicks = new int56[](20);
         for (uint i = 0; i < 20; i++) {
-            convTicks[i] = int56(int256(CONVERSION_TICK) * int256(uint256(intervalDuration)) * int256(20 - i));
+            convTicks[i] = int56(
+                int256(CONVERSION_TICK) * int256(uint256(intervalDuration)) * int256(20 - i)
+            );
         }
         oracle0.setTickCumulatives(convTicks); // token0 -> underlying at 2:1
         oracle1.setTickCumulatives(convTicks); // token1 -> underlying at 1:2 via convert1->0
@@ -671,8 +675,8 @@ contract PanopticVaultAccountantTest is Test {
         // poolExposure0 = short.right - long.right = 0 - 50 = -50 (token0 units)
         // convert0to1 with price=2 => -50 * 2 = -100 (underlying units)
         mockPool.setMockPremiums(
-            LeftRightUnsigned.wrap(0),          // short: left|right = 0
-            LeftRightUnsigned.wrap(50e18)       // long:  left|right = 50e18 (only right side set)
+            LeftRightUnsigned.wrap(0), // short: left|right = 0
+            LeftRightUnsigned.wrap(50e18) // long:  left|right = 50e18 (only right side set)
         );
 
         // No positions
@@ -680,19 +684,23 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setMockPositionBalanceArray(new uint256[2][](0));
 
         // Manager prices must match the oracles
-        PanopticVaultAccountant.ManagerPrices[] memory managerPrices =
-            new PanopticVaultAccountant.ManagerPrices[](1);
+        PanopticVaultAccountant.ManagerPrices[]
+            memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
         managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
-            poolPrice: TWAP_TICK,     // matches poolOracle (100)
+            poolPrice: TWAP_TICK, // matches poolOracle (100)
             token0Price: CONVERSION_TICK, // matches oracle0 (6931)
-            token1Price: CONVERSION_TICK  // matches oracle1 (6931)
+            token1Price: CONVERSION_TICK // matches oracle1 (6931)
         });
 
         bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
         // NAV = underlying(500) + max(-100, 0) = 500
-        assertEq(nav, 500e18, "NAV should be 500 ether when net exposure -100 is zeroed out after conversion");
+        assertEq(
+            nav,
+            500e18,
+            "NAV should be 500 ether when net exposure -100 is zeroed out after conversion"
+        );
     }
 
     function test_computeNAV_withPositions() public {
@@ -2224,15 +2232,34 @@ contract PanopticVaultAccountantTest is Test {
         // Plus premiums:
         //           token0NetPremiumInUnderlyingToken: convert0to1((largeBalance/10 - largeBalance/20), oracle0)
         //           token1NetPremiumInUnderlyingToken: convert0to1((largeBalance/10 - largeBalance/20), oracle0)
-        uint160 token0ToUnderlyingTokenConversionPrice = Math.getSqrtRatioAtTick(oracle0.currentTick());
-        uint160 token1ToUnderlyingTokenConversionPrice = Math.getSqrtRatioAtTick(oracle1.currentTick());
-        uint256 expectedNav = PanopticMath.convert0to1(largeBalance, token0ToUnderlyingTokenConversionPrice) +
+        uint160 token0ToUnderlyingTokenConversionPrice = Math.getSqrtRatioAtTick(
+            oracle0.currentTick()
+        );
+        uint160 token1ToUnderlyingTokenConversionPrice = Math.getSqrtRatioAtTick(
+            oracle1.currentTick()
+        );
+        uint256 expectedNav = PanopticMath.convert0to1(
+            largeBalance,
+            token0ToUnderlyingTokenConversionPrice
+        ) +
             PanopticMath.convert0to1(largeBalance, token1ToUnderlyingTokenConversionPrice) +
-            PanopticMath.convert0to1(mockPool.collateralToken0().previewRedeem(largeBalance / 2), token0ToUnderlyingTokenConversionPrice) +
-            PanopticMath.convert0to1(mockPool.collateralToken1().previewRedeem(largeBalance / 2), token1ToUnderlyingTokenConversionPrice) +
+            PanopticMath.convert0to1(
+                mockPool.collateralToken0().previewRedeem(largeBalance / 2),
+                token0ToUnderlyingTokenConversionPrice
+            ) +
+            PanopticMath.convert0to1(
+                mockPool.collateralToken1().previewRedeem(largeBalance / 2),
+                token1ToUnderlyingTokenConversionPrice
+            ) +
             largeBalance +
-            PanopticMath.convert0to1((largeBalance/10) - (largeBalance/20), token0ToUnderlyingTokenConversionPrice) +
-            PanopticMath.convert0to1((largeBalance/10) - (largeBalance/20), token1ToUnderlyingTokenConversionPrice);
+            PanopticMath.convert0to1(
+                (largeBalance / 10) - (largeBalance / 20),
+                token0ToUnderlyingTokenConversionPrice
+            ) +
+            PanopticMath.convert0to1(
+                (largeBalance / 10) - (largeBalance / 20),
+                token1ToUnderlyingTokenConversionPrice
+            );
         uint256 tolerance = largeBalance / 10; // 10% tolerance for large number calculations
         assertApproxEqAbs(
             nav,
