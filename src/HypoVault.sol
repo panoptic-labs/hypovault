@@ -493,7 +493,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         reservedWithdrawalDepositAssets -= depositAssetsToWithdraw;
 
         // calculate corresponding value in proceeds token
-
         uint256 proceedsAssetsToWithdraw = Math.mulDiv(
             depositAssetsToWithdraw,
             _withdrawalEpochState.proceedsAssetsReceived,
@@ -524,9 +523,9 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
             Math.max(0, int256(depositAssetsToWithdraw) - int256(withdrawnBasis))
         ) * performanceFeeBps) / 10_000;
 
-        uint256 performanceFeeProceeds = (uint256(
-            Math.max(0, int256(proceedsAssetsToWithdraw) - int256(0))
-        ) * performanceFeeProceedsBps) / 10_000;
+        // zero basis on proceeds performance fee
+        uint256 performanceFeeProceeds = (proceedsAssetsToWithdraw * performanceFeeProceedsBps) /
+            10_000;
 
         queuedWithdrawal[user][epoch] = PendingWithdrawal({
             amount: 0,
@@ -773,9 +772,9 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         withdrawalEpoch = uint128(currentEpoch);
 
         withdrawalEpochState[currentEpoch] = WithdrawalEpochState({
+            sharesWithdrawn: uint128(sharesRemaining),
             depositAssetsReceived: 0,
             proceedsAssetsReceived: 0,
-            sharesWithdrawn: uint128(sharesRemaining),
             sharesFulfilled: 0
         });
 
