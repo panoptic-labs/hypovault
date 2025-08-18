@@ -12,6 +12,7 @@ import {TokenId} from "lib/panoptic-v1.1/contracts/types/TokenId.sol";
 import {LeftRightUnsigned} from "lib/panoptic-v1.1/contracts/types/LeftRight.sol";
 import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
 import {Strings} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/utils/Strings.sol";
+import {PanopticMath} from "lib/panoptic-v1.1/contracts/libraries/PanopticMath.sol";
 
 /*//////////////////////////////////////////////////////////////
                             MOCKS
@@ -603,72 +604,312 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setNumberOfLegs(vault, 0);
         mockPool.setMockPositionBalanceArray(new uint256[2][](0));
 
-        bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
+        // TODO: I don't think this is creating the managerInput correctly -
+        // may need to do something like:
+        /*
+        PanopticVaultAccountant.ManagerPrices[] memory managerPrices =
+            new PanopticVaultAccountant.ManagerPrices[](1);
+        managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
+            poolPrice: TWAP_TICK,     // matches poolOracle (100)
+            token0Price: CONVERSION_TICK, // matches oracle0 (6931)
+            token1Price: CONVERSION_TICK  // matches oracle1 (6931)
+        });
+        But at which ticks??
+        */
+        PanopticVaultAccountant.ManagerPrices[] memory managerPrices =
+            new PanopticVaultAccountant.ManagerPrices[](1);
+        managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
+            poolPrice: TWAP_TICK, // token1 to token0 (aka underlyingToken)
+            token0Price: 0, // token0 == underlyingToken
+            token1Price: TWAP_TICK // token1 to token0 (aka underlyingToken)
+        });
+        bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
-        // Premium calculation involves conversion and may not be exactly as expected
-        // The actual result shows ~1099, suggesting token1 conversion affects the calculation
-        // Use tolerance to account for conversion precision
-        uint256 expectedNavBase = 1000e18 + 100e18; // Conservative estimate
+        // TODO: And then I think expectedNavBase should be more straightforward too -
+        // its just 150e18 token0s of premium, plus 50e18 token1s of premium, plus a balance of 1000e18 token0s, right?
+        // if so, can't we just convert1to0(50e18) plus 150e18 + 1000e18 to get the expectedNavBase?
+        // Expected NAV: underlyingToken balance, plus 150e18 of underlyingToken in net premium, plus convert1To0(50e18 token1s) in net premia
+        uint160 conversionPrice = Math.getSqrtRatioAtTick(TWAP_TICK);
+        uint256 netPremium1 = 50e18;
+        uint256 expectedNavInUnderlyingToken = 1000e18 + 150e18 + PanopticMath.convert1to0(netPremium1, conversionPrice);
         uint256 tolerance = 100e18; // Large tolerance for premium conversion calculations
         assertApproxEqAbs(
             nav,
-            expectedNavBase,
+            expectedNavInUnderlyingToken,
             tolerance,
             "NAV should include underlying plus converted premiums"
         );
     }
 
+    // INSTRUCTIONS FOR LLM ASSISTANT: You are an expert Solidity engineer, assisting your fellow expert engineer with
+    // fixing some regressed tests after a recent fix.
+    // TODO: After the recent fix to HypoVault, where we convert each of the pool.token0/token1.balanceOf(vault) values
+    // to the vault's underlyingToken before adding to the underlyingToken-denominated NAV:
+    /* OVERVIEW OF HYPOVAULT LOGIC CHANGES - here is the method, with the CHANGED part highlighted
+    /// @notice Returns the NAV of the portfolio contained in `vault` in terms of its underlying token.
+    /// @param vault The address of the vault to value
+    /// @param underlyingToken The underlying token of the vault
+    /// @param managerInput Input calldata from the vault manager consisting of price quotes from the manager, pool information, and a position lsit for each pool
+    /// @return nav The NAV of the portfolio contained in `vault` in terms of its underlying token
+    function computeNAV(
+        address vault,
+        address underlyingToken,
+        bytes calldata managerInput
+    ) external view returns (uint256 nav) {
+        (
+            ManagerPrices[] memory managerPrices,
+            PoolInfo[] memory pools,
+            TokenId[][] memory tokenIds
+        ) = abi.decode(managerInput, (ManagerPrices[], PoolInfo[], TokenId[][]));
+
+        if (keccak256(abi.encode(pools)) != vaultPools[vault]) revert InvalidPools();
+
+        address[] memory underlyingTokens = new address[](pools.length * 2);
+
+        // resolves stack too deep error
+        address _vault = vault;
+
+        for (uint256 i = 0; i < pools.length; i++) {
+            if (
+                Math.abs(
+                    managerPrices[i].poolPrice -
+                        PanopticMath.twapFilter(pools[i].poolOracle, pools[i].twapWindow)
+                ) > pools[i].maxPriceDeviation
+            ) revert StaleOraclePrice();
+
+            uint256[2][] memory positionBalanceArray;
+            int256 poolExposure0;
+            int256 poolExposure1;
+            {
+                LeftRightUnsigned shortPremium;
+                LeftRightUnsigned longPremium;
+
+                (shortPremium, longPremium, positionBalanceArray) = pools[i]
+                    .pool
+                    .getAccumulatedFeesAndPositionsData(_vault, true, tokenIds[i]);
+
+                poolExposure0 =
+                    int256(uint256(shortPremium.rightSlot())) -
+                    int256(uint256(longPremium.rightSlot()));
+                poolExposure1 =
+                    int256(uint256(shortPremium.leftSlot())) -
+                    int256(uint256(longPremium.leftSlot()));
+            }
+
+            uint256 numLegs;
+            for (uint256 j = 0; j < tokenIds[i].length; j++) {
+                if (positionBalanceArray[j][1] == 0) revert IncorrectPositionList();
+                uint256 positionLegs = tokenIds[i][j].countLegs();
+                for (uint256 k = 0; k < positionLegs; k++) {
+                    (uint256 amount0, uint256 amount1) = Math.getAmountsForLiquidity(
+                        managerPrices[i].poolPrice,
+                        PanopticMath.getLiquidityChunk(
+                            tokenIds[i][j],
+                            k,
+                            uint128(positionBalanceArray[j][1])
+                        )
+                    );
+
+                    if (tokenIds[i][j].isLong(k) == 0) {
+                        unchecked {
+                            poolExposure0 += int256(amount0);
+                            poolExposure1 += int256(amount1);
+                        }
+                    } else {
+                        unchecked {
+                            poolExposure0 -= int256(amount0);
+                            poolExposure1 -= int256(amount1);
+                        }
+                    }
+                }
+
+                (LeftRightSigned longAmounts, LeftRightSigned shortAmounts) = PanopticMath
+                    .computeExercisedAmounts(tokenIds[i][j], uint128(positionBalanceArray[j][1]));
+
+                poolExposure0 += int256(longAmounts.rightSlot()) - int256(shortAmounts.rightSlot());
+                poolExposure1 += int256(longAmounts.leftSlot()) - int256(shortAmounts.leftSlot());
+
+                numLegs += positionLegs;
+            }
+
+            if (numLegs != pools[i].pool.numberOfLegs(_vault)) revert IncorrectPositionList();
+
+            if (address(pools[i].token0) == address(0))
+                pools[i].token0 = IERC20Partial(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
+
+            bool skipToken0 = false;
+            bool skipToken1 = false;
+
+            // optimized for small number of pools
+            for (uint256 j = 0; j < underlyingTokens.length; j++) {
+                if (underlyingTokens[j] == address(pools[i].token0)) skipToken0 = true;
+                if (underlyingTokens[j] == address(pools[i].token1)) skipToken1 = true;
+
+                if (underlyingTokens[j] == address(0)) {
+                    if (!skipToken0) underlyingTokens[j] = address(pools[i].token0);
+                    // ensure a gap is not created in the underlyingTokens array
+                    if (!skipToken1)
+                        underlyingTokens[j + (skipToken0 ? 0 : 1)] = address(pools[i].token1);
+                    break;
+                }
+            }
+
+            uint256 token0Exposure;
+            uint256 token1Exposure;
+
+            if (!skipToken0)
+                token0Exposure = address(pools[i].token0) ==
+                    address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)
+                    ? address(_vault).balance
+                    : pools[i].token0.balanceOf(_vault);
+            if (!skipToken1) token1Exposure = pools[i].token1.balanceOf(_vault);
+
+            uint256 collateralBalance = pools[i].pool.collateralToken0().balanceOf(_vault);
+            poolExposure0 += int256(
+                pools[i].pool.collateralToken0().previewRedeem(collateralBalance)
+            );
+
+            collateralBalance = pools[i].pool.collateralToken1().balanceOf(_vault);
+            poolExposure1 += int256(
+                pools[i].pool.collateralToken1().previewRedeem(collateralBalance)
+            );
+
+            // CHANGED:comment here
+            // OLD: convert position values to underlying NEW: // convert position & token values to underlying
+            if (address(pools[i].token0) != underlyingToken) {
+                int24 conversionTick = PanopticMath.twapFilter(
+                    pools[i].oracle0,
+                    pools[i].twapWindow
+                );
+                if (
+                    Math.abs(conversionTick - managerPrices[i].token0Price) >
+                    pools[i].maxPriceDeviation
+                ) revert StaleOraclePrice();
+
+                uint160 conversionPrice = Math.getSqrtRatioAtTick(
+                    pools[i].isUnderlyingToken0InOracle0 ? -conversionTick : conversionTick
+                );
+
+                poolExposure0 = PanopticMath.convert0to1(poolExposure0, conversionPrice);
+                // CHANGED: Added here:
+                token0Exposure = uint256(
+                    PanopticMath.convert0to1(int256(token0Exposure), conversionPrice)
+                );
+            }
+
+            if (address(pools[i].token1) != underlyingToken) {
+                int24 conversionTick = PanopticMath.twapFilter(
+                    pools[i].oracle1,
+                    pools[i].twapWindow
+                );
+                if (
+                    Math.abs(conversionTick - managerPrices[i].token1Price) >
+                    pools[i].maxPriceDeviation
+                ) revert StaleOraclePrice();
+
+                uint160 conversionPrice = Math.getSqrtRatioAtTick(
+                    pools[i].isUnderlyingToken0InOracle1 ? conversionTick : -conversionTick
+                );
+
+                poolExposure1 = PanopticMath.convert1to0(poolExposure1, conversionPrice);
+                // CHANGED: Added here:
+                token1Exposure = uint256(
+                    PanopticMath.convert1to0(int256(token1Exposure), conversionPrice)
+                );
+            }
+
+            // debt in pools with negative exposure does not need to be paid back
+            nav +=
+                token0Exposure +
+                token1Exposure +
+                uint256(Math.max(poolExposure0 + poolExposure1, 0));
+        }
+
+        // underlying cannot be native (0x000/0xeee)
+        bool skipUnderlying = false;
+        for (uint256 i = 0; i < underlyingTokens.length; i++) {
+            if (underlyingTokens[i] == underlyingToken) skipUnderlying = true;
+        }
+        if (!skipUnderlying) nav += IERC20Partial(underlyingToken).balanceOf(_vault);
+    }
+    */
+    // We now need to fix this test that was written around the old logic. It currently fails with:
+    // [FAIL: NAV should be exactly 900 ether when negative premiums are offset by token exposure: 1000000000000000000000 != 900000000000000000000]
+    // The fact that this test passed before with the bad logic probably has to do with the fact that token0 and token1 in the test example are underlyingToken
+    // - this meant no conversion was necessary in the computeNAV's internal logic, which shielded it from the fact that before, raw token0-denominated and token1-denominated
+    // values were being added onto values in vault.underlyingToken units.
+    // To fix, please:
+    // - Make the test use the token0 and token1 that other tests use
+    // - Convert the values used in the setup scenario, such as mock premium values or underlyingToken.setBalance argument,
+    // between different denominations as necessary. We want to retain the behaviour that we create exactly -100 ether net exposure.
+    // However, we also want to now show that vaults compute NAV as the underlying token balance PLUS poolExposure, which is zeroed out if net negative
     function test_computeNAV_exactCalculation_negativeExposureToZero() public {
-        // Test the Math.max(0, exposure) behavior with exact negative exposure
+        // Build pool with distinct tokens (not the underlying)
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
             pool: PanopticPool(address(mockPool)),
-            token0: underlyingToken, // Same as underlying - no conversion
-            token1: underlyingToken, // Same as underlying - no conversion
-            poolOracle: poolOracle,
+            token0: token0,
+            token1: token1,
+            poolOracle: poolOracle, // remains at TWAP_TICK=100 (from setupDefaultOracles)
             oracle0: oracle0,
-            isUnderlyingToken0InOracle0: true,
+            isUnderlyingToken0InOracle0: false, // underlying is token1 in oracle0 (so convert0->1 yields underlying)
             oracle1: oracle1,
-            isUnderlyingToken0InOracle1: true,
+            isUnderlyingToken0InOracle1: true,  // underlying is token0 in oracle1 (so convert1->0 yields underlying)
             maxPriceDeviation: MAX_PRICE_DEVIATION,
             twapWindow: TWAP_WINDOW
         });
 
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
 
-        // Setup scenario where exposure is exactly negative
+        // --- Configure conversion ticks ---
+        // Price target = 2 => tick ~= ln(2)/ln(1.0001) ≈ 6931
+        int24 CONVERSION_TICK = 6931;
+        uint32 intervalDuration = TWAP_WINDOW / 20; // matches setupDefaultOracles()
+        int56[] memory convTicks = new int56[](20);
+        for (uint i = 0; i < 20; i++) {
+            convTicks[i] = int56(int256(CONVERSION_TICK) * int256(uint256(intervalDuration)) * int256(20 - i));
+        }
+        oracle0.setTickCumulatives(convTicks); // token0 -> underlying at 2:1
+        oracle1.setTickCumulatives(convTicks); // token1 -> underlying at 1:2 via convert1->0
+
+        // Underlying balance stays as-is in NAV
         underlyingToken.setBalance(vault, 500e18);
+
+        // No direct token exposure or collateral
+        token0.setBalance(vault, 0);
+        token1.setBalance(vault, 0);
         mockPool.collateralToken0().setBalance(vault, 0);
         mockPool.collateralToken0().setPreviewRedeemReturn(0);
         mockPool.collateralToken1().setBalance(vault, 0);
         mockPool.collateralToken1().setPreviewRedeemReturn(0);
 
-        // Set premiums that create exactly -100 ether net exposure
-        // longPremium > shortPremium by exactly 100 ether
-        uint256 shortPremiumTotal = 50e18;
-        uint256 longPremiumTotal = 150e18;
-
+        // Premiums: create -100e18 net exposure after conversion
+        // poolExposure0 = short.right - long.right = 0 - 50 = -50 (token0 units)
+        // convert0to1 with price=2 => -50 * 2 = -100 (underlying units)
         mockPool.setMockPremiums(
-            LeftRightUnsigned.wrap(shortPremiumTotal), // All in right side
-            LeftRightUnsigned.wrap(longPremiumTotal) // All in right side
+            LeftRightUnsigned.wrap(0),          // short: left|right = 0
+            LeftRightUnsigned.wrap(50e18)       // long:  left|right = 50e18 (only right side set)
         );
 
+        // No positions
         mockPool.setNumberOfLegs(vault, 0);
         mockPool.setMockPositionBalanceArray(new uint256[2][](0));
 
-        bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
+        // Manager prices must match the oracles
+        PanopticVaultAccountant.ManagerPrices[] memory managerPrices =
+            new PanopticVaultAccountant.ManagerPrices[](1);
+        managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
+            poolPrice: TWAP_TICK,     // matches poolOracle (100)
+            token0Price: CONVERSION_TICK, // matches oracle0 (6931)
+            token1Price: CONVERSION_TICK  // matches oracle1 (6931)
+        });
+
+        bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
-        // The result shows 900, which suggests: underlying(500) + Math.max(0, premiums(-100) + tokens(500)) = 900
-        // Net exposure = premiums(-100) + underlying_token_balance(500) = 400
-        // Final NAV = underlying_balance(500) + Math.max(0, 400) = 900
-        uint256 expectedNav = 900e18;
-        assertEq(
-            nav,
-            expectedNav,
-            "NAV should be exactly 900 ether when negative premiums are offset by token exposure"
-        );
+        // NAV = underlying(500) + max(-100, 0) = 500
+        assertEq(nav, 500e18, "NAV should be 500 ether when net exposure -100 is zeroed out after conversion");
     }
 
     function test_computeNAV_withPositions() public {
@@ -1041,8 +1282,8 @@ contract PanopticVaultAccountantTest is Test {
 
         // Set large negative premiums
         mockPool.setMockPremiums(
-            LeftRightUnsigned.wrap((uint256(1000 ether) << 128) | uint256(1000 ether)),
-            LeftRightUnsigned.wrap(0)
+            LeftRightUnsigned.wrap(0),
+            LeftRightUnsigned.wrap((uint256(1000 ether) << 128) | uint256(1000 ether))
         );
 
         mockPool.setNumberOfLegs(vault, 0);
@@ -1524,6 +1765,22 @@ contract PanopticVaultAccountantTest is Test {
     }
 
     function test_computeNAV_exactCalculation_withPremiums() public {
+        /*
+        PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
+        pools[0] = PanopticVaultAccountant.PoolInfo({
+            pool: PanopticPool(address(mockPool)),
+            token0: token0,
+            token1: token1,
+            poolOracle: poolOracle, <- givesyou token0/token1
+            oracle0: oracle0, <- gives you token0/underlyingToken
+            isUnderlyingToken0InOracle0: false,
+            oracle1: oracle1, <- gives you token1/underlyingToken
+            isUnderlyingToken0InOracle1: false,
+            maxPriceDeviation: MAX_PRICE_DEVIATION,
+            twapWindow: TWAP_WINDOW
+        });
+        return pools;
+        */
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
 
@@ -1542,9 +1799,9 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
-        // Expected premium contribution: shortPremium0 - longPremium0 + longPremium1 - shortPremium1
-        int256 premiumContribution0 = int256(shortPremium0) - int256(longPremium0);
-        int256 premiumContribution1 = int256(longPremium1) - int256(shortPremium1);
+        // Expected premium contribution: shortPremium0 - longPremium0 + shortPremium1 - longPremium1
+        int256 premiumContribution0 = int256(shortPremium0) - int256(longPremium0); // 5e18 token0s
+        int256 premiumContribution1 = int256(shortPremium1) - int256(longPremium1); // 7e18 token1s
 
         uint256 baseBalance = 100e18 + 200e18 + 50e18 + 75e18 + 1000e18; // token balances + collateral + underlying
         uint256 expectedNav = uint256(
@@ -1629,10 +1886,10 @@ contract PanopticVaultAccountantTest is Test {
         token1.setBalance(vault, 0);
         underlyingToken.setBalance(vault, 1000e18);
 
-        // Set massive short premiums to create negative exposure
+        // Set massive long premiums to create negative exposure
         mockPool.setMockPremiums(
-            LeftRightUnsigned.wrap((2000e18 << 128) | 2000e18), // Large short premiums
-            LeftRightUnsigned.wrap(0) // No long premiums
+            LeftRightUnsigned.wrap(0), // No short premiums
+            LeftRightUnsigned.wrap((2000e18 << 128) | 2000e18) // Large long premiums
         );
 
         mockPool.collateralToken0().setBalance(vault, 0);
@@ -2173,6 +2430,20 @@ contract PanopticVaultAccountantTest is Test {
     }
 
     function test_computeNAV_largeNumbers_noOverflow() public {
+        /*
+        pools[0] = PanopticVaultAccountant.PoolInfo({
+            pool: PanopticPool(address(mockPool)),
+            token0: token0,
+            token1: token1,
+            poolOracle: poolOracle, <- token0/token1
+            oracle0: oracle0, <- token0/underlyingToken
+            isUnderlyingToken0InOracle0: false,
+            oracle1: oracle1, <- token1/underlyingToken
+            isUnderlyingToken0InOracle1: false,
+            maxPriceDeviation: MAX_PRICE_DEVIATION,
+            twapWindow: TWAP_WINDOW
+        });
+        */
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
 
@@ -2180,22 +2451,35 @@ contract PanopticVaultAccountantTest is Test {
         uint256 largeBalance = 1000000e18; // 1M tokens
 
         setupPrecisionTestScenario(
-            largeBalance,
-            largeBalance,
-            largeBalance,
-            largeBalance / 2,
-            largeBalance / 2,
-            LeftRightUnsigned.wrap(((largeBalance / 10) << 128) | (largeBalance / 10)),
-            LeftRightUnsigned.wrap(((largeBalance / 20) << 128) | (largeBalance / 20))
+            largeBalance, // token0
+            largeBalance, // token1
+            largeBalance, // underlying
+            largeBalance / 2, // collateral0
+            largeBalance / 2, // collateral1
+            LeftRightUnsigned.wrap(((largeBalance / 10) << 128) | (largeBalance / 10)), // shortPremiums
+            LeftRightUnsigned.wrap(((largeBalance / 20) << 128) | (largeBalance / 20)) // longPremiums
         );
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
-        // Expected: largeBalance*4 (token0+token1+collateral0+collateral1) + largeBalance (underlying)
-        // Plus premiums: (largeBalance/10 - largeBalance/20) * 2 = largeBalance/20 * 2 = largeBalance/10
-        // Actual calculation shows ~4.03e18 for 1e24 input, so ratio is ~4.03
-        uint256 expectedNav = (largeBalance * 403) / 100; // 4.03 * largeBalance (empirically determined)
+        // Expected: token0BalanceInUnderlyingToken: convert0to1(largeBalance, oracle0) +
+        //           token1BalanceInUnderlyingToken: convert0to1(largeBalance, oracle1)  +
+        //           collateral0AssetsInUnderlyingToken: convert0to1(collateralToken0.convertToAssets(largeBalance / 2), oracle0)  +
+        //           collateral1AssetsInUnderlyingToken: convert0to1(collateralToken1.convertToAssets(largeBalance / 2), oracle1) +
+        //           underlyingTokenBalance: largeBalance
+        // Plus premiums:
+        //           token0NetPremiumInUnderlyingToken: convert0to1((largeBalance/10 - largeBalance/20), oracle0)
+        //           token1NetPremiumInUnderlyingToken: convert0to1((largeBalance/10 - largeBalance/20), oracle0)
+        uint160 token0ToUnderlyingTokenConversionPrice = Math.getSqrtRatioAtTick(oracle0.currentTick());
+        uint160 token1ToUnderlyingTokenConversionPrice = Math.getSqrtRatioAtTick(oracle1.currentTick());
+        uint256 expectedNav = PanopticMath.convert0to1(largeBalance, token0ToUnderlyingTokenConversionPrice) +
+            PanopticMath.convert0to1(largeBalance, token1ToUnderlyingTokenConversionPrice) +
+            PanopticMath.convert0to1(mockPool.collateralToken0().previewRedeem(largeBalance / 2), token0ToUnderlyingTokenConversionPrice) +
+            PanopticMath.convert0to1(mockPool.collateralToken1().previewRedeem(largeBalance / 2), token1ToUnderlyingTokenConversionPrice) +
+            largeBalance +
+            PanopticMath.convert0to1((largeBalance/10) - (largeBalance/20), token0ToUnderlyingTokenConversionPrice) +
+            PanopticMath.convert0to1((largeBalance/10) - (largeBalance/20), token1ToUnderlyingTokenConversionPrice);
         uint256 tolerance = largeBalance / 10; // 10% tolerance for large number calculations
         assertApproxEqAbs(
             nav,
