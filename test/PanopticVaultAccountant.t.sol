@@ -2306,7 +2306,7 @@ contract PanopticVaultAccountantTest is Test {
                 (largeBalance / 10) - (largeBalance / 20),
                 token1ToUnderlyingTokenConversionPrice
             );
-        uint256 tolerance = largeBalance / 10; // 10% tolerance for large number calculations
+        uint256 tolerance = 5; // Allow tolerance of 5 wei, for each convert0to1
         assertApproxEqAbs(
             nav,
             expectedNav,
