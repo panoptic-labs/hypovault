@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
+import "forge-std/console2.sol";
 
 // Interfaces
 import {ERC20Minimal} from "lib/panoptic-v1.1/contracts/tokens/ERC20Minimal.sol";
@@ -28,12 +29,12 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @notice A type that represents an unfulfilled or partially fulfilled withdrawal.
     /// @param amount The amount of shares requested
     /// @param basis The amount of assets used to mint the shares requested
-    /// @param ratioX64 The fraction of the requested shares that will be distributed in proceeds tokens
+    /// @param maxProceedsAmount The max amount of proceeds token to be distributed from the requested shares.
     /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
     struct PendingWithdrawal {
         uint128 amount;
         uint128 basis;
-        uint128 ratioX64;
+        uint128 maxProceedsAmount;
         bool shouldRedeposit;
     }
 
@@ -89,12 +90,12 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @notice Emitted when a withdrawal is requested.
     /// @param user The address that requested the withdrawal
     /// @param shares The amount of shares requested
-    /// @param ratioX64 The fraction of the requested shares that will be distributed in proceeds tokens
+    /// @param maxProceedsAmount The max amount of proceeds token to be distributed from the requested shares.
     /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
     event WithdrawalRequested(
         address indexed user,
         uint256 shares,
-        uint128 ratioX64,
+        uint128 maxProceedsAmount,
         bool shouldRedeposit
     );
 
@@ -207,9 +208,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
     /// @notice Deposit assets in the vault reserved for fulfilled withdrawal requests.
     uint256 public reservedWithdrawalDepositAssets;
-
-    /// @notice Proceeds assets in the vault reserved for fulfilled withdrawal requests.
-    uint256 public reservedWithdrawalProceedsAssets;
 
     /// @notice Contains information about the quantity of assets requested and fulfilled for deposits in each epoch.
     mapping(uint256 epoch => DepositEpochState) public depositEpochState;
@@ -335,9 +333,9 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
     /// @notice Requests a withdrawal of shares.
     /// @param shares The amount of shares to withdraw
-    /// @param ratioX64 The fraction of the requested shares that will be distributed in proceeds tokens
-    function requestWithdrawal(uint128 shares, uint128 ratioX64) external {
-        _requestWithdrawal(msg.sender, shares, ratioX64, false);
+    /// @param maxProceedsAmount The max amount of proceeds token to be distributed from the requested shares.
+    function requestWithdrawal(uint128 shares, uint128 maxProceedsAmount) external {
+        _requestWithdrawal(msg.sender, shares, maxProceedsAmount, false);
     }
 
     /// @notice Requests a withdrawal of shares from any user and optionally redeposits the assets into the vault upon withdrawal execution.
@@ -355,12 +353,12 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @notice Internal function to request a withdrawal of shares.
     /// @param user The user to initiate the withdrawal
     /// @param shares The amount of shares to withdraw
-    /// @param ratioX64 The fraction of the requested shares that will be distributed in proceeds tokens
+    /// @param maxProceedsAmount The max amount of proceeds token to be distributed from the requested shares.
     /// @param shouldRedeposit Whether the assets should be redeposited into the vault upon withdrawal execution
     function _requestWithdrawal(
         address user,
         uint128 shares,
-        uint128 ratioX64,
+        uint128 maxProceedsAmount,
         bool shouldRedeposit
     ) internal {
         uint256 _withdrawalEpoch = withdrawalEpoch;
@@ -378,7 +376,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         queuedWithdrawal[user][_withdrawalEpoch] = PendingWithdrawal({
             amount: pendingWithdrawal.amount + shares,
             basis: uint128(pendingWithdrawal.basis + withdrawalBasis),
-            ratioX64: ratioX64,
+            maxProceedsAmount: maxProceedsAmount,
             shouldRedeposit: pendingWithdrawal.shouldRedeposit || shouldRedeposit
         });
 
@@ -386,7 +384,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         _burnVirtual(user, shares);
 
-        emit WithdrawalRequested(user, shares, ratioX64, shouldRedeposit);
+        emit WithdrawalRequested(user, shares, maxProceedsAmount, shouldRedeposit);
     }
 
     /// @notice Cancels a deposit in the current (unfulfilled) epoch.
@@ -420,7 +418,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         queuedWithdrawal[withdrawer][currentEpoch] = PendingWithdrawal({
             amount: 0,
             basis: 0,
-            ratioX64: 0,
+            maxProceedsAmount: 0,
             shouldRedeposit: false
         });
         userBasis[withdrawer] += currentPendingWithdrawal.basis;
@@ -488,21 +486,35 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         // deposit assets to withdraw = prorated shares to withdraw * assets fulfilled / total shares fulfilled
         uint256 depositAssetsToWithdraw = Math.mulDiv(
-            Math.mulDiv64(sharesToFulfill, 2 ** 64 - pendingWithdrawal.ratioX64),
+            sharesToFulfill,
             _withdrawalEpochState.depositAssetsReceived,
             _withdrawalEpochState.sharesFulfilled == 0 ? 1 : _withdrawalEpochState.sharesFulfilled
         );
 
         reservedWithdrawalDepositAssets -= depositAssetsToWithdraw;
 
-        // proceeds assets to withdraw = prorated shares to withdraw * assets fulfilled / total shares fulfilled
+        // calculate corresponding value in proceeds token
+
         uint256 proceedsAssetsToWithdraw = Math.mulDiv(
-            Math.mulDiv64(sharesToFulfill, pendingWithdrawal.ratioX64),
+            depositAssetsToWithdraw,
             _withdrawalEpochState.proceedsAssetsReceived,
-            _withdrawalEpochState.sharesFulfilled == 0 ? 1 : _withdrawalEpochState.sharesFulfilled
+            _withdrawalEpochState.depositAssetsReceived
         );
 
-        reservedWithdrawalProceedsAssets -= proceedsAssetsToWithdraw;
+        // compute the amount of proceeds token requested
+        proceedsAssetsToWithdraw = Math.min(
+            proceedsAssetsToWithdraw,
+            pendingWithdrawal.maxProceedsAmount
+        );
+
+        if (proceedsAssetsToWithdraw > 0) {
+            // deduct that amount from the depositAssets amount
+            depositAssetsToWithdraw -= Math.mulDivRoundingUp(
+                proceedsAssetsToWithdraw,
+                _withdrawalEpochState.depositAssetsReceived,
+                _withdrawalEpochState.proceedsAssetsReceived
+            );
+        }
 
         uint256 withdrawnBasis = (uint256(pendingWithdrawal.basis) *
             _withdrawalEpochState.sharesFulfilled) / _withdrawalEpochState.sharesWithdrawn;
@@ -518,7 +530,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         queuedWithdrawal[user][epoch] = PendingWithdrawal({
             amount: 0,
             basis: 0,
-            ratioX64: 0,
+            maxProceedsAmount: 0,
             shouldRedeposit: false
         });
 
@@ -532,7 +544,9 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
             queuedWithdrawal[user][epoch + 1] = PendingWithdrawal({
                 amount: uint128(nextQueuedWithdrawal.amount + sharesRemaining),
                 basis: uint128(nextQueuedWithdrawal.basis + basisRemaining),
-                ratioX64: pendingWithdrawal.ratioX64,
+                maxProceedsAmount: uint128(
+                    pendingWithdrawal.maxProceedsAmount - proceedsAssetsToWithdraw
+                ),
                 shouldRedeposit: pendingWithdrawal.shouldRedeposit
             });
         }
@@ -579,7 +593,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         queuedWithdrawal[msg.sender][epoch] = PendingWithdrawal({
             amount: pendingWithdrawal.amount,
             basis: pendingWithdrawal.basis,
-            ratioX64: pendingWithdrawal.ratioX64,
+            maxProceedsAmount: pendingWithdrawal.maxProceedsAmount,
             shouldRedeposit: false
         });
 
@@ -721,7 +735,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         bytes memory managerInput
     ) external onlyManager {
         uint256 _reservedWithdrawalDepositAssets = reservedWithdrawalDepositAssets;
-        uint256 _reservedWithdrawalProceedsAssets = reservedWithdrawalProceedsAssets;
 
         uint256 totalAssets = accountant.computeNAV(address(this), depositToken, managerInput) +
             1 -
@@ -733,41 +746,18 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         WithdrawalEpochState memory epochState = withdrawalEpochState[currentEpoch];
         uint256 _totalSupply = totalSupply;
 
-        uint256 proceedsDepositRatioX128;
-
-        if (maxProceedsAssetsReceived > 0) {
-            proceedsDepositRatioX128 = Math.mulDiv(
-                maxProceedsAssetsReceived,
-                type(uint128).max,
-                maxDepositAssetsReceived + maxProceedsAssetsReceived
-            );
-        }
-
-        uint256 depositAssetsReceived = Math.mulDiv(
-            Math.mulDiv128(sharesToFulfill, 2 ** 128 - proceedsDepositRatioX128),
-            totalAssets,
-            _totalSupply
+        uint256 depositAssetsReceived = Math.mulDiv(sharesToFulfill, totalAssets, _totalSupply);
+        uint256 proceedsAssetsReceived = accountant.getProceedsFromDeposit(
+            address(this),
+            depositToken,
+            proceedsToken,
+            depositAssetsReceived,
+            managerInput
         );
-
-        uint256 proceedsAssetsReceived = Math.mulDiv(
-            Math.mulDiv128(sharesToFulfill, proceedsDepositRatioX128),
-            totalAssets,
-            _totalSupply
-        );
-
-        /*
-        (uint256 depositAssetsReceived, uint256 proceedsAssetsReceived) = accountant
-            .getTokenAmountsFromPrice(
-                address(this),
-                depositToken,
-                proceedsToken,
-                assetsReceived,
-                managerInput
-            );
-        */
 
         if (depositAssetsReceived > maxDepositAssetsReceived) revert WithdrawalNotFulfillable();
         if (proceedsAssetsReceived > maxProceedsAssetsReceived) revert WithdrawalNotFulfillable();
+
         uint256 sharesRemaining = epochState.sharesWithdrawn - sharesToFulfill;
 
         withdrawalEpochState[currentEpoch] = WithdrawalEpochState({

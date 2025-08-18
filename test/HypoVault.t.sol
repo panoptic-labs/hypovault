@@ -39,13 +39,13 @@ contract VaultAccountantMock {
         return nav;
     }
 
-    function getTokenAmountsFromPrice(
+    function getProceedsFromDeposit(
         address vault,
         address,
         address,
         uint256,
         bytes memory managerInput
-    ) external view returns (uint256 depositTokenAmount, uint256 proceedsTokenAmount) {
+    ) external view returns (uint256 proceedsTokenAmount) {
         require(vault == expectedVault, "Invalid vault");
         if (managerInput.length > 0) {
             require(
@@ -53,7 +53,7 @@ contract VaultAccountantMock {
                 "Invalid manager input"
             );
         }
-        return (depositTokenAmount, proceedsTokenAmount);
+        return proceedsTokenAmount;
     }
 }
 

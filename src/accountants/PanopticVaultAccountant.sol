@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
+import "forge-std/console2.sol";
 // Base
 import {Ownable} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 // Libraries
@@ -264,31 +265,68 @@ contract PanopticVaultAccountant is Ownable {
         if (!skipUnderlying) nav += IERC20Partial(underlyingToken).balanceOf(_vault);
     }
 
-    /// @notice Returns the correct price of the proceedsToken in terms of the depositToken.
+    /// @notice Returns the amount of proceedsToken for the supplied number of depositToken.
+    /// @dev This can be used to determine a price conversion between proceeds and deposit tokens at the `managerInput` snapshot
     /// @param vault The address of the vault to value
     /// @param depositToken The deposit token of the vault
     /// @param proceedsToken The proceeds token of the vault
-    /// @param assetsRequested The total amount of assets to be converted
+    /// @param depositAssetsReceived The total amount of assets to be converted
     /// @param managerInput Input calldata from the vault manager consisting of price quotes from the manager, pool information, and a position lsit for each pool
-    /// @return depositAssetsReceived The amount of deposit token to distribute based on the `ManagerPrices`
     /// @return proceedsAssetsReceived The amount of proceeds token to distrubute based on the `ManagerPrices`
-    function getTokenAmountsFromPrice(
+    function getProceedsFromDeposit(
         address vault,
         address depositToken,
         address proceedsToken,
-        uint256 assetsRequested,
+        uint256 depositAssetsReceived,
         bytes calldata managerInput
-    ) external view returns (uint256 depositAssetsReceived, uint256 proceedsAssetsReceived) {
-        /*
+    ) external view returns (uint256 proceedsAssetsReceived) {
+        if (proceedsToken == address(0)) {
+            return 0;
+        }
         (
             ManagerPrices[] memory managerPrices,
             PoolInfo[] memory pools,
             TokenId[][] memory tokenIds
         ) = abi.decode(managerInput, (ManagerPrices[], PoolInfo[], TokenId[][]));
-        */
         // compute conversion price here, matching the PoolInfo with deposit/proceeds token
 
-        depositAssetsReceived = assetsRequested;
-        proceedsAssetsReceived = 0;
+        for (uint256 i = 0; i < pools.length; i++) {
+            if (address(pools[i].token0) == address(0))
+                pools[i].token0 = IERC20Partial(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
+
+            if (
+                (address(pools[i].token0) == depositToken) &&
+                (address(pools[i].token1) == proceedsToken)
+            ) {
+                int24 conversionTick = PanopticMath.twapFilter(
+                    pools[i].oracle1,
+                    pools[i].twapWindow
+                );
+                uint160 conversionPrice = Math.getSqrtRatioAtTick(
+                    pools[i].isUnderlyingToken0InOracle1 ? conversionTick : -conversionTick
+                );
+                proceedsAssetsReceived = PanopticMath.convert1to0(
+                    depositAssetsReceived,
+                    conversionPrice
+                );
+            }
+            if (
+                (address(pools[i].token1) == depositToken) &&
+                (address(pools[i].token0) == proceedsToken)
+            ) {
+                int24 conversionTick = PanopticMath.twapFilter(
+                    pools[i].oracle0,
+                    pools[i].twapWindow
+                );
+                uint160 conversionPrice = Math.getSqrtRatioAtTick(
+                    pools[i].isUnderlyingToken0InOracle0 ? conversionTick : -conversionTick
+                );
+                proceedsAssetsReceived = PanopticMath.convert1to0(
+                    depositAssetsReceived,
+                    conversionPrice
+                );
+            }
+        }
+        console2.log("proceedsAssetsReceived", proceedsAssetsReceived);
     }
 }
