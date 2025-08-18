@@ -290,10 +290,9 @@ contract PanopticVaultAccountant is Ownable {
         ) = abi.decode(managerInput, (ManagerPrices[], PoolInfo[], TokenId[][]));
         // compute conversion price here, matching the PoolInfo with deposit/proceeds token
 
-        for (uint256 i = 0; i < pools.length; i++) {
-            if (address(pools[i].token0) == address(0))
-                pools[i].token0 = IERC20Partial(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
+        uint256 numberOfOracles;
 
+        for (uint256 i = 0; i < pools.length; i++) {
             if (
                 (address(pools[i].token0) == depositToken) &&
                 (address(pools[i].token1) == proceedsToken)
@@ -305,10 +304,11 @@ contract PanopticVaultAccountant is Ownable {
                 uint160 conversionPrice = Math.getSqrtRatioAtTick(
                     pools[i].isUnderlyingToken0InOracle1 ? conversionTick : -conversionTick
                 );
-                proceedsAssetsReceived = PanopticMath.convert1to0(
+                proceedsAssetsReceived += PanopticMath.convert1to0(
                     depositAssetsReceived,
                     conversionPrice
                 );
+                ++numberOfOracles;
             }
             if (
                 (address(pools[i].token1) == depositToken) &&
@@ -321,12 +321,18 @@ contract PanopticVaultAccountant is Ownable {
                 uint160 conversionPrice = Math.getSqrtRatioAtTick(
                     pools[i].isUnderlyingToken0InOracle0 ? conversionTick : -conversionTick
                 );
-                proceedsAssetsReceived = PanopticMath.convert1to0(
+                proceedsAssetsReceived += PanopticMath.convert1to0(
                     depositAssetsReceived,
                     conversionPrice
                 );
+                ++numberOfOracles;
+            }
+
+            if (numberOfOracles == 0) {
+                proceedsAssetsReceived = 0;
+            } else {
+                proceedsAssetsReceived = proceedsAssetsReceived / numberOfOracles;
             }
         }
-        console2.log("proceedsAssetsReceived", proceedsAssetsReceived);
     }
 }
