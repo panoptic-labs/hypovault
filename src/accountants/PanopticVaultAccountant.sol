@@ -260,7 +260,7 @@ contract PanopticVaultAccountant is Ownable {
                 );
 
                 poolExposure1 = PanopticMath.convert1to0(poolExposure1, conversionPrice);
-                // See comment about on the if (token0Exposure) for why this makes sense even though convert1to0 safely returns 0 output for 0 input
+                // See comment above on if (token0Exposure != 0) for why this makes sense despite convert1to0 safely returning 0 given an input of 0
                 if (token1Exposure != 0) {
                     token1Exposure = uint256(
                         PanopticMath.convert1to0(int256(token1Exposure), conversionPrice)
