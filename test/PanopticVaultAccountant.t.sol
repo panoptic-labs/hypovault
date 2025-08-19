@@ -461,15 +461,27 @@ contract PanopticVaultAccountantTest is Test {
 
         // Expected: token0(100) + token1(200) + collateral0(50) + collateral1(75) + underlying(1000) = 1425
         uint160 conversionPrice = Math.getSqrtRatioAtTick(-TWAP_TICK);
-        uint256 token0HoldingsInUnderlying = PanopticMath.convert1to0(uint256(100e18), conversionPrice);
-        uint256 token1HoldingsInUnderlying = PanopticMath.convert1to0(uint256(200e18), conversionPrice);
-        uint256 collateralTrackerRedeemableToken0sInUnderlying = PanopticMath.convert1to0(uint256(50e18), conversionPrice);
-        uint256 collateralTrackerRedeemableToken1sInUnderlying = PanopticMath.convert1to0(uint256(75e18), conversionPrice);
+        uint256 token0HoldingsInUnderlying = PanopticMath.convert1to0(
+            uint256(100e18),
+            conversionPrice
+        );
+        uint256 token1HoldingsInUnderlying = PanopticMath.convert1to0(
+            uint256(200e18),
+            conversionPrice
+        );
+        uint256 collateralTrackerRedeemableToken0sInUnderlying = PanopticMath.convert1to0(
+            uint256(50e18),
+            conversionPrice
+        );
+        uint256 collateralTrackerRedeemableToken1sInUnderlying = PanopticMath.convert1to0(
+            uint256(75e18),
+            conversionPrice
+        );
         uint256 expectedNav = token0HoldingsInUnderlying +
-          token1HoldingsInUnderlying +
-          collateralTrackerRedeemableToken0sInUnderlying +
-          collateralTrackerRedeemableToken1sInUnderlying +
-          1000e18;
+            token1HoldingsInUnderlying +
+            collateralTrackerRedeemableToken0sInUnderlying +
+            collateralTrackerRedeemableToken1sInUnderlying +
+            1000e18;
         uint256 tolerance = 0; // No tolerance, we know everything
         assertApproxEqAbs(
             nav,
@@ -516,7 +528,10 @@ contract PanopticVaultAccountantTest is Test {
         // Expected: underlying(1000) + converted(token1) + collateral0(50) + converted(collateral1(75))
         uint160 token1ToToken0ConversionPrice = Math.getSqrtRatioAtTick(-TWAP_TICK);
         uint256 token1HoldingsAndRedeemables = 200e18 + 75e18;
-        uint256 token1HoldingsAndRedeemablesInToken0 = PanopticMath.convert1to0(token1HoldingsAndRedeemables, token1ToToken0ConversionPrice);
+        uint256 token1HoldingsAndRedeemablesInToken0 = PanopticMath.convert1to0(
+            token1HoldingsAndRedeemables,
+            token1ToToken0ConversionPrice
+        );
         uint256 expectedNavBase = 1000e18 + 50e18 + token1HoldingsAndRedeemablesInToken0;
         uint256 tolerance = 0;
         assertApproxEqAbs(
