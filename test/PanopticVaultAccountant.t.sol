@@ -460,8 +460,17 @@ contract PanopticVaultAccountantTest is Test {
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
         // Expected: token0(100) + token1(200) + collateral0(50) + collateral1(75) + underlying(1000) = 1425
-        uint256 expectedNav = 100e18 + 200e18 + 50e18 + 75e18 + 1000e18;
-        uint256 tolerance = 5e18; // Small tolerance for conversion calculations
+        uint160 conversionPrice = Math.getSqrtRatioAtTick(-TWAP_TICK);
+        uint256 token0HoldingsInUnderlying = PanopticMath.convert1to0(uint256(100e18), conversionPrice);
+        uint256 token1HoldingsInUnderlying = PanopticMath.convert1to0(uint256(200e18), conversionPrice);
+        uint256 collateralTrackerRedeemableToken0sInUnderlying = PanopticMath.convert1to0(uint256(50e18), conversionPrice);
+        uint256 collateralTrackerRedeemableToken1sInUnderlying = PanopticMath.convert1to0(uint256(75e18), conversionPrice);
+        uint256 expectedNav = token0HoldingsInUnderlying +
+          token1HoldingsInUnderlying +
+          collateralTrackerRedeemableToken0sInUnderlying +
+          collateralTrackerRedeemableToken1sInUnderlying +
+          1000e18;
+        uint256 tolerance = 0; // No tolerance, we know everything
         assertApproxEqAbs(
             nav,
             expectedNav,
@@ -504,10 +513,12 @@ contract PanopticVaultAccountantTest is Test {
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
-        // Expected: underlying(1000) + token1_converted + collateral0(50) + collateral1(75) ≈ 1325+
-        // Token1 conversion introduces precision differences, so use tolerance
-        uint256 expectedNavBase = 1000e18 + 200e18 + 50e18 + 75e18;
-        uint256 tolerance = 10e18; // Tolerance for token1 conversion
+        // Expected: underlying(1000) + converted(token1) + collateral0(50) + converted(collateral1(75))
+        uint160 token1ToToken0ConversionPrice = Math.getSqrtRatioAtTick(-TWAP_TICK);
+        uint256 token1HoldingsAndRedeemables = 200e18 + 75e18;
+        uint256 token1HoldingsAndRedeemablesInToken0 = PanopticMath.convert1to0(token1HoldingsAndRedeemables, token1ToToken0ConversionPrice);
+        uint256 expectedNavBase = 1000e18 + 50e18 + token1HoldingsAndRedeemablesInToken0;
+        uint256 tolerance = 0;
         assertApproxEqAbs(
             nav,
             expectedNavBase,
@@ -620,7 +631,7 @@ contract PanopticVaultAccountantTest is Test {
         uint256 expectedNavInUnderlyingToken = 1000e18 +
             150e18 +
             PanopticMath.convert1to0(netPremium1, conversionPrice);
-        uint256 tolerance = 0e18; // No tolerance, we know exact amounts
+        uint256 tolerance = 0; // No tolerance, we know exact amounts
         assertApproxEqAbs(
             nav,
             expectedNavInUnderlyingToken,
@@ -702,6 +713,8 @@ contract PanopticVaultAccountantTest is Test {
             "NAV should be 500 ether when net exposure -100 is zeroed out after conversion"
         );
     }
+
+    // TODO: Continue reducing tolerances from here
 
     function test_computeNAV_withPositions() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
