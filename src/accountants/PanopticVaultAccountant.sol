@@ -214,7 +214,7 @@ contract PanopticVaultAccountant is Ownable {
                 pools[i].pool.collateralToken1().previewRedeem(collateralBalance)
             );
 
-            // convert position values to underlying
+            // convert position & token values to underlying
             if (address(pools[i].token0) != underlyingToken) {
                 int24 conversionTick = PanopticMath.twapFilter(
                     pools[i].oracle0,
@@ -230,6 +230,19 @@ contract PanopticVaultAccountant is Ownable {
                 );
 
                 poolExposure0 = PanopticMath.convert0to1(poolExposure0, conversionPrice);
+                // Gas-optimisation-wise, it makes sense to gate the token0-to-underlying conversion by the token0Exposure != 0 condition,
+                // even though convert0to1(0) will safely equal 0:
+                // I. skipToken0 will happen any time the token0 of a pool is token0 or 1 of another of the vault's pool.
+                // e.g., if the vault trades two ETH-paired pools, skipToken0 == true for pools[1]
+                // II. additionally, the vault might actually just have a zero balance of raw token0s (e.g. all token0s are currently deposited in CT)
+                // III. convert0to1 costs 228 in the zero-value case, whereas if (token0Exposure != 0) costs 13 gas
+                // IV. so therefore, if we save 1 convert0to1 call per 228/13 ~= 17 checks, its worth it
+                // V. I predict that (I) or (II) will be true > 1/17th of the time, so let's insert the check:
+                if (token0Exposure != 0) {
+                    token0Exposure = uint256(
+                        PanopticMath.convert0to1(int256(token0Exposure), conversionPrice)
+                    );
+                }
             }
 
             if (address(pools[i].token1) != underlyingToken) {
@@ -247,12 +260,18 @@ contract PanopticVaultAccountant is Ownable {
                 );
 
                 poolExposure1 = PanopticMath.convert1to0(poolExposure1, conversionPrice);
+                // See comment above on if (token0Exposure != 0) for why this makes sense despite convert1to0 safely returning 0 given an input of 0
+                if (token1Exposure != 0) {
+                    token1Exposure = uint256(
+                        PanopticMath.convert1to0(int256(token1Exposure), conversionPrice)
+                    );
+                }
             }
 
-            // debt in pools with negative exposure does not need to be paid back
             nav +=
                 token0Exposure +
                 token1Exposure +
+                // debt in pools with negative exposure does not need to be paid back
                 uint256(Math.max(poolExposure0 + poolExposure1, 0));
         }
 
