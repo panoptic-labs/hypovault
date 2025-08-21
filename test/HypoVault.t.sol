@@ -3979,7 +3979,6 @@ contract HypoVaultTest is Test {
             values
         );
 
-
         // Try to call from permissioned account, but with invalid merkle proof
         bytes32[][] memory invalidProofs = new bytes32[][](1);
         invalidProofs[0] = new bytes32[](1);
