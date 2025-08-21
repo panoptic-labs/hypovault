@@ -3829,13 +3829,8 @@ contract HypoVaultTest is Test {
         // Call the decoder to get the exact same output
         (bool success, bytes memory returnData) = address(decoder).staticcall(targetCalldata);
         bytes memory packedArgumentAddresses = abi.decode(returnData, (bytes));
-        console2.log("Decoder address:", address(decoder));
-        console2.log("Target address:", address(manageTarget));
         uint256 valueToSend = 0.5 ether;
         bool valueNonZero = valueToSend > 0; // This should be true
-        console2.log("Value:", valueToSend);
-        console2.log("Selector (on the next line):");
-        console2.logBytes4(bytes4(targetCalldata));
         bytes32 leaf = keccak256(
             abi.encodePacked(
                 address(decoder),
@@ -3845,10 +3840,7 @@ contract HypoVaultTest is Test {
                 packedArgumentAddresses // packedArgumentAddresses (should be empty - the decoder always returns empty)
             )
         );
-        console2.log("Calculated leaf (on next line):");
-        console2.logBytes32(leaf);
         bytes32 merkleRoot = leaf;
-        console2.log("Expected valueNonZero:", valueNonZero);
 
         // Set the manage root for the curator - manager may call manageTarget with targetCalldata
         vm.prank(InitialManagerOwner);
@@ -3953,6 +3945,7 @@ contract HypoVaultTest is Test {
         uint256[] memory values = new uint256[](1);
         values[0] = 0.5 ether;
 
+        uint256 vaultEthBefore = address(testVault).balance;
         vm.prank(Curator);
         vaultManager.manageVaultWithMerkleVerification(
             merkleProofs,
@@ -3967,6 +3960,7 @@ contract HypoVaultTest is Test {
         assertEq(manageTarget.value(), 12345);
         assertEq(manageTarget.lastCaller(), address(testVault));
         assertEq(manageTarget.lastValue(), 0.5 ether);
+        assertEq(address(testVault).balance, vaultEthBefore - 0.5 ether, "Vault ETH debited");
 
         console2.log("=== Step 9: Test unauthorized access fails ===");
         // Try to call without proper authorization
@@ -3974,7 +3968,19 @@ contract HypoVaultTest is Test {
         vm.expectRevert();
         vaultManager.fulfillDeposits(0, "");
 
-        // Try to call with invalid merkle proof
+        // Try to call manage without authorization (should revert via authority)
+        vm.prank(Bob);
+        vm.expectRevert();
+        vaultManager.manageVaultWithMerkleVerification(
+            merkleProofs,
+            decodersAndSanitizers,
+            targets,
+            targetDatas,
+            values
+        );
+
+
+        // Try to call from permissioned account, but with invalid merkle proof
         bytes32[][] memory invalidProofs = new bytes32[][](1);
         invalidProofs[0] = new bytes32[](1);
         invalidProofs[0][0] = bytes32(uint256(0x1234));
@@ -3995,7 +4001,7 @@ contract HypoVaultTest is Test {
 
 contract NoopDecoder {
     fallback() external {
-        // Return empty bytes encoded properly
+        // Return empty bytes, ABI-encoded as a single dynamic bytes (offset=0x20, length=0)
         assembly {
             let ptr := mload(0x40)
             mstore(ptr, 0x20) // offset to data

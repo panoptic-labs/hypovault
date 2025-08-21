@@ -10,14 +10,14 @@ import "../interfaces/IHypoVault.sol";
 contract HypoVaultManagerWithMerkleVerification is ManagerWithMerkleVerification {
     //============================== ERRORS ===============================
 
-    error HypovaultManager__Unauthorized();
+    error HypoVaultManager__Unauthorized();
 
     //============================== MODIFIERS ===============================
 
     /// @notice Modifier that restricts access to curators (addresses with merkle roots) or owner
     modifier onlyStrategist() {
         if (manageRoot[msg.sender] == bytes32(0) && msg.sender != owner) {
-            revert HypovaultManager__Unauthorized();
+            revert HypoVaultManager__Unauthorized();
         }
         _;
     }
