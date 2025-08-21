@@ -4,20 +4,20 @@ pragma solidity ^0.8.28;
 import "lib/boring-vault/src/base/Roles/ManagerWithMerkleVerification.sol";
 import "../interfaces/IHypoVault.sol";
 
-/// @title HypovaultManagerWithMerkleVerification
+/// @title HypoVaultManagerWithMerkleVerification
 /// @notice Extends boring-vault's ManagerWithMerkleVerification with HypoVault-specific management functions
 /// @dev Inherits merkle tree verification for secure function calls while adding HypoVault operations
-contract HypovaultManagerWithMerkleVerification is ManagerWithMerkleVerification {
+contract HypoVaultManagerWithMerkleVerification is ManagerWithMerkleVerification {
     //============================== ERRORS ===============================
 
-    error HypovaultManager__Unauthorized();
+    error HypoVaultManager__Unauthorized();
 
     //============================== MODIFIERS ===============================
 
     /// @notice Modifier that restricts access to curators (addresses with merkle roots) or owner
     modifier onlyStrategist() {
         if (manageRoot[msg.sender] == bytes32(0) && msg.sender != owner) {
-            revert HypovaultManager__Unauthorized();
+            revert HypoVaultManager__Unauthorized();
         }
         _;
     }

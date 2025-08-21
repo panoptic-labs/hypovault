@@ -16,7 +16,7 @@ import {LiquidityChunk} from "lib/panoptic-v1.1/contracts/types/LiquidityChunk.s
 import {PositionBalance} from "lib/panoptic-v1.1/contracts/types/PositionBalance.sol";
 import {TokenId} from "lib/panoptic-v1.1/contracts/types/TokenId.sol";
 
-/// @author dyedm1
+/// @author Axicon Labs Limited
 contract PanopticVaultAccountant is Ownable {
     /// @notice Holds the information required to compute the NAV of a PanopticPool
     /// @param pool The PanopticPool to compute the NAV of
@@ -28,7 +28,7 @@ contract PanopticVaultAccountant is Ownable {
     /// @param oracle1 The oracle for token1-underlying
     /// @param isUnderlyingToken0InOracle1 Whether token0 in oracle1 is the underlying token
     /// @param maxPriceDeviation The maximum price deviation allowed for the oracle prices
-    /// @param twapWindow The time window (in seconds)to compute the TWAP over
+    /// @param twapWindow The time window (in seconds) to compute the TWAP over
     struct PoolInfo {
         PanopticPool pool;
         IERC20Partial token0;
@@ -89,7 +89,7 @@ contract PanopticVaultAccountant is Ownable {
     /// @notice Returns the NAV of the portfolio contained in `vault` in terms of its underlying token.
     /// @param vault The address of the vault to value
     /// @param underlyingToken The underlying token of the vault
-    /// @param managerInput Input calldata from the vault manager consisting of price quotes from the manager, pool information, and a position lsit for each pool
+    /// @param managerInput Input calldata from the vault manager consisting of price quotes from the manager, pool information, and a position list for each pool
     /// @return nav The NAV of the portfolio contained in `vault` in terms of its underlying token
     function computeNAV(
         address vault,
