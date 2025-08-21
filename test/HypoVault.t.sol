@@ -7,6 +7,10 @@ import "../src/HypoVault.sol";
 import {ERC20S} from "lib/panoptic-v1.1/test/foundry/testUtils/ERC20S.sol";
 import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
 
+import {HypoVaultManagerWithMerkleVerification} from "../src/managers/HypoVaultManagerWithMerkleVerification.sol";
+import {AccessManager} from "lib/boring-vault/lib/openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
+import {Authority} from "lib/boring-vault/lib/solmate/src/auth/Auth.sol";
+
 contract VaultAccountantMock {
     uint256 public nav;
     address public expectedVault;
@@ -3763,6 +3767,205 @@ contract HypoVaultTest is Test {
         assertEq(newAmount, originalAmount);
         assertEq(newBasis, originalBasis);
         assertFalse(shouldRedeposit);
+    }
+
+    function test_complete_manager_integration_flow() public {
+        console2.log("=== Step 1: Deploy HypoVault with dummy manager ===");
+
+        address VaultOwner = address(0x1111);
+        address DummyManager = address(0x2222);
+        address InitialManagerOwner = address(0x3333);
+        address Curator = address(0x4444);
+        address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
+
+        // Deploy HypoVault with dummy manager
+        vm.prank(VaultOwner);
+        HypoVault testVault = new HypoVault(
+            address(token),
+            DummyManager, // dummy manager initially
+            IVaultAccountant(address(accountant)),
+            100, // 1% performance fee
+            "TEST_INTEGRATION",
+            "Test Integration Token"
+        );
+
+        // Alice already has tokens from setUp(), but needs to approve the new vault
+        vm.prank(Alice);
+        token.approve(address(testVault), type(uint256).max);
+
+        // Also approve for any other users you'll use in this test
+        vm.prank(Bob);
+        token.approve(address(testVault), type(uint256).max);
+
+        assertEq(testVault.manager(), DummyManager);
+        assertEq(testVault.owner(), VaultOwner);
+
+        console2.log("=== Step 2: Deploy HypoVaultManagerWithMerkleVerification ===");
+
+        // Deploy the real manager (msg.sender becomes owner automatically)
+        HypoVaultManagerWithMerkleVerification vaultManager = new HypoVaultManagerWithMerkleVerification(
+            InitialManagerOwner, // owner
+            address(testVault), // hypovault
+            BalancerVault // balancerVault
+        );
+
+        assertEq(address(vaultManager.vault()), address(testVault));
+        assertEq(vaultManager.owner(), InitialManagerOwner);
+
+        console2.log("=== Step 3: Set vault manager as the actual manager ===");
+
+        vm.prank(VaultOwner);
+        testVault.setManager(address(vaultManager));
+        assertEq(testVault.manager(), address(vaultManager));
+
+        console2.log("=== Step 4: Set up Merkle root for curator ===");
+
+        // Create a mock target for testing manage calls
+        MockTarget manageTarget = new MockTarget();
+
+        // Create merkle tree with allowed targets and function calls
+        bytes memory targetCalldata = abi.encodeWithSignature("simpleFunction(uint256)", 12345);
+        bytes32 leaf = keccak256(abi.encodePacked(address(manageTarget), targetCalldata));
+
+        // For simplicity, use single-leaf tree (root = leaf)
+        bytes32 merkleRoot = leaf;
+
+        // Set the manage root for the curator
+        vm.prank(InitialManagerOwner);
+        vaultManager.setManageRoot(Curator, merkleRoot);
+        assertEq(vaultManager.manageRoot(Curator), merkleRoot);
+
+        console2.log("=== Step 5: Set up AccessManager and grant curator permissions ===");
+
+        // Deploy AccessManager
+        vm.prank(InitialManagerOwner);
+        AccessManager accessManager = new AccessManager(InitialManagerOwner);
+
+        // Set AccessManager as authority
+        vm.prank(InitialManagerOwner);
+        vaultManager.setAuthority(Authority(address(accessManager)));
+        assertEq(address(vaultManager.authority()), address(accessManager));
+
+        // Grant curator role
+        uint64 CURATOR_ROLE = 1;
+        vm.prank(InitialManagerOwner);
+        accessManager.grantRole(CURATOR_ROLE, Curator, 0); // 0 = no delay
+
+        // Set permissions for curator role to call manager functions
+        bytes4[] memory selectors = new bytes4[](4);
+        selectors[0] = HypoVaultManagerWithMerkleVerification.fulfillDeposits.selector;
+        selectors[1] = HypoVaultManagerWithMerkleVerification.fulfillWithdrawals.selector;
+        selectors[2] = HypoVaultManagerWithMerkleVerification.cancelDeposit.selector;
+        selectors[3] = bytes4(keccak256("manageVaultWithMerkleVerification(bytes32[],address,bytes,uint256)"));
+
+        vm.prank(InitialManagerOwner);
+        accessManager.setTargetFunctionRole(address(vaultManager), selectors, CURATOR_ROLE);
+
+        // Verify access manager setup
+        (bool canCall,) = accessManager.canCall(
+            Curator,
+            address(vaultManager),
+            HypoVaultManagerWithMerkleVerification.fulfillDeposits.selector
+        );
+        assertTrue(canCall);
+
+        console2.log("=== Step 6: Test curator can fulfill deposits ===");
+
+        // Alice requests a deposit
+        vm.prank(Alice);
+        testVault.requestDeposit(100 ether);
+
+        assertEq(token.balanceOf(address(testVault)), 100 ether);
+        assertEq(testVault.queuedDeposit(Alice, 0), 100 ether);
+
+        // Curator fulfills deposits via the manager
+        accountant.setExpectedVault(address(testVault));
+        accountant.setNav(100 ether);
+
+        vm.prank(Curator);
+        vaultManager.fulfillDeposits(100 ether, "");
+
+        // Check deposit was fulfilled
+        assertEq(testVault.depositEpoch(), 1);
+        (uint128 assetsDeposited, , uint128 assetsFulfilled) = testVault.depositEpochState(0);
+        assertEq(assetsDeposited, 100 ether);
+        assertEq(assetsFulfilled, 100 ether);
+
+        console2.log("=== Step 7: Execute deposit and test withdrawals ===");
+
+        testVault.executeDeposit(Alice, 0);
+        uint256 aliceShares = testVault.balanceOf(Alice);
+        assertGt(aliceShares, 0);
+
+        // Alice requests withdrawal
+        vm.prank(Alice);
+        testVault.requestWithdrawal(uint128(aliceShares / 2));
+
+        // Curator fulfills withdrawals
+        vm.prank(Curator);
+        vaultManager.fulfillWithdrawals(aliceShares / 2, 50 ether, "");
+
+        // Execute withdrawal
+        uint256 aliceBalanceBefore = token.balanceOf(Alice);
+        testVault.executeWithdrawal(Alice, 0);
+        assertGt(token.balanceOf(Alice), aliceBalanceBefore);
+
+        console2.log("=== Step 8: Test arbitrary manage calls with Merkle verification ===");
+        vm.deal(address(testVault), 1 ether); // Fund vault for the call
+
+        // Prepare arrays for the new function signature
+        bytes32[][] memory merkleProofs = new bytes32[][](1);
+        merkleProofs[0] = new bytes32[](0); // Empty proof for single-leaf tree
+
+        address[] memory decodersAndSanitizers = new address[](1);
+        decodersAndSanitizers[0] = address(0); // No decoder/sanitizer for this test
+
+        address[] memory targets = new address[](1);
+        targets[0] = address(manageTarget);
+
+        bytes[] memory targetDatas = new bytes[](1);
+        targetDatas[0] = targetCalldata;
+
+        uint256[] memory values = new uint256[](1);
+        values[0] = 0.5 ether;
+
+        vm.prank(Curator);
+        vaultManager.manageVaultWithMerkleVerification(
+            merkleProofs,
+            decodersAndSanitizers,
+            targets,
+            targetDatas,
+            values
+        );
+
+        // Verify the target was called correctly
+        assertTrue(manageTarget.wasCalled());
+        assertEq(manageTarget.value(), 12345);
+        assertEq(manageTarget.lastCaller(), address(testVault));
+        assertEq(manageTarget.lastValue(), 0.5 ether);
+
+        console2.log("=== Step 9: Test unauthorized access fails ===");
+        // Try to call without proper authorization
+        vm.prank(Bob);
+        vm.expectRevert();
+        vaultManager.fulfillDeposits(0, "");
+
+        // Try to call with invalid merkle proof
+        bytes32[][] memory invalidProofs = new bytes32[][](1);
+        invalidProofs[0] = new bytes32[](1);
+        invalidProofs[0][0] = bytes32(uint256(0x1234));
+
+        vm.prank(Curator);
+        vm.expectRevert();
+        vaultManager.manageVaultWithMerkleVerification(
+            invalidProofs,
+            decodersAndSanitizers, // reuse from above
+            targets,               // reuse from above
+            targetDatas,          // reuse from above
+            values                // reuse from above
+        );
+
+        console2.log("=== Integration test completed successfully! ===");
     }
 }
 

@@ -4,10 +4,10 @@ pragma solidity ^0.8.28;
 import "lib/boring-vault/src/base/Roles/ManagerWithMerkleVerification.sol";
 import "../interfaces/IHypoVault.sol";
 
-/// @title HypovaultManagerWithMerkleVerification
+/// @title HypoVaultManagerWithMerkleVerification
 /// @notice Extends boring-vault's ManagerWithMerkleVerification with HypoVault-specific management functions
 /// @dev Inherits merkle tree verification for secure function calls while adding HypoVault operations
-contract HypovaultManagerWithMerkleVerification is ManagerWithMerkleVerification {
+contract HypoVaultManagerWithMerkleVerification is ManagerWithMerkleVerification {
     //============================== ERRORS ===============================
 
     error HypovaultManager__Unauthorized();
