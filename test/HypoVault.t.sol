@@ -3825,12 +3825,30 @@ contract HypoVaultTest is Test {
 
         // Create merkle tree with allowed targets and function calls
         bytes memory targetCalldata = abi.encodeWithSignature("simpleFunction(uint256)", 12345);
-        bytes32 leaf = keccak256(abi.encodePacked(address(manageTarget), targetCalldata));
-
-        // For simplicity, use single-leaf tree (root = leaf)
+        NoopDecoder decoder = new NoopDecoder();
+        // Call the decoder to get the exact same output
+        (bool success, bytes memory returnData) = address(decoder).staticcall(targetCalldata);
+        bytes memory packedArgumentAddresses = abi.decode(returnData, (bytes));
+        console2.log("Decoder address:", address(decoder));
+        console2.log("Target address:", address(manageTarget));
+        uint256 valueToSend = 0.5 ether;
+        bool valueNonZero = valueToSend > 0; // This should be true
+        console2.log("Value:", valueToSend);
+        console2.log("Selector (on the next line):");
+        console2.logBytes4(bytes4(targetCalldata));
+        bytes32 leaf = keccak256(abi.encodePacked(
+            address(decoder),
+            address(manageTarget),
+            valueNonZero,  // valueNonZero (we send 0.5 ether later on)
+            bytes4(targetCalldata), // selector for simpleFunction
+            packedArgumentAddresses  // packedArgumentAddresses (should be empty - the decoder always returns empty)
+        ));
+        console2.log("Calculated leaf (on next line):");
+        console2.logBytes32(leaf);
         bytes32 merkleRoot = leaf;
+        console2.log("Expected valueNonZero:", valueNonZero);
 
-        // Set the manage root for the curator
+        // Set the manage root for the curator - manager may call manageTarget with targetCalldata
         vm.prank(InitialManagerOwner);
         vaultManager.setManageRoot(Curator, merkleRoot);
         assertEq(vaultManager.manageRoot(Curator), merkleRoot);
@@ -3856,7 +3874,7 @@ contract HypoVaultTest is Test {
         selectors[0] = HypoVaultManagerWithMerkleVerification.fulfillDeposits.selector;
         selectors[1] = HypoVaultManagerWithMerkleVerification.fulfillWithdrawals.selector;
         selectors[2] = HypoVaultManagerWithMerkleVerification.cancelDeposit.selector;
-        selectors[3] = bytes4(keccak256("manageVaultWithMerkleVerification(bytes32[],address,bytes,uint256)"));
+        selectors[3] = bytes4(keccak256("manageVaultWithMerkleVerification(bytes32[][],address[],address[],bytes[],uint256[])"));
 
         vm.prank(InitialManagerOwner);
         accessManager.setTargetFunctionRole(address(vaultManager), selectors, CURATOR_ROLE);
@@ -3918,7 +3936,7 @@ contract HypoVaultTest is Test {
         merkleProofs[0] = new bytes32[](0); // Empty proof for single-leaf tree
 
         address[] memory decodersAndSanitizers = new address[](1);
-        decodersAndSanitizers[0] = address(0); // No decoder/sanitizer for this test
+        decodersAndSanitizers[0] = address(decoder);
 
         address[] memory targets = new address[](1);
         targets[0] = address(manageTarget);
@@ -3958,14 +3976,26 @@ contract HypoVaultTest is Test {
         vm.prank(Curator);
         vm.expectRevert();
         vaultManager.manageVaultWithMerkleVerification(
-            invalidProofs,
+            invalidProofs,         // swap in bad proof
             decodersAndSanitizers, // reuse from above
             targets,               // reuse from above
-            targetDatas,          // reuse from above
-            values                // reuse from above
+            targetDatas,           // reuse from above
+            values                 // reuse from above
         );
 
         console2.log("=== Integration test completed successfully! ===");
+    }
+}
+
+contract NoopDecoder {
+    fallback() external {
+        // Return empty bytes encoded properly
+        assembly {
+            let ptr := mload(0x40)
+            mstore(ptr, 0x20)        // offset to data
+            mstore(add(ptr, 0x20), 0) // length of bytes (0)
+            return(ptr, 0x40)        // return 64 bytes total
+        }
     }
 }
 
