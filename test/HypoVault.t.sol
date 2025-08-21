@@ -3804,10 +3804,10 @@ contract HypoVaultTest is Test {
 
         // Deploy the real manager (msg.sender becomes owner automatically)
         HypoVaultManagerWithMerkleVerification vaultManager = new HypoVaultManagerWithMerkleVerification(
-            InitialManagerOwner, // owner
-            address(testVault), // hypovault
-            BalancerVault // balancerVault
-        );
+                InitialManagerOwner, // owner
+                address(testVault), // hypovault
+                BalancerVault // balancerVault
+            );
 
         assertEq(address(vaultManager.vault()), address(testVault));
         assertEq(vaultManager.owner(), InitialManagerOwner);
@@ -3836,13 +3836,15 @@ contract HypoVaultTest is Test {
         console2.log("Value:", valueToSend);
         console2.log("Selector (on the next line):");
         console2.logBytes4(bytes4(targetCalldata));
-        bytes32 leaf = keccak256(abi.encodePacked(
-            address(decoder),
-            address(manageTarget),
-            valueNonZero,  // valueNonZero (we send 0.5 ether later on)
-            bytes4(targetCalldata), // selector for simpleFunction
-            packedArgumentAddresses  // packedArgumentAddresses (should be empty - the decoder always returns empty)
-        ));
+        bytes32 leaf = keccak256(
+            abi.encodePacked(
+                address(decoder),
+                address(manageTarget),
+                valueNonZero, // valueNonZero (we send 0.5 ether later on)
+                bytes4(targetCalldata), // selector for simpleFunction
+                packedArgumentAddresses // packedArgumentAddresses (should be empty - the decoder always returns empty)
+            )
+        );
         console2.log("Calculated leaf (on next line):");
         console2.logBytes32(leaf);
         bytes32 merkleRoot = leaf;
@@ -3874,13 +3876,17 @@ contract HypoVaultTest is Test {
         selectors[0] = HypoVaultManagerWithMerkleVerification.fulfillDeposits.selector;
         selectors[1] = HypoVaultManagerWithMerkleVerification.fulfillWithdrawals.selector;
         selectors[2] = HypoVaultManagerWithMerkleVerification.cancelDeposit.selector;
-        selectors[3] = bytes4(keccak256("manageVaultWithMerkleVerification(bytes32[][],address[],address[],bytes[],uint256[])"));
+        selectors[3] = bytes4(
+            keccak256(
+                "manageVaultWithMerkleVerification(bytes32[][],address[],address[],bytes[],uint256[])"
+            )
+        );
 
         vm.prank(InitialManagerOwner);
         accessManager.setTargetFunctionRole(address(vaultManager), selectors, CURATOR_ROLE);
 
         // Verify access manager setup
-        (bool canCall,) = accessManager.canCall(
+        (bool canCall, ) = accessManager.canCall(
             Curator,
             address(vaultManager),
             HypoVaultManagerWithMerkleVerification.fulfillDeposits.selector
@@ -3976,11 +3982,11 @@ contract HypoVaultTest is Test {
         vm.prank(Curator);
         vm.expectRevert();
         vaultManager.manageVaultWithMerkleVerification(
-            invalidProofs,         // swap in bad proof
+            invalidProofs, // swap in bad proof
             decodersAndSanitizers, // reuse from above
-            targets,               // reuse from above
-            targetDatas,           // reuse from above
-            values                 // reuse from above
+            targets, // reuse from above
+            targetDatas, // reuse from above
+            values // reuse from above
         );
 
         console2.log("=== Integration test completed successfully! ===");
@@ -3992,9 +3998,9 @@ contract NoopDecoder {
         // Return empty bytes encoded properly
         assembly {
             let ptr := mload(0x40)
-            mstore(ptr, 0x20)        // offset to data
+            mstore(ptr, 0x20) // offset to data
             mstore(add(ptr, 0x20), 0) // length of bytes (0)
-            return(ptr, 0x40)        // return 64 bytes total
+            return(ptr, 0x40) // return 64 bytes total
         }
     }
 }
