@@ -21,18 +21,4 @@ interface IVaultAccountant {
         uint256 reservedProceedsAssets,
         bytes calldata managerInput
     ) external view returns (uint256, uint256, uint256);
-
-    /// @notice Returns the correct price of the proceedsToken in terms of the depositToken.
-    /// @param vault The address of the vault to value
-    /// @param depositToken The deposit token of the vault
-    /// @param proceedsToken The proceeds token of the vault
-    /// @param depositAssetsReceived The total amount of assets to be converted
-    /// @param managerInput Input calldata from the vault manager consisting of price quotes from the manager, pool information, and a position lsit for each pool
-    function getProceedsFromDeposit(
-        address vault,
-        address depositToken,
-        address proceedsToken,
-        uint256 depositAssetsReceived,
-        bytes calldata managerInput
-    ) external view returns (uint256);
 }
