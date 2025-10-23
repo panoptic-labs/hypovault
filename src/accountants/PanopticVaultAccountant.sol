@@ -185,6 +185,54 @@ contract PanopticVaultAccountant is Ownable {
 
             if (numLegs != pools[i].pool.numberOfLegs(_vault)) revert IncorrectPositionList();
 
+            if (address(pools[i].token0) == address(0))
+                pools[i].token0 = IERC20Partial(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
+
+            // Get token balances in the vault itself
+            bool skipToken0 = false;
+            bool skipToken1 = false;
+
+            // optimized for small number of pools
+            for (uint256 j = 0; j < underlyingTokens.length; j++) {
+                if (underlyingTokens[j] == address(pools[i].token0)) skipToken0 = true;
+                if (underlyingTokens[j] == address(pools[i].token1)) skipToken1 = true;
+
+                if (underlyingTokens[j] == address(0)) {
+                    if (!skipToken0) underlyingTokens[j] = address(pools[i].token0);
+                    // ensure a gap is not created in the underlyingTokens array
+                    if (!skipToken1)
+                        underlyingTokens[j + (skipToken0 ? 0 : 1)] = address(pools[i].token1);
+                    break;
+                }
+            }
+
+            uint256 token0Exposure;
+            uint256 token1Exposure;
+
+            if (!skipToken0) {
+                token0Exposure = address(pools[i].token0) ==
+                    address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)
+                    ? address(_vault).balance
+                    : pools[i].token0.balanceOf(_vault);
+                if (address(pools[i].token0) == depositToken) {
+                    _depositBalance += int256(token0Exposure);
+                    token0Exposure -= reservedDepositAssets;
+                } else if (address(pools[i].token0) == proceedsToken) {
+                    _proceedsBalance += int256(token0Exposure);
+                    token0Exposure -= reservedProceedsAssets;
+                }
+            }
+            if (!skipToken1) {
+                token1Exposure = pools[i].token1.balanceOf(_vault);
+                if (address(pools[i].token1) == depositToken) {
+                    _depositBalance += int256(token1Exposure);
+                    token1Exposure -= reservedDepositAssets;
+                } else if (address(pools[i].token1) == proceedsToken) {
+                    _proceedsBalance += int256(token1Exposure);
+                    token1Exposure -= reservedProceedsAssets;
+                }
+            }
+
             uint256 collateralBalance = pools[i].pool.collateralToken0().balanceOf(_vault);
             poolExposure0 += int256(
                 pools[i].pool.collateralToken0().previewRedeem(collateralBalance)
@@ -214,6 +262,19 @@ contract PanopticVaultAccountant is Ownable {
                 );
 
                 poolExposure0 = PanopticMath.convert0to1(poolExposure0, conversionPrice);
+                // Gas-optimisation-wise, it makes sense to gate the token0-to-underlying conversion by the token0Exposure != 0 condition,
+                // even though convert0to1(0) will safely equal 0:
+                // I. skipToken0 will happen any time the token0 of a pool is token0 or 1 of another of the vault's pool.
+                // e.g., if the vault trades two ETH-paired pools, skipToken0 == true for pools[1]
+                // II. additionally, the vault might actually just have a zero balance of raw token0s (e.g. all token0s are currently deposited in CT)
+                // III. convert0to1 costs 228 in the zero-value case, whereas if (token0Exposure != 0) costs 13 gas
+                // IV. so therefore, if we save 1 convert0to1 call per 228/13 ~= 17 checks, its worth it
+                // V. I predict that (I) or (II) will be true > 1/17th of the time, so let's insert the check:
+                if (token0Exposure != 0) {
+                    token0Exposure = uint256(
+                        PanopticMath.convert0to1(int256(token0Exposure), conversionPrice)
+                    );
+                }
             } else {
                 _depositBalance += poolExposure0;
             }
@@ -239,37 +300,6 @@ contract PanopticVaultAccountant is Ownable {
             } else {
                 _depositBalance += poolExposure1;
             }
-
-            if (address(pools[i].token0) == address(0))
-                pools[i].token0 = IERC20Partial(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
-
-            // Get token balances in the vault itself
-            bool skipToken0 = false;
-            bool skipToken1 = false;
-
-            // optimized for small number of pools
-            for (uint256 j = 0; j < underlyingTokens.length; j++) {
-                if (underlyingTokens[j] == address(pools[i].token0)) skipToken0 = true;
-                if (underlyingTokens[j] == address(pools[i].token1)) skipToken1 = true;
-
-                if (underlyingTokens[j] == address(0)) {
-                    if (!skipToken0) underlyingTokens[j] = address(pools[i].token0);
-                    // ensure a gap is not created in the underlyingTokens array
-                    if (!skipToken1)
-                        underlyingTokens[j + (skipToken0 ? 0 : 1)] = address(pools[i].token1);
-                    break;
-                }
-            }
-
-            uint256 token0Exposure;
-            uint256 token1Exposure;
-
-            if (!skipToken0)
-                token0Exposure = address(pools[i].token0) ==
-                    address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)
-                    ? address(_vault).balance
-                    : pools[i].token0.balanceOf(_vault);
-            if (!skipToken1) token1Exposure = pools[i].token1.balanceOf(_vault);
 
             // debt in pools with negative exposure does not need to be paid back
             nav +=
