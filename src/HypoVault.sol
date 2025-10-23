@@ -520,6 +520,10 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
             SafeTransferLib.safeTransfer(proceedsToken, feeWallet, uint256(performanceFeeProceeds));
         }
 
+        if (proceedsAssetsToWithdraw > 0) {
+            SafeTransferLib.safeTransfer(proceedsToken, user, proceedsAssetsToWithdraw);
+        }
+
         if (pendingWithdrawal.shouldRedeposit) {
             uint256 _depositEpoch = depositEpoch;
 
@@ -529,9 +533,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
             emit DepositRequested(user, depositAssetsToWithdraw);
         } else {
             SafeTransferLib.safeTransfer(depositToken, user, depositAssetsToWithdraw);
-            if (proceedsAssetsToWithdraw > 0) {
-                SafeTransferLib.safeTransfer(proceedsToken, user, proceedsAssetsToWithdraw);
-            }
         }
 
         emit WithdrawalExecuted(
@@ -658,7 +659,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
             reservedWithdrawalProceedsAssets,
             managerInput
         );
-        uint256 totalAssets = totalNAV + 1;
+        uint256 totalAssets = totalNAV + 1 - epochState.assetsDeposited;
 
         uint256 _totalSupply = totalSupply;
 
