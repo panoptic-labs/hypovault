@@ -713,7 +713,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         emit Transfer(from, address(0), amount);
     }
 
-    function totalAssets() external view {
+    function totalAssets() external view returns (uint256) {
         return
             accountant.computeNAV(address(this), underlyingToken, "") +
             1 -
