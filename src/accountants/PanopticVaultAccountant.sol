@@ -88,12 +88,12 @@ contract PanopticVaultAccountant is Ownable {
 
     /// @notice Returns the NAV of the portfolio contained in `vault` in terms of its underlying token.
     /// @param vault The address of the vault to value
-    /// @param underlyingToken The underlying token of the vault
+    /// @param depositToken The underlying token of the vault
     /// @param managerInput Input calldata from the vault manager consisting of price quotes from the manager, pool information, and a position lsit for each pool
     /// @return nav The NAV of the portfolio contained in `vault` in terms of its underlying token
     function computeNAV(
         address vault,
-        address underlyingToken,
+        address depositToken,
         bytes calldata managerInput
     ) external view returns (uint256 nav) {
         (
@@ -217,7 +217,7 @@ contract PanopticVaultAccountant is Ownable {
                 }
             }
             // convert position & token values to underlying
-            if (address(pools[i].token0) != underlyingToken) {
+            if (address(pools[i].token0) != depositToken) {
                 int24 conversionTick = PanopticMath.twapFilter(
                     pools[i].oracle0,
                     pools[i].twapWindow
@@ -247,7 +247,7 @@ contract PanopticVaultAccountant is Ownable {
                 }
             }
 
-            if (address(pools[i].token1) != underlyingToken) {
+            if (address(pools[i].token1) != depositToken) {
                 int24 conversionTick = PanopticMath.twapFilter(
                     pools[i].oracle1,
                     pools[i].twapWindow
@@ -280,8 +280,8 @@ contract PanopticVaultAccountant is Ownable {
         // underlying cannot be native (0x000/0xeee)
         bool skipUnderlying = false;
         for (uint256 i = 0; i < underlyingTokens.length; i++) {
-            if (underlyingTokens[i] == underlyingToken) skipUnderlying = true;
+            if (underlyingTokens[i] == depositToken) skipUnderlying = true;
         }
-        if (!skipUnderlying) nav += IERC20Partial(underlyingToken).balanceOf(_vault);
+        if (!skipUnderlying) nav += IERC20Partial(depositToken).balanceOf(_vault);
     }
 }

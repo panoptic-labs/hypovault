@@ -161,7 +161,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Token used to denominate deposits and withdrawals.
-    address public immutable underlyingToken;
+    address public immutable depositToken;
 
     /// @notice Performance fee, in basis points, taken on each profitable withdrawal.
     uint256 public immutable performanceFeeBps;
@@ -207,21 +207,21 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     mapping(address user => uint256 basis) public userBasis;
 
     /// @notice Initializes the vault.
-    /// @param _underlyingToken The token used to denominate deposits and withdrawals.
+    /// @param _depositToken The token used to denominate deposits and withdrawals.
     /// @param _manager The account authorized to execute deposits, withdrawals, and make arbitrary function calls from the vault.
     /// @param _accountant The contract that reports the net asset value of the vault.
     /// @param _performanceFeeBps The performance fee, in basis points, taken on each profitable withdrawal.
     /// @param _symbol The symbol of the share token.
     /// @param _name The name of the share token.
     constructor(
-        address _underlyingToken,
+        address _depositToken,
         address _manager,
         IVaultAccountant _accountant,
         uint256 _performanceFeeBps,
         string memory _symbol,
         string memory _name
     ) {
-        underlyingToken = _underlyingToken;
+        depositToken = _depositToken;
         manager = _manager;
         accountant = _accountant;
         performanceFeeBps = _performanceFeeBps;
@@ -238,7 +238,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @dev If the underlying token does not implement decimals(), returns 0.
     /// @return The number of decimals in the share token
     function decimals() external view returns (uint8) {
-        try IERC20Metadata(underlyingToken).decimals() returns (uint8 _decimals) {
+        try IERC20Metadata(depositToken).decimals() returns (uint8 _decimals) {
             return _decimals;
         } catch {
             return 0;
@@ -295,7 +295,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         depositEpochState[currentEpoch].assetsDeposited += assets;
 
-        SafeTransferLib.safeTransferFrom(underlyingToken, msg.sender, address(this), assets);
+        SafeTransferLib.safeTransferFrom(depositToken, msg.sender, address(this), assets);
 
         emit DepositRequested(msg.sender, assets);
     }
@@ -377,7 +377,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         depositEpochState[currentEpoch].assetsDeposited -= uint128(queuedDepositAmount);
 
-        SafeTransferLib.safeTransfer(underlyingToken, depositor, queuedDepositAmount);
+        SafeTransferLib.safeTransfer(depositToken, depositor, queuedDepositAmount);
 
         emit DepositCancelled(depositor, queuedDepositAmount);
     }
@@ -497,7 +497,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         if (performanceFee > 0) {
             assetsToWithdraw -= performanceFee;
-            SafeTransferLib.safeTransfer(underlyingToken, feeWallet, uint256(performanceFee));
+            SafeTransferLib.safeTransfer(depositToken, feeWallet, uint256(performanceFee));
         }
 
         if (pendingWithdrawal.shouldRedeposit) {
@@ -508,7 +508,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
             emit DepositRequested(user, assetsToWithdraw);
         } else {
-            SafeTransferLib.safeTransfer(underlyingToken, user, assetsToWithdraw);
+            SafeTransferLib.safeTransfer(depositToken, user, assetsToWithdraw);
         }
 
         emit WithdrawalExecuted(
@@ -626,7 +626,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         DepositEpochState memory epochState = depositEpochState[currentEpoch];
 
-        uint256 totalAssets = accountant.computeNAV(address(this), underlyingToken, managerInput) +
+        uint256 totalAssets = accountant.computeNAV(address(this), depositToken, managerInput) +
             1 -
             epochState.assetsDeposited -
             reservedWithdrawalAssets;
@@ -668,7 +668,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         bytes memory managerInput
     ) external onlyManager {
         uint256 _reservedWithdrawalAssets = reservedWithdrawalAssets;
-        uint256 totalAssets = accountant.computeNAV(address(this), underlyingToken, managerInput) +
+        uint256 totalAssets = accountant.computeNAV(address(this), depositToken, managerInput) +
             1 -
             depositEpochState[depositEpoch].assetsDeposited -
             _reservedWithdrawalAssets;

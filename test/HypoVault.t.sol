@@ -171,7 +171,7 @@ contract HypoVaultTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_vaultParameters() public view {
-        assertEq(vault.underlyingToken(), address(token));
+        assertEq(vault.depositToken(), address(token));
         assertEq(vault.manager(), Manager);
         assertEq(address(vault.accountant()), address(accountant));
         assertEq(vault.performanceFeeBps(), 100);
