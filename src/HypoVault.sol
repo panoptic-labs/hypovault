@@ -163,6 +163,9 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @notice Token used to denominate deposits and withdrawals.
     address public immutable depositToken;
 
+    /// @notice Token used to denominate proceeds that can only be withdrawn.
+    address public immutable proceedsToken;
+
     /// @notice Performance fee, in basis points, taken on each profitable withdrawal.
     uint256 public immutable performanceFeeBps;
 
@@ -208,6 +211,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
     /// @notice Initializes the vault.
     /// @param _depositToken The token used to denominate deposits and withdrawals.
+    /// @param _proceedsToken The token used to denominate deposits and withdrawals.
     /// @param _manager The account authorized to execute deposits, withdrawals, and make arbitrary function calls from the vault.
     /// @param _accountant The contract that reports the net asset value of the vault.
     /// @param _performanceFeeBps The performance fee, in basis points, taken on each profitable withdrawal.
@@ -215,6 +219,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @param _name The name of the share token.
     constructor(
         address _depositToken,
+        address _proceedsToken,
         address _manager,
         IVaultAccountant _accountant,
         uint256 _performanceFeeBps,
@@ -222,6 +227,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         string memory _name
     ) {
         depositToken = _depositToken;
+        proceedsToken = _proceedsToken == address(0) ? address(0xdEaD) : _proceedsToken;
         manager = _manager;
         accountant = _accountant;
         performanceFeeBps = _performanceFeeBps;
