@@ -1078,14 +1078,15 @@ contract HypoVaultTest is Test {
         vault.requestWithdrawal(uint128(bobSharesToWithdraw));
 
         // Verify shares were burned and basis reduced proportionally
-        uint256 aliceSharesAfterRequest = vault.balanceOf(Alice);
         uint256 aliceBasisAfterRequest = vault.userBasis(Alice);
-        uint256 bobSharesAfterRequest = vault.balanceOf(Bob);
         uint256 bobBasisAfterRequest = vault.userBasis(Bob);
 
-        assertEq(aliceSharesAfterRequest, aliceSharesInitial - aliceSharesToWithdraw);
-        assertEq(bobSharesAfterRequest, bobSharesInitial - bobSharesToWithdraw);
-
+        {
+            uint256 aliceSharesAfterRequest = vault.balanceOf(Alice);
+            assertEq(aliceSharesAfterRequest, aliceSharesInitial - aliceSharesToWithdraw);
+            uint256 bobSharesAfterRequest = vault.balanceOf(Bob);
+            assertEq(bobSharesAfterRequest, bobSharesInitial - bobSharesToWithdraw);
+        }
         // Calculate expected basis after withdrawal request (allow for rounding)
         uint256 expectedAliceBasisAfterRequest = (aliceBasisInitial *
             (aliceSharesInitial - aliceSharesToWithdraw)) / aliceSharesInitial;
@@ -1104,7 +1105,6 @@ contract HypoVaultTest is Test {
             1,
             "Bob's basis should be reduced proportionally"
         );
-
         // Check withdrawal queue state
         (uint128 aliceQueuedAmount, uint128 aliceQueuedBasis, ) = vault.queuedWithdrawal(Alice, 0);
         (uint128 bobQueuedAmount, uint128 bobQueuedBasis, ) = vault.queuedWithdrawal(Bob, 0);
@@ -1112,13 +1112,16 @@ contract HypoVaultTest is Test {
         assertEq(aliceQueuedAmount, aliceSharesToWithdraw);
         assertEq(bobQueuedAmount, bobSharesToWithdraw);
 
-        // The queued basis should be the withdrawn basis amount
-        uint256 expectedAliceQueuedBasis = aliceBasisInitial - aliceBasisAfterRequest;
-        uint256 expectedBobQueuedBasis = bobBasisInitial - bobBasisAfterRequest;
+        {
+            uint256 _a = aliceBasisInitial;
+            // The queued basis should be the withdrawn basis amount
+            uint256 expectedAliceQueuedBasis = _a - aliceBasisAfterRequest;
+            uint256 _b = bobBasisInitial;
+            uint256 expectedBobQueuedBasis = _b - bobBasisAfterRequest;
 
-        assertEq(aliceQueuedBasis, expectedAliceQueuedBasis);
-        assertEq(bobQueuedBasis, expectedBobQueuedBasis);
-
+            assertEq(aliceQueuedBasis, expectedAliceQueuedBasis);
+            assertEq(bobQueuedBasis, expectedBobQueuedBasis);
+        }
         // Manager cancels both withdrawals
         vm.startPrank(Manager);
         vault.cancelWithdrawal(Alice);
