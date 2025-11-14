@@ -191,7 +191,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     uint128 public depositEpoch;
 
     /// @notice Assets in the vault reserved for fulfilled withdrawal requests.
-    uint256 public reservedWithdrawalAssets;
+    uint256 public reservedDepositTokens;
 
     /// @notice Contains information about the quantity of assets requested and fulfilled for deposits in each epoch.
     mapping(uint256 epoch => DepositEpochState) public depositEpochState;
@@ -473,7 +473,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
             _withdrawalEpochState.sharesFulfilled == 0 ? 1 : _withdrawalEpochState.sharesFulfilled
         );
 
-        reservedWithdrawalAssets -= assetsToWithdraw;
+        reservedDepositTokens -= assetsToWithdraw;
 
         uint256 withdrawnBasis = (uint256(pendingWithdrawal.basis) *
             _withdrawalEpochState.sharesFulfilled) / _withdrawalEpochState.sharesWithdrawn;
@@ -635,7 +635,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         uint256 totalAssets = accountant.computeNAV(address(this), depositToken, managerInput) +
             1 -
             epochState.assetsDeposited -
-            reservedWithdrawalAssets;
+            reservedDepositTokens;
 
         uint256 _totalSupply = totalSupply;
 
@@ -673,11 +673,11 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         uint256 maxAssetsReceived,
         bytes memory managerInput
     ) external onlyManager {
-        uint256 _reservedWithdrawalAssets = reservedWithdrawalAssets;
+        uint256 _reservedDepositTokens = reservedDepositTokens;
         uint256 totalAssets = accountant.computeNAV(address(this), depositToken, managerInput) +
             1 -
             depositEpochState[depositEpoch].assetsDeposited -
-            _reservedWithdrawalAssets;
+            _reservedDepositTokens;
 
         uint256 currentEpoch = withdrawalEpoch;
 
@@ -709,7 +709,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         totalSupply = _totalSupply - sharesToFulfill;
 
-        reservedWithdrawalAssets = _reservedWithdrawalAssets + assetsReceived;
+        reservedDepositTokens = _reservedDepositTokens + assetsReceived;
 
         emit WithdrawalsFulfilled(currentEpoch - 1, assetsReceived, sharesToFulfill);
     }
