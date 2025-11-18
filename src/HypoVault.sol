@@ -10,7 +10,7 @@ import {IVaultAccountant} from "./interfaces/IVaultAccountant.sol";
 import {ERC721Holder} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC721/utils/ERC721Holder.sol";
 import {ERC1155Holder} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import {Multicall} from "lib/panoptic-v1.1/contracts/base/Multicall.sol";
-import {Ownable} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable} from "lib/boring-vault/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 // Libraries
 import {Address} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/utils/Address.sol";
 import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
@@ -220,7 +220,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         uint256 _performanceFeeBps,
         string memory _symbol,
         string memory _name
-    ) {
+    ) Ownable(_manager) {
         underlyingToken = _underlyingToken;
         manager = _manager;
         accountant = _accountant;

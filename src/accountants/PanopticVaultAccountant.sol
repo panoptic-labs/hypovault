@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 // Base
-import {Ownable} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable} from "lib/boring-vault/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 // Libraries
 import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
 import {PanopticMath} from "lib/panoptic-v1.1/contracts/libraries/PanopticMath.sol";
@@ -69,6 +69,8 @@ contract PanopticVaultAccountant is Ownable {
 
     /// @notice Whether the list of pools for the vault is locked
     mapping(address vault => bool isLocked) public vaultLocked;
+
+    constructor() Ownable(msg.sender) {}
 
     /// @notice Updates the pools hash for a vault.
     /// @dev This function can only be called by the owner of the contract.

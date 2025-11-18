@@ -1,0 +1,11 @@
+{
+  "lib/boring-vault": {
+    "rev": "3cabfd773de18ddf9363d74512390e3f9b032ed9"
+  },
+  "lib/panoptic-v1.1": {
+    "branch": {
+      "name": "v1.1.x",
+      "rev": "1b8cb9fc51ad0befd23edcd1a0c9bc5f59cccf41"
+    }
+  }
+}

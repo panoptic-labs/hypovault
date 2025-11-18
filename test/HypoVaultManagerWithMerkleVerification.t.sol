@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import "forge-std/console2.sol";
+import "../src/HypoVaultFactory.sol";
 import "../src/HypoVault.sol";
 import {HypovaultManagerWithMerkleVerification} from "../src/managers/HypovaultManagerWithMerkleVerification.sol";
 import {ERC20S} from "lib/panoptic-v1.1/test/foundry/testUtils/ERC20S.sol";
@@ -48,6 +49,7 @@ contract MockBalancerVault {
 
 contract HypovaultManagerWithMerkleVerificationTest is Test {
     HypovaultManagerWithMerkleVerification public manager;
+    HypoVaultFactory public vaultFactory;
     HypoVault public vault;
     MockVaultAccountant public accountant;
     MockBalancerVault public balancerVault;
@@ -67,16 +69,19 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         accountant = new MockVaultAccountant();
         balancerVault = new MockBalancerVault();
 
-        // Step 1: Deploy vault with a dummy manager (address(0x999) as placeholder)
-        // Important: Deploy from the owner address so owner becomes the vault owner
-        vm.prank(owner);
-        vault = new HypoVault(
-            address(token),
-            address(0x999), // Dummy manager address
-            IVaultAccountant(address(accountant)),
-            100, // 1% performance fee
-            "HVAULT",
-            "HypoVault Token"
+        // Step 1: Deploy vault
+        vaultFactory = new HypoVaultFactory();
+        vault = HypoVault(
+            payable(
+                vaultFactory.createVault(
+                    address(token),
+                    address(owner), // Dummy manager address
+                    IVaultAccountant(address(accountant)),
+                    100, // 1% performance fee
+                    "HVAULT",
+                    "HypoVault Token"
+                )
+            )
         );
 
         // Step 2: Deploy manager with the correct vault address

@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "forge-std/console2.sol";
+import "../src/HypoVaultFactory.sol";
 import "../src/HypoVault.sol";
 import {ERC20S} from "lib/panoptic-v1.1/test/foundry/testUtils/ERC20S.sol";
 import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
@@ -81,6 +82,7 @@ contract MockTarget {
 
 contract HypoVaultTest is Test {
     VaultAccountantMock public accountant;
+    HypoVaultFactory public vaultFactory;
     HypoVault public vault;
     ERC20S public token;
 
@@ -143,17 +145,23 @@ contract HypoVaultTest is Test {
     function setUp() public {
         accountant = new VaultAccountantMock();
         token = new ERC20S("Test Token", "TEST", 18);
-        vault = new HypoVault(
-            address(token),
-            Manager,
-            IVaultAccountant(address(accountant)),
-            100,
-            "TEST",
-            "Test Token"
-        ); // 1% performance fee
+        vaultFactory = new HypoVaultFactory();
+        vault = HypoVault(
+            payable(
+                vaultFactory.createVault(
+                    address(token),
+                    Manager,
+                    IVaultAccountant(address(accountant)),
+                    100, // 1% performance fee
+                    "TEST",
+                    "Test Token"
+                )
+            )
+        );
         accountant.setExpectedVault(address(vault));
 
         // Set fee wallet
+        vm.prank(Manager);
         vault.setFeeWallet(FeeWallet);
 
         // Mint tokens and approve vault for all users
@@ -956,10 +964,12 @@ contract HypoVaultTest is Test {
 
         vm.stopPrank();
 
-        // Test that owner can call these functions
+        // Test that owner can call these functions (initial owner is manager arg in HypoVault creation)
+        vm.startPrank(Manager);
         vault.setManager(Alice);
         vault.setAccountant(IVaultAccountant(address(accountant)));
         vault.setFeeWallet(Alice);
+        vm.stopPrank();
     }
 
     /*//////////////////////////////////////////////////////////////

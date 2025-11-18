@@ -4,4 +4,5 @@
 	branch = v1.1.x
 [submodule "lib/boring-vault"]
 	path = lib/boring-vault
-	url = https://github.com/Se7en-Seas/boring-vault
+	url = https://github.com/whoislewys/boring-vault
+  branch = main
