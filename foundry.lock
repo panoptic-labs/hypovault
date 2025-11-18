@@ -8,6 +8,9 @@
       "rev": "aa677e9d28ed78fc427ec47ba2baef2030c58e7c"
     }
   },
+  "lib/forge-safe": {
+    "rev": "57da4693020f57c9efb7daada19fcc02b3611500"
+  },
   "lib/panoptic-v1.1": {
     "branch": {
       "name": "v1.1.x",
