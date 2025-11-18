@@ -28,6 +28,7 @@ contract MockVaultAccountant {
     function computeNAV(
         address vault,
         address,
+        address,
         bytes memory managerInput
     ) external view returns (uint256) {
         require(vault == expectedVault, "Invalid vault");
@@ -363,8 +364,12 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         assertEq(vault.depositEpoch(), 1);
 
         // Verify epoch state
-        (uint128 assetsDeposited, uint128 sharesReceived, uint128 assetsFulfilled) = vault
-            .depositEpochState(0);
+        (
+            uint128 assetsDeposited,
+            uint128 sharesReceived,
+            uint128 assetsFulfilled,
+            uint256 proceedsSnapshot
+        ) = vault.depositEpochState(0);
         assertEq(assetsDeposited, depositAmount);
         assertEq(assetsFulfilled, depositAmount);
         assertGt(sharesReceived, 0);

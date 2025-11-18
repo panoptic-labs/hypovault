@@ -27,6 +27,7 @@ contract VaultAccountantMock {
     function computeNAV(
         address vault,
         address,
+        address,
         bytes memory managerInput
     ) external view returns (uint256) {
         require(vault == expectedVault, "Invalid vault");
@@ -174,7 +175,7 @@ contract HypoVaultTest is Test {
 
     function test_vaultParameters() public view {
         assertEq(vault.depositToken(), address(token));
-        assertEq(vault.proceedsToken(), address(0xdead));
+        assertEq(vault.proceedsToken(), address(0));
         assertEq(vault.manager(), Manager);
         assertEq(address(vault.accountant()), address(accountant));
         assertEq(vault.performanceFeeBps(), 100);
@@ -216,8 +217,12 @@ contract HypoVaultTest is Test {
         vault.fulfillDeposits(depositAmount, "");
 
         // Check epoch state
-        (uint128 assetsDeposited, uint128 sharesReceived, uint128 assetsFulfilled) = vault
-            .depositEpochState(0);
+        (
+            uint128 assetsDeposited,
+            uint128 sharesReceived,
+            uint128 assetsFulfilled,
+            uint256 proceedsSnapshot
+        ) = vault.depositEpochState(0);
         assertEq(assetsDeposited, depositAmount);
         assertEq(assetsFulfilled, depositAmount);
         assertEq(sharesReceived, expectedShares);
@@ -305,12 +310,15 @@ contract HypoVaultTest is Test {
         // Calculate expected values
         uint256 totalSupplyBefore = vault.totalSupply();
         uint256 nav = totalDeposits;
-        uint256 totalAssets = nav + 1 - totalDeposits - vault.reservedDepositTokens(); // = 1
-        uint256 expectedTotalShares = calculateExpectedShares(
-            totalDeposits,
-            totalAssets,
-            totalSupplyBefore
-        );
+        uint256 expectedTotalShares;
+        {
+            uint256 totalAssets = nav + 1 - totalDeposits - vault.reservedDepositTokens(); // = 1
+            expectedTotalShares = calculateExpectedShares(
+                totalDeposits,
+                totalAssets,
+                totalSupplyBefore
+            );
+        }
 
         // Calculate proportional shares for each user
         uint256 expectedAliceShares = (expectedTotalShares * aliceDeposit) / totalDeposits;
@@ -323,8 +331,12 @@ contract HypoVaultTest is Test {
         vault.fulfillDeposits(totalDeposits, "");
 
         // Verify epoch state
-        (uint128 assetsDeposited, uint128 sharesReceived, uint128 assetsFulfilled) = vault
-            .depositEpochState(0);
+        (
+            uint128 assetsDeposited,
+            uint128 sharesReceived,
+            uint128 assetsFulfilled,
+            uint256 proceedsSnapshot
+        ) = vault.depositEpochState(0);
         assertEq(assetsDeposited, totalDeposits);
         assertEq(assetsFulfilled, totalDeposits);
         assertEq(sharesReceived, expectedTotalShares);
@@ -374,8 +386,12 @@ contract HypoVaultTest is Test {
         vault.fulfillDeposits(fulfillAmount, "");
 
         // Verify epoch state
-        (uint128 assetsDeposited, uint128 sharesReceived, uint128 assetsFulfilled) = vault
-            .depositEpochState(0);
+        (
+            uint128 assetsDeposited,
+            uint128 sharesReceived,
+            uint128 assetsFulfilled,
+            uint256 proceedsSnapshot
+        ) = vault.depositEpochState(0);
         assertEq(assetsDeposited, depositAmount);
         assertEq(assetsFulfilled, fulfillAmount);
         assertEq(sharesReceived, expectedShares);
@@ -421,8 +437,12 @@ contract HypoVaultTest is Test {
         vault.fulfillDeposits(fulfillAmount, "");
 
         // Verify epoch state
-        (uint128 assetsDeposited, uint128 sharesReceived, uint128 assetsFulfilled) = vault
-            .depositEpochState(0);
+        (
+            uint128 assetsDeposited,
+            uint128 sharesReceived,
+            uint128 assetsFulfilled,
+            uint256 proceedsSnapshot
+        ) = vault.depositEpochState(0);
         assertEq(assetsDeposited, totalDeposits);
         assertEq(assetsFulfilled, fulfillAmount);
         assertEq(sharesReceived, expectedTotalShares);
@@ -581,7 +601,7 @@ contract HypoVaultTest is Test {
 
         // Calculate expected withdrawal amounts before fulfillment
         uint256 totalSupplyBeforeFulfill = vault.totalSupply() + sharesToWithdraw; // Add back burned shares
-        (uint128 assetsDeposited, , ) = vault.depositEpochState(vault.depositEpoch());
+        (uint128 assetsDeposited, , , ) = vault.depositEpochState(vault.depositEpoch());
         uint256 totalAssets = nav + 1 - assetsDeposited - vault.reservedDepositTokens();
         uint256 expectedAssetsToWithdraw = calculateExpectedAssets(
             sharesToWithdraw,
@@ -797,7 +817,7 @@ contract HypoVaultTest is Test {
         assertEq(token.balanceOf(address(vault)), 0);
 
         // Verify epoch state updated correctly
-        (uint128 assetsDeposited, , ) = vault.depositEpochState(0);
+        (uint128 assetsDeposited, , , ) = vault.depositEpochState(0);
         assertEq(assetsDeposited, 0);
     }
 
@@ -836,7 +856,7 @@ contract HypoVaultTest is Test {
         assertEq(token.balanceOf(Bob), bobBalanceBefore + bobDeposit);
 
         // Verify epoch state reflects only Bob's cancellation
-        (uint128 assetsDeposited, , ) = vault.depositEpochState(0);
+        (uint128 assetsDeposited, , , ) = vault.depositEpochState(0);
         assertEq(assetsDeposited, aliceDeposit + charlieDeposit);
     }
 
@@ -880,20 +900,20 @@ contract HypoVaultTest is Test {
         vault.requestDeposit(uint128(charlieDeposit));
 
         // Verify initial epoch state
-        (uint128 assetsDeposited, , ) = vault.depositEpochState(0);
+        (uint128 assetsDeposited, , , ) = vault.depositEpochState(0);
         assertEq(assetsDeposited, aliceDeposit + bobDeposit + charlieDeposit);
 
         // Users cancel in sequence
         vm.prank(Alice);
         vault.cancelDeposit();
 
-        (assetsDeposited, , ) = vault.depositEpochState(0);
+        (assetsDeposited, , , ) = vault.depositEpochState(0);
         assertEq(assetsDeposited, bobDeposit + charlieDeposit);
 
         vm.prank(Charlie);
         vault.cancelDeposit();
 
-        (assetsDeposited, , ) = vault.depositEpochState(0);
+        (assetsDeposited, , , ) = vault.depositEpochState(0);
         assertEq(assetsDeposited, bobDeposit);
     }
 
@@ -1005,7 +1025,7 @@ contract HypoVaultTest is Test {
         assertEq(vault.queuedDeposit(Alice, 0), 0);
         assertEq(vault.queuedDeposit(Bob, 0), depositAmount * 2);
 
-        (uint128 assetsDeposited, , ) = vault.depositEpochState(0);
+        (uint128 assetsDeposited, , , ) = vault.depositEpochState(0);
         assertEq(assetsDeposited, depositAmount * 2); // Only Bob's deposits
     }
 
@@ -1666,8 +1686,12 @@ contract HypoVaultTest is Test {
         vault.fulfillDeposits(fulfillAmount, "");
 
         // Before executeDeposit, check epoch state
-        (uint128 assetsDeposited, uint128 sharesReceived, uint128 assetsFulfilled) = vault
-            .depositEpochState(0);
+        (
+            uint128 assetsDeposited,
+            uint128 sharesReceived,
+            uint128 assetsFulfilled,
+            uint256 proceedsSnapshot
+        ) = vault.depositEpochState(0);
         assertEq(assetsDeposited, 1000);
         assertEq(assetsFulfilled, 600);
         assertEq(sharesReceived, 599400); // 600 * 1_000_000 / 1001 = 599400.599... rounded down
@@ -1781,8 +1805,12 @@ contract HypoVaultTest is Test {
         vault.fulfillDeposits(600, ""); // Only fulfill 600 out of 1000
 
         // Check epoch state
-        (uint128 assetsDeposited, uint128 sharesReceived, uint128 assetsFulfilled) = vault
-            .depositEpochState(0);
+        (
+            uint128 assetsDeposited,
+            uint128 sharesReceived,
+            uint128 assetsFulfilled,
+            uint256 proceedsSnapshot
+        ) = vault.depositEpochState(0);
         assertEq(assetsDeposited, 1000);
         assertEq(assetsFulfilled, 600);
         assertEq(sharesReceived, 599400); // 600 * 1_000_000 / 1001
@@ -2532,8 +2560,12 @@ contract HypoVaultTest is Test {
 
         // Check that epoch advanced but no shares were minted
         assertEq(vault.depositEpoch(), 1);
-        (uint128 assetsDeposited, uint128 sharesReceived, uint128 assetsFulfilled) = vault
-            .depositEpochState(0);
+        (
+            uint128 assetsDeposited,
+            uint128 sharesReceived,
+            uint128 assetsFulfilled,
+            uint256 proceedsSnapshot
+        ) = vault.depositEpochState(0);
         assertEq(assetsDeposited, depositAmount);
         assertEq(sharesReceived, 0);
         assertEq(assetsFulfilled, 0);
@@ -2717,8 +2749,12 @@ contract HypoVaultTest is Test {
         vault.executeDeposit(Alice, 0);
 
         // Verify the vault state is consistent
-        (uint128 assetsDeposited1, uint128 sharesReceived1, uint128 assetsFulfilled1) = vault
-            .depositEpochState(0);
+        (
+            uint128 assetsDeposited1,
+            uint128 sharesReceived1,
+            uint128 assetsFulfilled1,
+            uint256 proceedsSnapshot1
+        ) = vault.depositEpochState(0);
         assertEq(assetsDeposited1, depositAmount);
         assertEq(assetsFulfilled1, 300 ether);
         assertGt(sharesReceived1, 0);
@@ -2729,8 +2765,12 @@ contract HypoVaultTest is Test {
         vault.executeDeposit(Alice, 1);
 
         // Verify the second epoch
-        (uint128 assetsDeposited2, uint128 sharesReceived2, uint128 assetsFulfilled2) = vault
-            .depositEpochState(1);
+        (
+            uint128 assetsDeposited2,
+            uint128 sharesReceived2,
+            uint128 assetsFulfilled2,
+            uint256 proceedsSnapshot2
+        ) = vault.depositEpochState(1);
         assertEq(assetsDeposited2, 700 ether); // Remaining from previous epoch
         assertEq(assetsFulfilled2, 700 ether);
         assertGt(sharesReceived2, 0);
@@ -2801,8 +2841,12 @@ contract HypoVaultTest is Test {
         accountant.setNav(2000 ether);
         vault.fulfillDeposits(2000 ether, "");
 
-        (uint128 assetsDeposited1, uint128 sharesReceived1, uint128 assetsFulfilled1) = vault
-            .depositEpochState(0);
+        (
+            uint128 assetsDeposited1,
+            uint128 sharesReceived1,
+            uint128 assetsFulfilled1,
+            uint256 proceedsSnapshot1
+        ) = vault.depositEpochState(0);
 
         vault.executeDeposit(Alice, 0);
         vault.executeDeposit(Bob, 0);
@@ -3524,7 +3568,7 @@ contract HypoVaultTest is Test {
         // Check initial state before execution
         uint256 aliceBalanceBefore = token.balanceOf(Alice);
         uint256 depositEpochBefore = vault.depositEpoch();
-        (uint128 assetsDepositedBefore, , ) = vault.depositEpochState(depositEpochBefore);
+        (uint128 assetsDepositedBefore, , , ) = vault.depositEpochState(depositEpochBefore);
 
         // Execute withdrawal - should redeposit instead of transfer
         vault.executeWithdrawal(Alice, 0);
@@ -3536,7 +3580,7 @@ contract HypoVaultTest is Test {
         assertEq(vault.queuedDeposit(Alice, depositEpochBefore), 500 ether);
 
         // Verify deposit epoch state was updated
-        (uint128 assetsDepositedAfter, , ) = vault.depositEpochState(depositEpochBefore);
+        (uint128 assetsDepositedAfter, , , ) = vault.depositEpochState(depositEpochBefore);
         assertEq(assetsDepositedAfter, assetsDepositedBefore + 500 ether);
     }
 
