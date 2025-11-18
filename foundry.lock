@@ -2,6 +2,9 @@
   "lib/boring-vault": {
     "rev": "3cabfd773de18ddf9363d74512390e3f9b032ed9"
   },
+  "lib/forge-safe": {
+    "rev": "57da4693020f57c9efb7daada19fcc02b3611500"
+  },
   "lib/panoptic-v1.1": {
     "branch": {
       "name": "v1.1.x",

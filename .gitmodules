@@ -6,3 +6,6 @@
 	path = lib/boring-vault
 	url = https://github.com/whoislewys/boring-vault
   branch = main
+[submodule "lib/forge-safe"]
+	path = lib/forge-safe
+	url = https://github.com/whoislewys/forge-safe
