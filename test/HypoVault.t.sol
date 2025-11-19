@@ -98,6 +98,7 @@ contract HypoVaultTest is Test {
     // Events
     event WithdrawalRequested(address indexed user, uint256 shares, bool shouldRedeposit);
     event DepositRequested(address indexed user, uint256 amount);
+    event DepositCancelled(address indexed user, uint256 amount);
     event RedepositStatusChanged(address indexed user, uint256 indexed epoch, bool shouldRedeposit);
 
     /*//////////////////////////////////////////////////////////////
@@ -262,6 +263,20 @@ contract HypoVaultTest is Test {
 
         assertEq(vault.balanceOf(Alice), expectedShares);
         assertEq(vault.userBasis(Alice), depositAmount);
+    }
+
+    function test_cancelDeposit_user_initiated_events() public {
+        uint256 depositAmount = 100 ether;
+
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+
+        // Expect the DepositCancelled event
+        vm.expectEmit(true, true, false, true);
+        emit DepositCancelled(Alice, depositAmount);
+
+        vm.prank(Alice);
+        vault.cancelDeposit();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -759,6 +774,238 @@ contract HypoVaultTest is Test {
         assertEq(token.balanceOf(address(vault)), 0);
     }
 
+    function test_cancelDeposit_user_initiated_basic() public {
+        uint256 depositAmount = 100 ether;
+
+        // Alice requests deposit
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+
+        uint256 aliceBalanceBefore = token.balanceOf(Alice);
+        assertEq(vault.queuedDeposit(Alice, 0), depositAmount);
+
+        // Alice cancels her own deposit
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        // Verify cancellation
+        assertEq(vault.queuedDeposit(Alice, 0), 0);
+        assertEq(token.balanceOf(Alice), aliceBalanceBefore + depositAmount);
+        assertEq(token.balanceOf(address(vault)), 0);
+
+        // Verify epoch state updated correctly
+        (uint128 assetsDeposited, , ) = vault.depositEpochState(0);
+        assertEq(assetsDeposited, 0);
+    }
+
+    function test_cancelDeposit_user_initiated_with_zero_amount() public {
+        // User with no deposit tries to cancel
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        // Should succeed but do nothing
+        assertEq(vault.queuedDeposit(Alice, 0), 0);
+        assertEq(token.balanceOf(Alice), INITIAL_BALANCE);
+    }
+
+    function test_cancelDeposit_user_initiated_multiple_users() public {
+        uint256 aliceDeposit = 100 ether;
+        uint256 bobDeposit = 200 ether;
+        uint256 charlieDeposit = 150 ether;
+
+        // Multiple users request deposits
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(aliceDeposit));
+        vm.prank(Bob);
+        vault.requestDeposit(uint128(bobDeposit));
+        vm.prank(Charlie);
+        vault.requestDeposit(uint128(charlieDeposit));
+
+        // Bob cancels his deposit
+        uint256 bobBalanceBefore = token.balanceOf(Bob);
+        vm.prank(Bob);
+        vault.cancelDeposit();
+
+        // Verify only Bob's deposit is cancelled
+        assertEq(vault.queuedDeposit(Alice, 0), aliceDeposit);
+        assertEq(vault.queuedDeposit(Bob, 0), 0);
+        assertEq(vault.queuedDeposit(Charlie, 0), charlieDeposit);
+        assertEq(token.balanceOf(Bob), bobBalanceBefore + bobDeposit);
+
+        // Verify epoch state reflects only Bob's cancellation
+        (uint128 assetsDeposited, , ) = vault.depositEpochState(0);
+        assertEq(assetsDeposited, aliceDeposit + charlieDeposit);
+    }
+
+    function test_cancelDeposit_user_initiated_after_epoch_advance() public {
+        uint256 depositAmount = 100 ether;
+
+        // Alice deposits in epoch 0
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+
+        // Manager fulfills epoch 0, moving to epoch 1
+        vm.startPrank(Manager);
+        accountant.setNav(depositAmount);
+        vault.fulfillDeposits(depositAmount, "");
+        vm.stopPrank();
+
+        assertEq(vault.depositEpoch(), 1);
+
+        // Alice tries to cancel her epoch 0 deposit (should fail as epoch fulfilled)
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        // Nothing should happen as Alice has no deposit in epoch 1
+        assertEq(vault.queuedDeposit(Alice, 0), depositAmount); // Already fulfilled, funds are still queued
+        assertEq(vault.queuedDeposit(Alice, 1), 0); // No deposit in new epoch
+        vault.executeDeposit(Alice, 0);
+        assertEq(vault.queuedDeposit(Alice, 0), 0); // no funds in queue
+    }
+
+    function test_cancelDeposit_user_initiated_partial_epoch_state() public {
+        uint256 aliceDeposit = 100 ether;
+        uint256 bobDeposit = 200 ether;
+        uint256 charlieDeposit = 300 ether;
+
+        // Multiple deposits
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(aliceDeposit));
+        vm.prank(Bob);
+        vault.requestDeposit(uint128(bobDeposit));
+        vm.prank(Charlie);
+        vault.requestDeposit(uint128(charlieDeposit));
+
+        // Verify initial epoch state
+        (uint128 assetsDeposited, , ) = vault.depositEpochState(0);
+        assertEq(assetsDeposited, aliceDeposit + bobDeposit + charlieDeposit);
+
+        // Users cancel in sequence
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        (assetsDeposited, , ) = vault.depositEpochState(0);
+        assertEq(assetsDeposited, bobDeposit + charlieDeposit);
+
+        vm.prank(Charlie);
+        vault.cancelDeposit();
+
+        (assetsDeposited, , ) = vault.depositEpochState(0);
+        assertEq(assetsDeposited, bobDeposit);
+    }
+
+    function test_cancelDeposit_user_initiated_after_partial_fulfillment() public {
+        uint256 depositAmount = 100 ether;
+
+        // Alice deposits in epoch 0
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+
+        // Manager partially fulfills epoch 0
+        vm.startPrank(Manager);
+        accountant.setNav(200 ether);
+        vault.fulfillDeposits(60 ether, "");
+        vault.executeDeposit(Alice, 0);
+        vm.stopPrank();
+
+        // Alice executes her partial deposit
+
+        // Verify Alice has 40 ether moved to epoch 1
+        assertEq(vault.queuedDeposit(Alice, 1), 40 ether);
+
+        // Alice cancels her epoch 1 deposit
+        uint256 aliceBalanceBefore = token.balanceOf(Alice);
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        // Verify cancellation of epoch 1 deposit
+        assertEq(vault.queuedDeposit(Alice, 1), 0);
+        assertEq(token.balanceOf(Alice), aliceBalanceBefore + 40 ether);
+    }
+
+    function test_cancelDeposit_user_vs_manager_permissions() public {
+        uint256 aliceDeposit = 100 ether;
+        uint256 bobDeposit = 200 ether;
+
+        // Both users deposit
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(aliceDeposit));
+        vm.prank(Bob);
+        vault.requestDeposit(uint128(bobDeposit));
+
+        // Alice cannot cancel Bob's deposit with user function
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        // Bob's deposit should remain
+        assertEq(vault.queuedDeposit(Bob, 0), bobDeposit);
+        assertEq(vault.queuedDeposit(Alice, 0), 0);
+
+        // Manager can cancel Bob's deposit
+        vm.prank(Manager);
+        vault.cancelDeposit(Bob);
+
+        assertEq(vault.queuedDeposit(Bob, 0), 0);
+    }
+
+    function test_cancelDeposit_user_initiated_multiple_epochs() public {
+        // Alice deposits across multiple epochs
+        vm.prank(Alice);
+        vault.requestDeposit(100 ether);
+
+        // Advance epoch
+        vm.startPrank(Manager);
+        accountant.setNav(100 ether);
+        vault.fulfillDeposits(100 ether, "");
+        vm.stopPrank();
+
+        // Alice deposits in new epoch
+        vm.prank(Alice);
+        vault.requestDeposit(200 ether);
+
+        // Alice can only cancel current epoch deposit
+        uint256 aliceBalanceBefore = token.balanceOf(Alice);
+        assertEq(vault.queuedDeposit(Alice, 0), 100 ether);
+        assertEq(vault.queuedDeposit(Alice, 1), 200 ether);
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        assertEq(vault.queuedDeposit(Alice, 1), 0);
+        assertEq(token.balanceOf(Alice), aliceBalanceBefore + 200 ether);
+
+        // Previous epoch deposit remains fulfilled
+        assertEq(vault.balanceOf(Alice), 0);
+        vm.prank(Alice);
+        vault.executeDeposit(Alice, 0);
+        assertEq(vault.queuedDeposit(Alice, 0), 0);
+        assertEq(vault.balanceOf(Alice), 100 ether * 1000000);
+    }
+
+    function test_cancelDeposit_user_initiated_concurrent_operations() public {
+        // Test interaction with other operations happening simultaneously
+        uint256 depositAmount = 100 ether;
+
+        // Alice and Bob deposit
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+        vm.prank(Bob);
+        vault.requestDeposit(uint128(depositAmount));
+
+        // Alice cancels while Bob executes a new deposit
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        vm.prank(Bob);
+        vault.requestDeposit(uint128(depositAmount)); // Bob deposits more
+
+        // Verify state consistency
+        assertEq(vault.queuedDeposit(Alice, 0), 0);
+        assertEq(vault.queuedDeposit(Bob, 0), depositAmount * 2);
+
+        (uint128 assetsDeposited, , ) = vault.depositEpochState(0);
+        assertEq(assetsDeposited, depositAmount * 2); // Only Bob's deposits
+    }
+
     function test_cancel_unfulfilled_withdrawal() public {
         // Setup: Multiple users to avoid division by zero
         vm.prank(Alice);
@@ -831,14 +1078,15 @@ contract HypoVaultTest is Test {
         vault.requestWithdrawal(uint128(bobSharesToWithdraw));
 
         // Verify shares were burned and basis reduced proportionally
-        uint256 aliceSharesAfterRequest = vault.balanceOf(Alice);
         uint256 aliceBasisAfterRequest = vault.userBasis(Alice);
-        uint256 bobSharesAfterRequest = vault.balanceOf(Bob);
         uint256 bobBasisAfterRequest = vault.userBasis(Bob);
 
-        assertEq(aliceSharesAfterRequest, aliceSharesInitial - aliceSharesToWithdraw);
-        assertEq(bobSharesAfterRequest, bobSharesInitial - bobSharesToWithdraw);
-
+        {
+            uint256 aliceSharesAfterRequest = vault.balanceOf(Alice);
+            assertEq(aliceSharesAfterRequest, aliceSharesInitial - aliceSharesToWithdraw);
+            uint256 bobSharesAfterRequest = vault.balanceOf(Bob);
+            assertEq(bobSharesAfterRequest, bobSharesInitial - bobSharesToWithdraw);
+        }
         // Calculate expected basis after withdrawal request (allow for rounding)
         uint256 expectedAliceBasisAfterRequest = (aliceBasisInitial *
             (aliceSharesInitial - aliceSharesToWithdraw)) / aliceSharesInitial;
@@ -857,7 +1105,6 @@ contract HypoVaultTest is Test {
             1,
             "Bob's basis should be reduced proportionally"
         );
-
         // Check withdrawal queue state
         (uint128 aliceQueuedAmount, uint128 aliceQueuedBasis, ) = vault.queuedWithdrawal(Alice, 0);
         (uint128 bobQueuedAmount, uint128 bobQueuedBasis, ) = vault.queuedWithdrawal(Bob, 0);
@@ -865,13 +1112,16 @@ contract HypoVaultTest is Test {
         assertEq(aliceQueuedAmount, aliceSharesToWithdraw);
         assertEq(bobQueuedAmount, bobSharesToWithdraw);
 
-        // The queued basis should be the withdrawn basis amount
-        uint256 expectedAliceQueuedBasis = aliceBasisInitial - aliceBasisAfterRequest;
-        uint256 expectedBobQueuedBasis = bobBasisInitial - bobBasisAfterRequest;
+        {
+            uint256 _a = aliceBasisInitial;
+            // The queued basis should be the withdrawn basis amount
+            uint256 expectedAliceQueuedBasis = _a - aliceBasisAfterRequest;
+            uint256 _b = bobBasisInitial;
+            uint256 expectedBobQueuedBasis = _b - bobBasisAfterRequest;
 
-        assertEq(aliceQueuedBasis, expectedAliceQueuedBasis);
-        assertEq(bobQueuedBasis, expectedBobQueuedBasis);
-
+            assertEq(aliceQueuedBasis, expectedAliceQueuedBasis);
+            assertEq(bobQueuedBasis, expectedBobQueuedBasis);
+        }
         // Manager cancels both withdrawals
         vm.startPrank(Manager);
         vault.cancelWithdrawal(Alice);

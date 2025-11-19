@@ -5,6 +5,8 @@ pragma solidity ^0.8.28;
 interface IHypoVault {
     function cancelDeposit(address depositor) external;
 
+    function cancelDeposit() external;
+
     function cancelWithdrawal(address withdrawer) external;
 
     function requestWithdrawalFrom(address user, uint128 shares, bool shouldRedeposit) external;

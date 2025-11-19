@@ -353,6 +353,23 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @dev If deposited funds in previous epochs have not been completely fulfilled, the manager can execute those deposits to move the unfulfilled amount to the current epoch.
     /// @param depositor The address that requested the deposit
     function cancelDeposit(address depositor) external onlyManager {
+        _cancelDeposit(depositor);
+    }
+
+    /// @notice Cancels the caller's deposit in the current (unfulfilled) epoch.
+    /// @dev If prior-epoch deposits exist, anyone may call executeDeposit(user, epoch) to advance
+    ///      that epoch; any unfulfilled remainder rolls forward to epoch+1 (repeat as needed).
+    function cancelDeposit() external {
+        _cancelDeposit(msg.sender);
+    }
+
+    /// @notice Internal logic to cancel a deposit for the current, unfulfilled epoch.
+    /// @dev This function retrieves the depositor's queued amount for the current
+    /// deposit epoch, sets it to zero, and decrements the total assets
+    /// deposited in that epoch's state. It then transfers the token
+    /// amount back to the depositor.
+    /// @param depositor The address of the user whose deposit is being cancelled.
+    function _cancelDeposit(address depositor) internal {
         uint256 currentEpoch = depositEpoch;
 
         uint256 queuedDepositAmount = queuedDeposit[depositor][currentEpoch];

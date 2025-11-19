@@ -964,31 +964,27 @@ contract PanopticVaultAccountantTest is Test {
     /// @param currentTick Current price tick
     /// @return A properly constructed multi-leg TokenId
     function createMultiLegTokenId(int24 currentTick) internal pure returns (TokenId) {
-        return
-            TokenId
-                .wrap(0)
-                .addPoolId(1)
-                .addTickSpacing(60)
-                .addLeg({
-                    legIndex: 0,
-                    _optionRatio: 1,
-                    _asset: 0,
-                    _isLong: 1,
-                    _tokenType: 0,
-                    _riskPartner: 0,
-                    _strike: currentTick - 500,
-                    _width: 10
-                })
-                .addLeg({
-                    legIndex: 1,
-                    _optionRatio: 1,
-                    _asset: 1,
-                    _isLong: 0,
-                    _tokenType: 1,
-                    _riskPartner: 1,
-                    _strike: currentTick + 500,
-                    _width: 12
-                });
+        TokenId tokenId = TokenId.wrap(0).addPoolId(1).addTickSpacing(60).addLeg({
+            legIndex: 0,
+            _optionRatio: 1,
+            _asset: 0,
+            _isLong: 1,
+            _tokenType: 0,
+            _riskPartner: 0,
+            _strike: currentTick - 500,
+            _width: 10
+        });
+        tokenId = tokenId.addLeg({
+            legIndex: 1,
+            _optionRatio: 1,
+            _asset: 1,
+            _isLong: 0,
+            _tokenType: 1,
+            _riskPartner: 1,
+            _strike: currentTick + 500,
+            _width: 12
+        });
+        return tokenId;
     }
 
     function createDefaultPools()
@@ -1116,80 +1112,73 @@ contract PanopticVaultAccountantTest is Test {
 
     /// @notice Creates a complex straddle position for testing
     function createStraddlePosition(int24 currentTick) internal pure returns (TokenId) {
-        return
-            TokenId
-                .wrap(0)
-                .addPoolId(1)
-                .addTickSpacing(60)
-                .addLeg({
-                    legIndex: 0,
-                    _optionRatio: 1,
-                    _asset: 0,
-                    _isLong: 0, // Short put
-                    _tokenType: 0,
-                    _riskPartner: 1,
-                    _strike: currentTick,
-                    _width: 10
-                })
-                .addLeg({
-                    legIndex: 1,
-                    _optionRatio: 1,
-                    _asset: 1,
-                    _isLong: 0, // Short call
-                    _tokenType: 1,
-                    _riskPartner: 0,
-                    _strike: currentTick,
-                    _width: 10
-                });
+        TokenId tokenId = TokenId.wrap(0).addPoolId(1).addTickSpacing(60).addLeg({
+            legIndex: 0,
+            _optionRatio: 1,
+            _asset: 0,
+            _isLong: 0, // Short put
+            _tokenType: 0,
+            _riskPartner: 1,
+            _strike: currentTick,
+            _width: 10
+        });
+        tokenId = tokenId.addLeg({
+            legIndex: 1,
+            _optionRatio: 1,
+            _asset: 1,
+            _isLong: 0, // Short call
+            _tokenType: 1,
+            _riskPartner: 0,
+            _strike: currentTick,
+            _width: 10
+        });
+        return tokenId;
     }
 
     /// @notice Creates an iron condor position for testing
     function createIronCondorPosition(int24 currentTick) internal pure returns (TokenId) {
-        return
-            TokenId
-                .wrap(0)
-                .addPoolId(1)
-                .addTickSpacing(60)
-                .addLeg({
-                    legIndex: 0,
-                    _optionRatio: 1,
-                    _asset: 0,
-                    _isLong: 0, // Short put
-                    _tokenType: 0,
-                    _riskPartner: 0,
-                    _strike: currentTick - 1000,
-                    _width: 10
-                })
-                .addLeg({
-                    legIndex: 1,
-                    _optionRatio: 1,
-                    _asset: 0,
-                    _isLong: 1, // Long put
-                    _tokenType: 0,
-                    _riskPartner: 0,
-                    _strike: currentTick - 1500,
-                    _width: 10
-                })
-                .addLeg({
-                    legIndex: 2,
-                    _optionRatio: 1,
-                    _asset: 1,
-                    _isLong: 0, // Short call
-                    _tokenType: 1,
-                    _riskPartner: 0,
-                    _strike: currentTick + 1000,
-                    _width: 10
-                })
-                .addLeg({
-                    legIndex: 3,
-                    _optionRatio: 1,
-                    _asset: 1,
-                    _isLong: 1, // Long call
-                    _tokenType: 1,
-                    _riskPartner: 0,
-                    _strike: currentTick + 1500,
-                    _width: 10
-                });
+        TokenId tokenId = TokenId.wrap(0).addPoolId(1).addTickSpacing(60).addLeg({
+            legIndex: 0,
+            _optionRatio: 1,
+            _asset: 0,
+            _isLong: 0, // Short put
+            _tokenType: 0,
+            _riskPartner: 0,
+            _strike: currentTick - 1000,
+            _width: 10
+        });
+        tokenId = tokenId.addLeg({
+            legIndex: 1,
+            _optionRatio: 1,
+            _asset: 0,
+            _isLong: 1, // Long put
+            _tokenType: 0,
+            _riskPartner: 0,
+            _strike: currentTick - 1500,
+            _width: 10
+        });
+        tokenId = tokenId.addLeg({
+            legIndex: 2,
+            _optionRatio: 1,
+            _asset: 1,
+            _isLong: 0, // Short call
+            _tokenType: 1,
+            _riskPartner: 0,
+            _strike: currentTick + 1000,
+            _width: 10
+        });
+        tokenId = tokenId.addLeg({
+            legIndex: 3,
+            _optionRatio: 1,
+            _asset: 1,
+            _isLong: 1, // Long call
+            _tokenType: 1,
+            _riskPartner: 0,
+            _strike: currentTick + 1500,
+            _width: 10
+        });
+
+        return tokenId;
     }
 
     /// @notice Setup scenario with exact known values for precise testing
