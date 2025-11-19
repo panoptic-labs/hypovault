@@ -28,6 +28,7 @@ contract MockVaultAccountant {
     function computeNAV(
         address vault,
         address,
+        address,
         bytes memory managerInput
     ) external view returns (uint256) {
         require(vault == expectedVault, "Invalid vault");
@@ -72,6 +73,7 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         vm.prank(owner);
         vault = new HypoVault(
             address(token),
+            address(0x0),
             address(0x999), // Dummy manager address
             IVaultAccountant(address(accountant)),
             100, // 1% performance fee

@@ -44,8 +44,8 @@ contract PanopticVaultAccountant is Ownable {
 
     /// @notice Holds the prices provided by the vault manager
     /// @param poolPrice The price of the pool
-    /// @param token0Price The price of token0 relative to the underlying
-    /// @param token1Price The price of token1 relative to the underlying
+    /// @param token0Price The price of token0 relative to the deposit token
+    /// @param token1Price The price of token1 relative to the deposit token
     struct ManagerPrices {
         int24 poolPrice;
         int24 token0Price;
@@ -86,14 +86,16 @@ contract PanopticVaultAccountant is Ownable {
         vaultLocked[vault] = true;
     }
 
-    /// @notice Returns the NAV of the portfolio contained in `vault` in terms of its underlying token.
+    /// @notice Returns the NAV of the portfolio contained in `vault` in terms of its deposit token.
     /// @param vault The address of the vault to value
-    /// @param underlyingToken The underlying token of the vault
+    /// @param depositToken The deposit token of the vault
+    /// @param proceedsToken The proceeds token of the vault
     /// @param managerInput Input calldata from the vault manager consisting of price quotes from the manager, pool information, and a position lsit for each pool
-    /// @return nav The NAV of the portfolio contained in `vault` in terms of its underlying token
+    /// @return nav The NAV of the portfolio contained in `vault` in terms of its deposit token
     function computeNAV(
         address vault,
-        address underlyingToken,
+        address depositToken,
+        address proceedsToken,
         bytes calldata managerInput
     ) external view returns (uint256 nav) {
         (
@@ -108,7 +110,6 @@ contract PanopticVaultAccountant is Ownable {
 
         // resolves stack too deep error
         address _vault = vault;
-
         for (uint256 i = 0; i < pools.length; i++) {
             if (
                 Math.abs(
@@ -116,72 +117,90 @@ contract PanopticVaultAccountant is Ownable {
                         PanopticMath.twapFilter(pools[i].poolOracle, pools[i].twapWindow)
                 ) > pools[i].maxPriceDeviation
             ) revert StaleOraclePrice();
-
-            uint256[2][] memory positionBalanceArray;
             int256 poolExposure0;
             int256 poolExposure1;
+
             {
-                LeftRightUnsigned shortPremium;
-                LeftRightUnsigned longPremium;
+                uint256[2][] memory positionBalanceArray;
+                uint256 numLegs;
+                {
+                    LeftRightUnsigned shortPremium;
+                    LeftRightUnsigned longPremium;
 
-                (shortPremium, longPremium, positionBalanceArray) = pools[i]
-                    .pool
-                    .getAccumulatedFeesAndPositionsData(_vault, true, tokenIds[i]);
+                    (shortPremium, longPremium, positionBalanceArray) = pools[i]
+                        .pool
+                        .getAccumulatedFeesAndPositionsData(_vault, true, tokenIds[i]);
 
-                poolExposure0 =
-                    int256(uint256(shortPremium.rightSlot())) -
-                    int256(uint256(longPremium.rightSlot()));
-                poolExposure1 =
-                    int256(uint256(shortPremium.leftSlot())) -
-                    int256(uint256(longPremium.leftSlot()));
-            }
-
-            uint256 numLegs;
-            for (uint256 j = 0; j < tokenIds[i].length; j++) {
-                if (positionBalanceArray[j][1] == 0) revert IncorrectPositionList();
-                uint256 positionLegs = tokenIds[i][j].countLegs();
-                for (uint256 k = 0; k < positionLegs; k++) {
-                    (uint256 amount0, uint256 amount1) = Math.getAmountsForLiquidity(
-                        managerPrices[i].poolPrice,
-                        PanopticMath.getLiquidityChunk(
-                            tokenIds[i][j],
-                            k,
-                            uint128(positionBalanceArray[j][1])
-                        )
-                    );
-
-                    if (tokenIds[i][j].isLong(k) == 0) {
-                        unchecked {
-                            poolExposure0 += int256(amount0);
-                            poolExposure1 += int256(amount1);
-                        }
-                    } else {
-                        unchecked {
-                            poolExposure0 -= int256(amount0);
-                            poolExposure1 -= int256(amount1);
-                        }
-                    }
+                    poolExposure0 =
+                        int256(uint256(shortPremium.rightSlot())) -
+                        int256(uint256(longPremium.rightSlot()));
+                    poolExposure1 =
+                        int256(uint256(shortPremium.leftSlot())) -
+                        int256(uint256(longPremium.leftSlot()));
                 }
 
-                (LeftRightSigned longAmounts, LeftRightSigned shortAmounts) = PanopticMath
-                    .computeExercisedAmounts(tokenIds[i][j], uint128(positionBalanceArray[j][1]));
+                for (uint256 j = 0; j < tokenIds[i].length; j++) {
+                    if (positionBalanceArray[j][1] == 0) revert IncorrectPositionList();
+                    uint256 positionLegs = tokenIds[i][j].countLegs();
+                    for (uint256 k = 0; k < positionLegs; k++) {
+                        (uint256 amount0, uint256 amount1) = Math.getAmountsForLiquidity(
+                            managerPrices[i].poolPrice,
+                            PanopticMath.getLiquidityChunk(
+                                tokenIds[i][j],
+                                k,
+                                uint128(positionBalanceArray[j][1])
+                            )
+                        );
 
-                poolExposure0 += int256(longAmounts.rightSlot()) - int256(shortAmounts.rightSlot());
-                poolExposure1 += int256(longAmounts.leftSlot()) - int256(shortAmounts.leftSlot());
+                        if (tokenIds[i][j].isLong(k) == 0) {
+                            unchecked {
+                                poolExposure0 += int256(amount0);
+                                poolExposure1 += int256(amount1);
+                            }
+                        } else {
+                            unchecked {
+                                poolExposure0 -= int256(amount0);
+                                poolExposure1 -= int256(amount1);
+                            }
+                        }
+                    }
 
-                numLegs += positionLegs;
+                    (LeftRightSigned longAmounts, LeftRightSigned shortAmounts) = PanopticMath
+                        .computeExercisedAmounts(
+                            tokenIds[i][j],
+                            uint128(positionBalanceArray[j][1])
+                        );
+
+                    poolExposure0 +=
+                        int256(longAmounts.rightSlot()) -
+                        int256(shortAmounts.rightSlot());
+                    poolExposure1 +=
+                        int256(longAmounts.leftSlot()) -
+                        int256(shortAmounts.leftSlot());
+
+                    numLegs += positionLegs;
+                }
+                if (numLegs != pools[i].pool.numberOfLegs(_vault)) revert IncorrectPositionList();
             }
-
-            if (numLegs != pools[i].pool.numberOfLegs(_vault)) revert IncorrectPositionList();
+            address _proceedsToken = proceedsToken;
 
             if (address(pools[i].token0) == address(0))
                 pools[i].token0 = IERC20Partial(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
             uint256 token0Exposure;
             uint256 token1Exposure;
 
+            // get the vault balance for each token
+            /// @dev DO NOT count the proceeds token balance towards the NAV: those tokens are automatically allocated for the proceeds distribution
             {
                 bool skipToken0 = false;
                 bool skipToken1 = false;
+
+                if (address(pools[i].token0) == _proceedsToken && _proceedsToken != address(0)) {
+                    skipToken0 = true;
+                }
+                if (address(pools[i].token1) == _proceedsToken && _proceedsToken != address(0)) {
+                    skipToken1 = true;
+                }
 
                 // optimized for small number of pools
                 for (uint256 j = 0; j < underlyingTokens.length; j++) {
@@ -216,8 +235,8 @@ contract PanopticVaultAccountant is Ownable {
                     );
                 }
             }
-            // convert position & token values to underlying
-            if (address(pools[i].token0) != underlyingToken) {
+            // convert position & token values to deposit token
+            if (address(pools[i].token0) != depositToken) {
                 int24 conversionTick = PanopticMath.twapFilter(
                     pools[i].oracle0,
                     pools[i].twapWindow
@@ -232,7 +251,7 @@ contract PanopticVaultAccountant is Ownable {
                 );
 
                 poolExposure0 = PanopticMath.convert0to1(poolExposure0, conversionPrice);
-                // Gas-optimisation-wise, it makes sense to gate the token0-to-underlying conversion by the token0Exposure != 0 condition,
+                // Gas-optimisation-wise, it makes sense to gate the token0-to-deposit conversion by the token0Exposure != 0 condition,
                 // even though convert0to1(0) will safely equal 0:
                 // I. skipToken0 will happen any time the token0 of a pool is token0 or 1 of another of the vault's pool.
                 // e.g., if the vault trades two ETH-paired pools, skipToken0 == true for pools[1]
@@ -247,7 +266,7 @@ contract PanopticVaultAccountant is Ownable {
                 }
             }
 
-            if (address(pools[i].token1) != underlyingToken) {
+            if (address(pools[i].token1) != depositToken) {
                 int24 conversionTick = PanopticMath.twapFilter(
                     pools[i].oracle1,
                     pools[i].twapWindow
@@ -277,11 +296,11 @@ contract PanopticVaultAccountant is Ownable {
                 uint256(Math.max(poolExposure0 + poolExposure1, 0));
         }
 
-        // underlying cannot be native (0x000/0xeee)
+        // deposit cannot be native (0x000/0xeee)
         bool skipUnderlying = false;
         for (uint256 i = 0; i < underlyingTokens.length; i++) {
-            if (underlyingTokens[i] == underlyingToken) skipUnderlying = true;
+            if (underlyingTokens[i] == depositToken) skipUnderlying = true;
         }
-        if (!skipUnderlying) nav += IERC20Partial(underlyingToken).balanceOf(_vault);
+        if (!skipUnderlying) nav += IERC20Partial(depositToken).balanceOf(_vault);
     }
 }

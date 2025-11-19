@@ -27,6 +27,7 @@ contract VaultAccountantMock {
     function computeNAV(
         address vault,
         address,
+        address,
         bytes memory managerInput
     ) external view returns (uint256) {
         require(vault == expectedVault, "Invalid vault");
@@ -82,7 +83,9 @@ contract MockTarget {
 contract HypoVaultTest is Test {
     VaultAccountantMock public accountant;
     HypoVault public vault;
+    HypoVault public vaultWithProceeds;
     ERC20S public token;
+    ERC20S public proceeds;
 
     address Manager = address(0x1234);
     address FeeWallet = address(0x5678);
@@ -146,6 +149,7 @@ contract HypoVaultTest is Test {
         token = new ERC20S("Test Token", "TEST", 18);
         vault = new HypoVault(
             address(token),
+            address(0x0),
             Manager,
             IVaultAccountant(address(accountant)),
             100,
@@ -166,12 +170,42 @@ contract HypoVaultTest is Test {
         }
     }
 
+    function _setUpVaultWithProceeds() internal returns (HypoVault v) {
+        if (address(proceeds) == address(0)) {
+            proceeds = new ERC20S("Proceeds Token", "PRO", 18);
+        }
+
+        v = new HypoVault(
+            address(token), // deposit token
+            address(proceeds), // proceeds token
+            Manager,
+            IVaultAccountant(address(accountant)),
+            100, // 1 percent performance fee
+            "TEST",
+            "Test Token"
+        );
+
+        vaultWithProceeds = v;
+        accountant.setExpectedVault(address(v));
+
+        // set fee wallet
+        v.setFeeWallet(FeeWallet);
+
+        // give approvals for deposit token to the new vault
+        address[6] memory users = [Alice, Bob, Charlie, Dave, Eve, Manager];
+        for (uint i = 0; i < users.length; i++) {
+            vm.prank(users[i]);
+            token.approve(address(v), type(uint256).max);
+        }
+    }
+
     /*//////////////////////////////////////////////////////////////
                             BASIC FUNCTIONALITY
     //////////////////////////////////////////////////////////////*/
 
     function test_vaultParameters() public view {
-        assertEq(vault.underlyingToken(), address(token));
+        assertEq(vault.depositToken(), address(token));
+        assertEq(vault.proceedsToken(), address(0));
         assertEq(vault.manager(), Manager);
         assertEq(address(vault.accountant()), address(accountant));
         assertEq(vault.performanceFeeBps(), 100);
@@ -200,7 +234,7 @@ contract HypoVaultTest is Test {
         // Calculate expected values before fulfillment
         uint256 totalSupplyBefore = vault.totalSupply();
         uint256 nav = depositAmount;
-        uint256 totalAssets = nav + 1 - depositAmount - vault.reservedWithdrawalAssets(); // = 1
+        uint256 totalAssets = nav + 1 - depositAmount - vault.reservedDepositTokens(); // = 1
         uint256 expectedShares = calculateExpectedShares(
             depositAmount,
             totalAssets,
@@ -245,7 +279,7 @@ contract HypoVaultTest is Test {
 
         // Calculate expected shares before fulfillment
         uint256 totalSupplyBefore = vault.totalSupply();
-        uint256 totalAssets = depositAmount + 1 - depositAmount - vault.reservedWithdrawalAssets(); // = 1
+        uint256 totalAssets = depositAmount + 1 - depositAmount - vault.reservedDepositTokens(); // = 1
         uint256 expectedShares = calculateExpectedShares(
             depositAmount,
             totalAssets,
@@ -302,12 +336,15 @@ contract HypoVaultTest is Test {
         // Calculate expected values
         uint256 totalSupplyBefore = vault.totalSupply();
         uint256 nav = totalDeposits;
-        uint256 totalAssets = nav + 1 - totalDeposits - vault.reservedWithdrawalAssets(); // = 1
-        uint256 expectedTotalShares = calculateExpectedShares(
-            totalDeposits,
-            totalAssets,
-            totalSupplyBefore
-        );
+        uint256 expectedTotalShares;
+        {
+            uint256 totalAssets = nav + 1 - totalDeposits - vault.reservedDepositTokens(); // = 1
+            expectedTotalShares = calculateExpectedShares(
+                totalDeposits,
+                totalAssets,
+                totalSupplyBefore
+            );
+        }
 
         // Calculate proportional shares for each user
         uint256 expectedAliceShares = (expectedTotalShares * aliceDeposit) / totalDeposits;
@@ -359,7 +396,7 @@ contract HypoVaultTest is Test {
         // Calculate expected values
         uint256 totalSupplyBefore = vault.totalSupply();
         uint256 nav = 200 ether;
-        uint256 totalAssets = nav + 1 - depositAmount - vault.reservedWithdrawalAssets(); // = 101
+        uint256 totalAssets = nav + 1 - depositAmount - vault.reservedDepositTokens(); // = 101
         uint256 expectedShares = calculateExpectedShares(
             fulfillAmount,
             totalAssets,
@@ -405,7 +442,7 @@ contract HypoVaultTest is Test {
         // Calculate expected values
         uint256 totalSupplyBefore = vault.totalSupply();
         uint256 nav = 500 ether;
-        uint256 totalAssets = nav + 1 - totalDeposits - vault.reservedWithdrawalAssets(); // = 201
+        uint256 totalAssets = nav + 1 - totalDeposits - vault.reservedDepositTokens(); // = 201
         uint256 expectedTotalShares = calculateExpectedShares(
             fulfillAmount,
             totalAssets,
@@ -491,7 +528,7 @@ contract HypoVaultTest is Test {
 
         // First partial fulfillment (100 out of 300)
         uint256 totalSupplyBefore1 = vault.totalSupply();
-        uint256 totalAssets1 = 400 ether + 1 - 300 ether - vault.reservedWithdrawalAssets(); // = 101 ether
+        uint256 totalAssets1 = 400 ether + 1 - 300 ether - vault.reservedDepositTokens(); // = 101 ether
         uint256 expectedShares1 = calculateExpectedShares(
             100 ether,
             totalAssets1,
@@ -510,7 +547,7 @@ contract HypoVaultTest is Test {
 
         // Second partial fulfillment (150 out of 200 remaining)
         uint256 totalSupplyBefore2 = vault.totalSupply();
-        uint256 totalAssets2 = 350 ether + 1 - 200 ether - vault.reservedWithdrawalAssets(); // = 151 ether
+        uint256 totalAssets2 = 350 ether + 1 - 200 ether - vault.reservedDepositTokens(); // = 151 ether
         uint256 expectedShares2 = calculateExpectedShares(
             150 ether,
             totalAssets2,
@@ -535,6 +572,246 @@ contract HypoVaultTest is Test {
         assertEq(vault.userBasis(Alice), 300 ether);
         assertEq(vault.queuedDeposit(Alice, 3), 0);
         vm.stopPrank();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        PROCEEDS VAULT
+    //////////////////////////////////////////////////////////////*/
+
+    function test_constructor_revertsIfDepositEqualsProceeds() public {
+        vm.expectRevert();
+        new HypoVault(
+            address(token),
+            address(token),
+            Manager,
+            IVaultAccountant(address(accountant)),
+            100,
+            "TEST",
+            "Test Token"
+        );
+    }
+
+    function test_vaultWithProceeds_parameters() public {
+        HypoVault v = _setUpVaultWithProceeds();
+        assertEq(v.depositToken(), address(token));
+        assertEq(v.proceedsToken(), address(proceeds));
+    }
+
+    function test_updateK_onFulfillDeposits_updatesKAndReserve() public {
+        HypoVault v = _setUpVaultWithProceeds();
+
+        // 1. Alice deposits into epoch 0
+        uint256 depositAmount = 100 ether;
+        vm.prank(Alice);
+        v.requestDeposit(uint128(depositAmount));
+
+        uint256 totalSupplyBefore = v.totalSupply();
+
+        // NAV equals depositAmount so totalAssets = 1 (same as your existing tests)
+        accountant.setNav(depositAmount);
+
+        vm.prank(Manager);
+        v.fulfillDeposits(depositAmount, "");
+
+        // Execute deposit so Alice gets shares
+        vm.prank(Manager);
+        v.executeDeposit(Alice, 0);
+
+        uint256 aliceShares = v.balanceOf(Alice);
+        assertGt(aliceShares, 0);
+
+        // 2. Mint proceeds to the vault and call fulfillDeposits(0) to trigger _updateK
+        uint256 proceedsAmount = 1000 ether;
+        proceeds.mint(address(v), proceedsAmount);
+
+        uint256 KBefore = v.K_global();
+        uint256 reservedBefore = v.reservedProceedsTokens();
+        uint256 totalSupplyForK = v.totalSupply();
+
+        // NAV for this call does not matter for K, but keep it sane
+        accountant.setNav(0);
+
+        vm.prank(Manager);
+        v.fulfillDeposits(0, "");
+
+        uint256 reservedAfter = v.reservedProceedsTokens();
+        uint256 KAfter = v.K_global();
+
+        // All newly minted proceeds should be reserved
+        assertEq(reservedAfter, reservedBefore + proceedsAmount, "reservedProceedsTokens wrong");
+
+        // K increment is proceedsDelta * RAY / totalSupply
+        uint256 expectedDeltaK = (proceedsAmount * 1e27) / totalSupplyForK;
+        assertEq(KAfter, KBefore + expectedDeltaK, "K_global wrong");
+    }
+
+    function test_settleProceeds_onRequestWithdrawal_paysUserAndUpdatesSnapshot() public {
+        HypoVault v = _setUpVaultWithProceeds();
+
+        // 1. Alice deposit and fulfill epoch 0
+        uint256 depositAmount = 100 ether;
+        vm.prank(Alice);
+        v.requestDeposit(uint128(depositAmount));
+
+        accountant.setNav(depositAmount);
+
+        vm.prank(Manager);
+        v.fulfillDeposits(depositAmount, "");
+
+        vm.prank(Manager);
+        v.executeDeposit(Alice, 0);
+
+        uint256 aliceShares = v.balanceOf(Alice);
+        assertGt(aliceShares, 0);
+        assertEq(v.K_snapshot(Alice), 0, "initial snapshot should be zero");
+
+        // 2. Mint proceeds and bump K via fulfillDeposits(0)
+        uint256 proceedsAmount = 1000 ether;
+        proceeds.mint(address(v), proceedsAmount);
+
+        accountant.setNav(0);
+
+        vm.prank(Manager);
+        v.fulfillDeposits(0, ""); // triggers _updateK
+
+        uint256 K = v.K_global();
+        uint256 reservedBefore = v.reservedProceedsTokens();
+        assertEq(reservedBefore, proceedsAmount, "all proceeds should be reserved");
+
+        // 3. Alice requests a withdrawal which calls _settleProceeds(Alice)
+        uint256 aliceSharesToWithdraw = aliceShares / 2;
+        uint256 expectedProceeds = (K * aliceShares) / 1e27; // K_snapshot was 0
+
+        vm.prank(Alice);
+        v.requestWithdrawal(uint128(aliceSharesToWithdraw));
+
+        // Proceeds should have been paid out
+        uint256 aliceProceedsBalance = proceeds.balanceOf(Alice);
+        assertEq(aliceProceedsBalance, expectedProceeds, "wrong proceeds paid to Alice");
+
+        // Reserve should be reduced by exactly what was paid
+        uint256 reservedAfter = v.reservedProceedsTokens();
+        assertEq(reservedAfter, reservedBefore - expectedProceeds, "wrong reserve after settle");
+
+        // Snapshot should be updated to current K
+        assertEq(v.K_snapshot(Alice), K, "snapshot not updated to K_global");
+    }
+
+    function test_updateK_revertsIfProceedsBalanceBelowReserve() public {
+        HypoVault v = _setUpVaultWithProceeds();
+
+        // Setup: same as before, deposit and then create some reserved proceeds
+        uint256 depositAmount = 100 ether;
+        vm.prank(Alice);
+        v.requestDeposit(uint128(depositAmount));
+
+        accountant.setNav(depositAmount);
+        vm.prank(Manager);
+        v.fulfillDeposits(depositAmount, "");
+        vm.prank(Manager);
+        v.executeDeposit(Alice, 0);
+
+        // Mint proceeds and call fulfillDeposits(0) once to set reservedProceedsTokens
+        uint256 proceedsAmount = 1000 ether;
+        proceeds.mint(address(v), proceedsAmount);
+
+        accountant.setNav(0);
+        vm.prank(Manager);
+        v.fulfillDeposits(0, ""); // first _updateK
+
+        uint256 reserved = v.reservedProceedsTokens();
+        assertEq(reserved, proceedsAmount, "all proceeds should be reserved after first updateK");
+
+        address receiver = address(0xDEAD);
+
+        address[] memory targets = new address[](1);
+        bytes[] memory data = new bytes[](1);
+        uint256[] memory values = new uint256[](1);
+
+        targets[0] = address(proceeds);
+        data[0] = abi.encodeWithSignature(
+            "transfer(address,uint256)",
+            receiver,
+            proceedsAmount / 2
+        );
+        values[0] = 0;
+
+        vm.prank(Manager);
+        v.manage(targets, data, values);
+
+        uint256 balanceAfterDrain = proceeds.balanceOf(address(v));
+        assertLt(balanceAfterDrain, v.reservedProceedsTokens(), "balance should be below reserve");
+
+        // Now burn half of the proceeds balance from the vault, leaving balance < reserved
+        //proceeds.burn(address(v), proceedsAmount / 2);
+
+        // Next call that triggers _updateK should revert
+        accountant.setNav(0);
+        vm.prank(Manager);
+        vm.expectRevert(HypoVault.NotEnoughReserve.selector);
+        v.fulfillDeposits(0, "");
+    }
+
+    function test_settleProceeds_multipleUsers_proportional() public {
+        HypoVault v = _setUpVaultWithProceeds();
+
+        // Alice and Bob both deposit
+        uint256 aliceDep = 100 ether;
+        uint256 bobDep = 300 ether;
+
+        vm.prank(Alice);
+        v.requestDeposit(uint128(aliceDep));
+        vm.prank(Bob);
+        v.requestDeposit(uint128(bobDep));
+
+        accountant.setNav(aliceDep + bobDep);
+        vm.prank(Manager);
+        v.fulfillDeposits(aliceDep + bobDep, "");
+
+        vm.startPrank(Manager);
+        v.executeDeposit(Alice, 0);
+        v.executeDeposit(Bob, 0);
+        vm.stopPrank();
+
+        uint256 aliceShares = v.balanceOf(Alice);
+        uint256 bobShares = v.balanceOf(Bob);
+        assertEq(aliceShares * 3, bobShares, "share ratio should be 1:3");
+
+        // K starts at 0, snapshots at 0
+        assertEq(v.K_snapshot(Alice), 0);
+        assertEq(v.K_snapshot(Bob), 0);
+
+        // Mint proceeds and bump K
+        uint256 proceedsAmount = 4000 ether;
+        proceeds.mint(address(v), proceedsAmount);
+
+        accountant.setNav(0);
+        vm.prank(Manager);
+        v.fulfillDeposits(0, ""); // _updateK
+
+        uint256 K = v.K_global();
+        uint256 totalSupply = v.totalSupply();
+
+        // Expected proceeds per share
+        // K = proceeds * RAY / totalSupply
+        // proceedsForUser = K * balance / RAY
+        uint256 expectedAliceProceeds = (K * aliceShares) / 1e27;
+        uint256 expectedBobProceeds = (K * bobShares) / 1e27;
+
+        // Trigger settlement for Alice
+        vm.prank(Alice);
+        v.requestWithdrawal(uint128(aliceShares / 2)); // any amount, just to hit _settleProceeds
+
+        // Trigger settlement for Bob
+        vm.prank(Bob);
+        v.requestWithdrawal(uint128(bobShares / 2));
+
+        assertEq(proceeds.balanceOf(Alice), expectedAliceProceeds, "Alice proceeds incorrect");
+        assertEq(proceeds.balanceOf(Bob), expectedBobProceeds, "Bob proceeds incorrect");
+
+        // And the ratio should be 1:3 within rounding
+        assertApproxEqAbs(expectedAliceProceeds * 3, expectedBobProceeds, 1);
+        assertLe(expectedAliceProceeds * 3, expectedBobProceeds);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -579,7 +856,7 @@ contract HypoVaultTest is Test {
         // Calculate expected withdrawal amounts before fulfillment
         uint256 totalSupplyBeforeFulfill = vault.totalSupply() + sharesToWithdraw; // Add back burned shares
         (uint128 assetsDeposited, , ) = vault.depositEpochState(vault.depositEpoch());
-        uint256 totalAssets = nav + 1 - assetsDeposited - vault.reservedWithdrawalAssets();
+        uint256 totalAssets = nav + 1 - assetsDeposited - vault.reservedDepositTokens();
         uint256 expectedAssetsToWithdraw = calculateExpectedAssets(
             sharesToWithdraw,
             totalAssets,
@@ -1300,7 +1577,7 @@ contract HypoVaultTest is Test {
         vault.requestDeposit(uint128(depositAmount));
 
         // Calculate expected shares to be minted
-        uint256 totalAssets = 200 ether + 1 - 200 ether - vault.reservedWithdrawalAssets(); // = 1
+        uint256 totalAssets = 200 ether + 1 - 200 ether - vault.reservedDepositTokens(); // = 1
         uint256 expectedSharesAdded = calculateExpectedShares(
             200 ether,
             totalAssets,
@@ -1478,7 +1755,7 @@ contract HypoVaultTest is Test {
         uint256 totalAssetsBeforeSecondDeposit = 250 ether +
             1 -
             100 ether -
-            vault.reservedWithdrawalAssets();
+            vault.reservedDepositTokens();
         uint256 expectedSharesFromSecondDeposit = calculateExpectedShares(
             100 ether,
             totalAssetsBeforeSecondDeposit,
@@ -1525,13 +1802,13 @@ contract HypoVaultTest is Test {
         vault.fulfillWithdrawals(aliceShares / 2, 100 ether, "");
 
         // Check reserved assets increased
-        assertEq(vault.reservedWithdrawalAssets(), 100 ether);
+        assertEq(vault.reservedDepositTokens(), 100 ether);
 
         // Execute withdrawal
         vault.executeWithdrawal(Alice, 0);
 
         // Check reserved assets decreased
-        assertEq(vault.reservedWithdrawalAssets(), 0);
+        assertEq(vault.reservedDepositTokens(), 0);
         vm.stopPrank();
     }
 
@@ -1592,7 +1869,7 @@ contract HypoVaultTest is Test {
 
         // Calculate expected shares for large amount
         uint256 totalSupplyBefore = vault.totalSupply();
-        uint256 totalAssets = largeAmount + 1 - largeAmount - vault.reservedWithdrawalAssets(); // = 1
+        uint256 totalAssets = largeAmount + 1 - largeAmount - vault.reservedDepositTokens(); // = 1
         uint256 expectedShares = calculateExpectedShares(
             largeAmount,
             totalAssets,
@@ -1624,7 +1901,7 @@ contract HypoVaultTest is Test {
 
         // Calculate expected shares for small amount
         uint256 totalSupplyBefore = vault.totalSupply();
-        uint256 totalAssets = smallDeposit + 1 - smallDeposit - vault.reservedWithdrawalAssets(); // = 1
+        uint256 totalAssets = smallDeposit + 1 - smallDeposit - vault.reservedDepositTokens(); // = 1
         uint256 expectedShares = calculateExpectedShares(
             smallDeposit,
             totalAssets,
@@ -2465,6 +2742,7 @@ contract HypoVaultTest is Test {
 
         HypoVault vault6 = new HypoVault(
             address(token6),
+            address(0x0),
             Manager,
             IVaultAccountant(address(accountant)),
             100,
@@ -2473,6 +2751,7 @@ contract HypoVaultTest is Test {
         );
         HypoVault vault8 = new HypoVault(
             address(token8),
+            address(0x0),
             Manager,
             IVaultAccountant(address(accountant)),
             100,
@@ -2481,6 +2760,7 @@ contract HypoVaultTest is Test {
         );
         HypoVault vault12 = new HypoVault(
             address(token12),
+            address(0x0),
             Manager,
             IVaultAccountant(address(accountant)),
             100,
@@ -2497,6 +2777,7 @@ contract HypoVaultTest is Test {
         MockTokenWithoutDecimals badToken = new MockTokenWithoutDecimals();
         HypoVault vaultBad = new HypoVault(
             address(badToken),
+            address(0x0),
             Manager,
             IVaultAccountant(address(accountant)),
             100,
@@ -2809,6 +3090,7 @@ contract HypoVaultTest is Test {
         // Create new vault for comparison
         HypoVault vault2 = new HypoVault(
             address(token),
+            address(0x0),
             Manager,
             IVaultAccountant(address(accountant)),
             100,

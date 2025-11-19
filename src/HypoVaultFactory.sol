@@ -13,7 +13,8 @@ contract HypoVaultFactory {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Emitted when a vault is created.
-    /// @param underlyingToken The address of the underlying token
+    /// @param depositToken The address of the underlying token
+    /// @param proceedsToken The address of the proceeds token
     /// @param manager The address of the vault manager
     /// @param accountant The address of the vault accountant
     /// @param vault The address of the newly created vault
@@ -21,7 +22,8 @@ contract HypoVaultFactory {
     /// @param symbol The symbol of the share token
     /// @param name The name of the share token
     event VaultCreated(
-        address indexed underlyingToken,
+        address indexed depositToken,
+        address proceedsToken,
         address indexed manager,
         IVaultAccountant indexed accountant,
         address vault,
@@ -35,7 +37,8 @@ contract HypoVaultFactory {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Creates a new HypoVault instance.
-    /// @param underlyingToken The token used to denominate deposits and withdrawals
+    /// @param depositToken The token used to denominate deposits and withdrawals
+    /// @param proceedsToken The token used to denominate proceeds
     /// @param manager The account authorized to execute deposits, withdrawals, and make arbitrary function calls from the vault
     /// @param accountant The contract that reports the net asset value of the vault
     /// @param performanceFeeBps The performance fee, in basis points, taken on each profitable withdrawal
@@ -43,7 +46,8 @@ contract HypoVaultFactory {
     /// @param name The name of the share token
     /// @return vault The address of the newly created vault
     function createVault(
-        address underlyingToken,
+        address depositToken,
+        address proceedsToken,
         address manager,
         IVaultAccountant accountant,
         uint256 performanceFeeBps,
@@ -51,11 +55,20 @@ contract HypoVaultFactory {
         string memory name
     ) external returns (address vault) {
         vault = address(
-            new HypoVault(underlyingToken, manager, accountant, performanceFeeBps, symbol, name)
+            new HypoVault(
+                depositToken,
+                proceedsToken,
+                manager,
+                accountant,
+                performanceFeeBps,
+                symbol,
+                name
+            )
         );
 
         emit VaultCreated(
-            underlyingToken,
+            depositToken,
+            proceedsToken,
             manager,
             accountant,
             vault,
