@@ -720,6 +720,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
             assetsFulfilled: 0
         });
 
+        // update K before increasing the supply
         _updateK();
 
         totalSupply = _totalSupply + sharesReceived;
@@ -778,6 +779,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         totalSupply = _totalSupply - sharesToFulfill;
 
+        // update K after decreasing the supply
         _updateK();
 
         reservedDepositTokens = _reservedDepositTokens + assetsReceived;

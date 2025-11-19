@@ -195,14 +195,15 @@ contract PanopticVaultAccountant is Ownable {
                 bool skipToken0 = false;
                 bool skipToken1 = false;
 
+                if (address(pools[i].token0) == _proceedsToken && _proceedsToken != address(0)) {
+                    skipToken0 = true;
+                }
+                if (address(pools[i].token1) == _proceedsToken && _proceedsToken != address(0)) {
+                    skipToken1 = true;
+                }
+
                 // optimized for small number of pools
                 for (uint256 j = 0; j < underlyingTokens.length; j++) {
-                    if (underlyingTokens[j] == _proceedsToken) {
-                        if (_proceedsToken != address(0)) {
-                            skipToken0 = true;
-                            skipToken1 = true;
-                        }
-                    }
                     if (underlyingTokens[j] == address(pools[i].token0)) skipToken0 = true;
                     if (underlyingTokens[j] == address(pools[i].token1)) skipToken1 = true;
 

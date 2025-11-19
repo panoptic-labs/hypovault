@@ -2699,6 +2699,117 @@ contract PanopticVaultAccountantTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
+                        PROCEEDS TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_computeNAV_skipsProceedsBalance_whenNoPools() public {
+        // No pools
+        PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](0);
+        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+
+        // Vault holds both depositToken and proceedsToken
+        uint256 depositBal = 1000e18;
+        uint256 proceedsBal = 500e18;
+        depositToken.setBalance(vault, depositBal);
+        proceedsToken.setBalance(vault, proceedsBal);
+
+        // No pools -> no positions
+        TokenId[][] memory tokenIds = new TokenId[][](0);
+
+        bytes memory managerInput = createManagerInput(pools, tokenIds);
+
+        uint256 nav = accountant.computeNAV(
+            vault,
+            address(depositToken),
+            address(proceedsToken),
+            managerInput
+        );
+
+        // NAV must ignore proceedsToken.balanceOf(vault)
+        assertEq(
+            nav,
+            depositBal,
+            "NAV should ignore proceeds token balance when there are no pools"
+        );
+    }
+
+    function test_computeNAV_skipsProceedsBalance_whenTokenIsInPool(
+        bool isToken0,
+        bool isProceedsTwice
+    ) public {
+        // Two pools so that the second pool sees proceedsToken in underlyingTokens[]
+        PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](2);
+
+        // Pool 0: token0 is proceedsToken
+        pools[0] = PanopticVaultAccountant.PoolInfo({
+            pool: PanopticPool(address(mockPool)),
+            token0: isToken0 ? token0 : proceedsToken,
+            token1: isToken0 ? proceedsToken : token1,
+            poolOracle: poolOracle,
+            oracle0: oracle0,
+            isUnderlyingToken0InOracle0: false,
+            oracle1: oracle1,
+            isUnderlyingToken0InOracle1: false,
+            maxPriceDeviation: MAX_PRICE_DEVIATION,
+            twapWindow: TWAP_WINDOW
+        });
+
+        // Pool 1: some arbitrary other pair
+        pools[1] = PanopticVaultAccountant.PoolInfo({
+            pool: PanopticPool(address(mockPool)),
+            token0: isProceedsTwice ? isToken0 ? token0 : proceedsToken : token0,
+            token1: isProceedsTwice ? isToken0 ? proceedsToken : token1 : token1,
+            poolOracle: poolOracle,
+            oracle0: oracle0,
+            isUnderlyingToken0InOracle0: false,
+            oracle1: oracle1,
+            isUnderlyingToken0InOracle1: false,
+            maxPriceDeviation: MAX_PRICE_DEVIATION,
+            twapWindow: TWAP_WINDOW
+        });
+
+        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+
+        // Vault holds some depositToken and proceedsToken
+        uint256 depositBal = 1000e18;
+        uint256 proceedsBal = 500e18;
+        depositToken.setBalance(vault, depositBal);
+        proceedsToken.setBalance(vault, proceedsBal);
+
+        // No positions, no collateral, no premiums
+        mockPool.setNumberOfLegs(vault, 0);
+        mockPool.setMockPositionBalanceArray(new uint256[2][](0));
+        mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
+        mockPool.collateralToken0().setBalance(vault, 0);
+        mockPool.collateralToken1().setBalance(vault, 0);
+        mockPool.collateralToken0().setPreviewRedeemReturn(0);
+        mockPool.collateralToken1().setPreviewRedeemReturn(0);
+
+        // tokenIds length must match pools.length
+        TokenId[][] memory tokenIds = new TokenId[][](2);
+        tokenIds[0] = new TokenId[](0);
+        tokenIds[1] = new TokenId[](0);
+
+        // Use your existing helper to build managerInput with matching TWAP ticks
+        bytes memory managerInput = createManagerInput(pools, tokenIds);
+
+        uint256 nav = accountant.computeNAV(
+            vault,
+            address(depositToken),
+            address(proceedsToken),
+            managerInput
+        );
+
+        // With no positions/collateral and all pool exposures = 0,
+        // NAV should again be just the depositToken balance.
+        assertEq(
+            nav,
+            depositBal,
+            "NAV should ignore proceeds token free balance even when in pools"
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
                         INTEGRATION TESTS
     //////////////////////////////////////////////////////////////*/
 
