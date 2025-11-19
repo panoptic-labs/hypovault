@@ -364,12 +364,8 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         assertEq(vault.depositEpoch(), 1);
 
         // Verify epoch state
-        (
-            uint128 assetsDeposited,
-            uint128 sharesReceived,
-            uint128 assetsFulfilled,
-            uint256 proceedsSnapshot
-        ) = vault.depositEpochState(0);
+        (uint128 assetsDeposited, uint128 sharesReceived, uint128 assetsFulfilled) = vault
+            .depositEpochState(0);
         assertEq(assetsDeposited, depositAmount);
         assertEq(assetsFulfilled, depositAmount);
         assertGt(sharesReceived, 0);

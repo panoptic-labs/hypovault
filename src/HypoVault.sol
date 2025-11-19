@@ -39,12 +39,10 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @param assetsDeposited The amount of assets deposited
     /// @param sharesReceived The amount of shares received over `assetsFulfilled`
     /// @param assetsFulfilled The amount of assets fulfilled (out of `assetsDeposited`)
-    /// @param proceedsSnapshot
     struct DepositEpochState {
         uint128 assetsDeposited;
         uint128 sharesReceived;
         uint128 assetsFulfilled;
-        uint256 proceedsSnapshot;
     }
 
     /// @notice A type that represents the state of a withdrawal epoch.
@@ -370,7 +368,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
 
         // transfer any outstanding proceeds tokens to the user account
         _settleProceeds(user);
-        K_snapshot[user] = K_global;
 
         _burnVirtual(user, shares);
 
@@ -469,7 +466,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         // shares from pending deposits are already added to the supply at the start of every new epoch
         _mintVirtual(user, sharesReceived);
 
-        K_snapshot[user] = _depositEpochState.proceedsSnapshot;
         userBasis[user] += userAssetsDeposited;
 
         uint256 assetsRemaining = queuedDepositAmount - userAssetsDeposited;
@@ -488,6 +484,8 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         if (proceedsOwed > reservedProceedsTokens) revert NotEnoughReserve();
 
         reservedProceedsTokens -= proceedsOwed;
+
+        K_snapshot[user] = K_global;
 
         SafeTransferLib.safeTransfer(proceedsToken, user, proceedsOwed);
     }
@@ -643,7 +641,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         uint256 value
     ) external onlyManager returns (bytes memory result) {
         result = target.functionCallWithValue(data, value);
-        _updateK();
     }
 
     /// @notice Makes arbitrary function calls from this contract.
@@ -658,7 +655,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         for (uint256 i; i < targetsLength; ++i) {
             results[i] = targets[i].functionCallWithValue(data[i], values[i]);
         }
-        _updateK();
     }
 
     function _updateK() internal {
@@ -689,7 +685,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         uint256 assetsToFulfill,
         bytes memory managerInput
     ) external onlyManager {
-        _updateK();
         uint256 currentEpoch = depositEpoch;
 
         DepositEpochState memory epochState = depositEpochState[currentEpoch];
@@ -713,8 +708,7 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         depositEpochState[currentEpoch] = DepositEpochState({
             assetsDeposited: uint128(epochState.assetsDeposited),
             sharesReceived: uint128(sharesReceived),
-            assetsFulfilled: uint128(assetsToFulfill),
-            proceedsSnapshot: K_global
+            assetsFulfilled: uint128(assetsToFulfill)
         });
 
         currentEpoch++;
@@ -723,9 +717,10 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         depositEpochState[currentEpoch] = DepositEpochState({
             assetsDeposited: uint128(assetsRemaining),
             sharesReceived: 0,
-            assetsFulfilled: 0,
-            proceedsSnapshot: 0
+            assetsFulfilled: 0
         });
+
+        _updateK();
 
         totalSupply = _totalSupply + sharesReceived;
 
@@ -742,7 +737,6 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         uint256 maxAssetsReceived,
         bytes memory managerInput
     ) external onlyManager {
-        _updateK();
         uint256 _reservedDepositTokens = reservedDepositTokens;
         uint256 totalAssets = accountant.computeNAV(
             address(this),
@@ -783,6 +777,8 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
         });
 
         totalSupply = _totalSupply - sharesToFulfill;
+
+        _updateK();
 
         reservedDepositTokens = _reservedDepositTokens + assetsReceived;
 
