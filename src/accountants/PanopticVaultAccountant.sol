@@ -216,6 +216,7 @@ contract PanopticVaultAccountant is Ownable {
                     }
                 }
 
+
                 {
                     if (!skipToken0)
                         token0Exposure = address(pools[i].token0) ==
