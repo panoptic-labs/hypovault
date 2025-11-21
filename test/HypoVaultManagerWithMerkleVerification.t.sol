@@ -70,7 +70,10 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
         balancerVault = new MockBalancerVault();
 
         // Step 1: Deploy vault
-        vaultFactory = new HypoVaultFactory();
+        address implementation = address(new HypoVault());
+
+        vaultFactory = new HypoVaultFactory(implementation);
+
         vault = HypoVault(
             payable(
                 vaultFactory.createVault(
@@ -79,7 +82,8 @@ contract HypovaultManagerWithMerkleVerificationTest is Test {
                     IVaultAccountant(address(accountant)),
                     100, // 1% performance fee
                     "HVAULT",
-                    "HypoVault Token"
+                    "HypoVault Token",
+                    keccak256("test-vault-salt")
                 )
             )
         );
