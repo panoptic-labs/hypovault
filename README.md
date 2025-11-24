@@ -46,7 +46,7 @@ forge install
 
 2. Ensure your `.env` is up to date
 
-If you don't have a Safe transaction API key, you'll need to generate one here for the `SAFE_TX_API_BEARER` env var: https://developer.safe.global/api-keys
+If you don't have a Safe transaction API key, you'll need to generate one here for the `SAFE_TX_API_KEY` env var: https://developer.safe.global/api-keys
 
 Example for a ledger signer using account 9:
 
@@ -54,7 +54,7 @@ Example for a ledger signer using account 9:
 CHAIN=sepolia
 WALLET_TYPE=ledger
 MNEMONIC_INDEX=9
-SAFE_TX_API_BEARER=<SAFE_TX_API_BEARER>
+SAFE_TX_API_KEY=<your safe transaction service api key>
 ```
 
 3. Copy the deployment script and rename it to contain the vault you want to deploy. This ensure each vault deployment is stored in version control to look back later if we need it for anything (like to regenerate the merkle tree containing allowlisted functions).
