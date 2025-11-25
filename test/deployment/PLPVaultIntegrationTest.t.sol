@@ -276,8 +276,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         bytes32[][] memory manageTree = _generateMerkleTree(leafs);
 
         // Save tree to JSON for debugging
-        string memory filePath = "./leafs/TestPanopticPLPStrategistLeaves.json";
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
+        string memory filePath = "./leafs/TestPanopticPLPStrategistLeaves.json";
         _generateLeafs(filePath, leafs, manageRoot, manageTree);
 
         vm.startPrank(owner);

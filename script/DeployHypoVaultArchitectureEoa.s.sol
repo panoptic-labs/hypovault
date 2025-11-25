@@ -18,6 +18,7 @@ import {RolesAuthority, Authority} from "lib/boring-vault/lib/solmate/src/auth/a
 
 // Intended to be run from an EOA using vm.startBroadcast/stopBroadcast
 contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
+    // @dev - test Safe on sepolia. NOT the real multisig.
     address PanopticMultisig = address(0x9C44C2B07380DA62a5ea572b886048410b0c44fd);
 
     uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -27,7 +28,7 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
     IERC20Partial sepoliaWeth = IERC20Partial(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
 
     // CREATE2 salt
-    bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v5"));
+    bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v6"));
 
     function run() public {
         address owner = msg.sender;
@@ -112,6 +113,8 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         _addCollateralTrackerLeafs(leafs, ERC4626(wethUsdc500bpsV3Collateral0));
         bytes32[][] memory manageTree = _generateMerkleTree(leafs);
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
+        string memory filePath = "./leafs/ProductionWETHPLPStrategistLeaves.json";
+        _generateLeafs(filePath, leafs, manageRoot, manageTree);
 
         console.log("Generated manageRoot:");
         console.logBytes32(manageRoot);
