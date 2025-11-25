@@ -32,7 +32,29 @@ $ forge fmt
 $ forge snapshot
 ```
 
-### Deploy
+### Deploy via EOA
+
+To deploy with an EOA on Sepolia...
+
+1. Ensure you .env is up to date:
+
+```sh
+PRIVATE_KEY=<private key>
+ETHERSCAN_API_KEY=<your etherscan key>
+ALCHEMY_API_KEY=<your alchemy key>
+```
+
+2. From the root of the repo, run
+
+```
+source .env && forge script --sender <sender for the private key in your env> --rpc-url https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY} script/DeployHypoVaultArchitectureEoa.s.sol -vvvv --broadcast --verify --slow`
+```
+
+> NOTE: Using a private key in a .env is not suitable for production. Forge script accepts the --turnkey option for deploying via Turnkey if we'd like to do an EOA deploy while maintaining high security guarantess. We may have to do this if the rabbit hole of Atomic Safe deployments continues to go deeper.
+
+### Deploy via Safe
+
+#### (ignore, not working currently)
 
 To propose a deployment of an instance of the HypoVault architecture (HypoVaultFactory, PanopticVaultAccountant, HypoVault, HypoVaultManagerWithMerkleVerification,CollateralTrackerDecoderAndSanitizer, RolesAuthority), along with setting of relevant configuration like setting roles, setting supported pools and function calls for accounts with Curator roles, to a Safe, we can use the DeployHypoVaultArchitecture.s.sol script.
 
@@ -55,6 +77,7 @@ CHAIN=sepolia
 WALLET_TYPE=ledger
 MNEMONIC_INDEX=9
 SAFE_TX_API_KEY=<your safe transaction service api key>
+ALCHEMY_API_KEY=<your alchemy key>
 ```
 
 3. Copy the deployment script and rename it to contain the vault you want to deploy. This ensure each vault deployment is stored in version control to look back later if we need it for anything (like to regenerate the merkle tree containing allowlisted functions).
