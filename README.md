@@ -90,7 +90,7 @@ ALCHEMY_API_KEY=<your alchemy key>
 5. Run the script to propose the deployment transaction to the safe!
 
 ```sh
-source .env && forge script --ffi --sender 0xb0300f0f038d7075e8e627e0d22d5786d59121ab --rpc-url https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY} script/DeployHypoVaultArchitecture.s.sol true
+source .env && forge script --ffi --sender 0xb0300f0f038d7075e8e627e0d22d5786d59121ab --rpc-url https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY} script/DeployHypoVaultArchitectureViaSafe.s.sol true
 ```
 
 6. Commit your new script and the `.json` file that was written in the `leafs/` directory and push to a branch on GitHub.

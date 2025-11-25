@@ -67,6 +67,12 @@ contract DeployHypoVaultArchitectureSepolia is BatchScript, MerkleTreeHelper {
             hypoVaultImplDeploymentData,
             salt // salt for CREATE2
         );
+        // Originally I was using a `delegatecall` to CreateCall contract for all deploys,
+        // but the Safe UI prevents signing transactions containing `delegatecall` after the ByBit hack (even though CreateCall is official Safe contract and is safe to dcall bc it doesnt mutate state!)
+        // I opened an issue with them here: https://github.com/safe-global/safe-client-gateway/issues/2805
+        // If this gets resolved, we should be able to use this script once again to send the deploy transaction, then allow other signers to sign and execute via the UI.
+
+        // Trying to use a regular `call` instead isn't working (reverts with UNAUTHORIZED upon calling setManager. In the trace, msg.sender shows as the Multisend contract rather than the safe, causing the revert.)
         addToBatch(createCall, 0, createImplCalldata, BatchScript.Operation.CALL);
         bytes32 hypoVaultImplBytecodeHash = keccak256(hypoVaultImplDeploymentData);
         address hypoVaultImplAddress = Create2.computeAddress(
