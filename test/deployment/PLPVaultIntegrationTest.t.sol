@@ -514,10 +514,13 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
 
         // use contract suite deployed from EOA
         HypoVault wethPlpVault = HypoVault(payable(0xae56271f76a19d6246e239C86433E6e16B7e4C39));
-        HypoVaultManagerWithMerkleVerification wethPlpVaultManager = HypoVaultManagerWithMerkleVerification(0x406ad508f215C0EB9D2Da996c1f2F6CC62Bc47B7);
-        PanopticVaultAccountant panopticVaultAccountant = PanopticVaultAccountant(0x2296535c2F05d6A0d8EA65508FFB8df7926B3ca3);
-        RolesAuthority rolesAuthority = RolesAuthority(0x3d9ecf53613b70f8a85315b20475a667008fb734);
-
+        HypoVaultManagerWithMerkleVerification wethPlpVaultManager = HypoVaultManagerWithMerkleVerification(
+                0x406ad508f215C0EB9D2Da996c1f2F6CC62Bc47B7
+            );
+        PanopticVaultAccountant panopticVaultAccountant = PanopticVaultAccountant(
+            0x2296535c2F05d6A0d8EA65508FFB8df7926B3ca3
+        );
+        RolesAuthority rolesAuthority = RolesAuthority(0x3d9ecf53613b70F8a85315B20475a667008Fb734);
 
         /////////////////////////////
         // rebuild merkle tree to show full manage flow
@@ -542,7 +545,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
 
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
         ////////////////////// end manageroot set up
-        
+
         // Confirm TurnkeyAccount0 can manage before doing the whole thing
         assertTrue(
             rolesAuthority.canCall(
@@ -693,7 +696,6 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
 
         console2.log("=== Integration test completed successfully! ===");
     }
-
 
     function createDefaultPools() internal returns (PanopticVaultAccountant.PoolInfo[] memory) {
         int24 TWAP_TICK = 100;
