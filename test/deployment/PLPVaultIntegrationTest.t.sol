@@ -495,9 +495,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         console2.log("=== Integration test completed successfully! ===");
     }
 
-    // TODO: test that turnkey signer can manage recently deployed vault (0xae56271f76a19d6246e239C86433E6e16B7e4C39)
-    // https://sepolia.etherscan.io/address/0xae56271f76a19d6246e239C86433E6e16B7e4C39#code
-    // then port to SDK test
+    // TODO: Port this example of turnkey signer managing recently deployed vault into SDK in typescript (https://sepolia.etherscan.io/address/0x5B61131B0b2589b5C8f6B93C6F989b5dAdFF0FB4)
     function test_turnkey_can_manage_vault() public {
         console2.log("=== Init ===");
         uint256 forkId = vm.createSelectFork(
@@ -513,19 +511,19 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         address wethUsdc500bpsV3PanopticPool = 0x00002c1c2EF3E4b606F8361d975Cdc2834668e9F; // Underlying: WETH9 | receives deposited assets
 
         // use contract suite deployed from EOA
-        HypoVault wethPlpVault = HypoVault(payable(0xae56271f76a19d6246e239C86433E6e16B7e4C39));
+        HypoVault wethPlpVault = HypoVault(payable(0x5B61131B0b2589b5C8f6B93C6F989b5dAdFF0FB4));
         HypoVaultManagerWithMerkleVerification wethPlpVaultManager = HypoVaultManagerWithMerkleVerification(
-                0x406ad508f215C0EB9D2Da996c1f2F6CC62Bc47B7
+                0x585a97cb89DC2E345D9fb80b84a5038c6D8c8118
             );
         PanopticVaultAccountant panopticVaultAccountant = PanopticVaultAccountant(
-            0x2296535c2F05d6A0d8EA65508FFB8df7926B3ca3
+            0x425379d80bf1ED904006B3C893BEa1903Fc13caF
         );
-        RolesAuthority rolesAuthority = RolesAuthority(0x3d9ecf53613b70F8a85315B20475a667008Fb734);
+        RolesAuthority rolesAuthority = RolesAuthority(0x8d50AB622417Fa699F19bd125E69E927418c4B2A);
 
         /////////////////////////////
         // rebuild merkle tree to show full manage flow
         ///////////////////////
-        address collateralTrackerDecoderAndSanitizer = 0xEd5B1b5B57973D03F7F48A23Aea0F03568c5D1EA;
+        address collateralTrackerDecoderAndSanitizer = 0x068C823B047B0cBAEFB1aE57Cf792D05665858b7;
         setSourceChainName(sepolia);
         setAddress(false, sepolia, "boringVault", address(wethPlpVault));
         setAddress(false, sepolia, "managerAddress", address(wethPlpVaultManager));

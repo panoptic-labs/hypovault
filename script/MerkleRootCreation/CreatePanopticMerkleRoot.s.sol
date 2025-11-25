@@ -6,7 +6,7 @@ import {ERC20} from "lib/boring-vault/lib/solmate/src/tokens/ERC20.sol";
 import {ERC4626} from "lib/boring-vault/lib/solmate/src/tokens/ERC4626.sol";
 import {ManagerWithMerkleVerification} from "lib/boring-vault/src/base/Roles/ManagerWithMerkleVerification.sol";
 import {RolesAuthority, Authority} from "lib/boring-vault/lib/solmate/src/auth/authorities/RolesAuthority.sol";
-import {MerkleTreeHelper} from "lib/boring-vault/test/resources/MerkleTreeHelper/MerkleTreeHelper.sol";
+import {MerkleTreeHelper} from "test/resources/MerkleTreeHelper/MerkleTreeHelper.sol";
 import "forge-std/Script.sol";
 
 /**
