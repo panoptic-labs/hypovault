@@ -18,6 +18,8 @@ import {RolesAuthority, Authority} from "lib/boring-vault/lib/solmate/src/auth/a
 
 // Intended to be run from an EOA using vm.startBroadcast/stopBroadcast
 contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
+    // Real Panoptic multisig
+    // ISafe PanopticMultisig = ISafe(0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1);
     // @dev - test Safe on sepolia. NOT the real multisig.
     address PanopticMultisig = address(0x9C44C2B07380DA62a5ea572b886048410b0c44fd);
 
@@ -114,7 +116,7 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         bytes32[][] memory manageTree = _generateMerkleTree(leafs);
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
         string memory filePath = "./leafs/ProductionWETHPLPStrategistLeaves.json";
-        _generateLeafs(filePath, leafs, manageRoot, manageTree);
+        _generateLeafs(filePath, leafs, manageRoot, manageTree); // Dump tree and leaves to JSON. Useful for SDK later.
 
         console.log("Generated manageRoot:");
         console.logBytes32(manageRoot);
@@ -175,7 +177,7 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         console.log("Accountant:", accountantAddress);
         console.log("Vault:", wethPlpVaultAddress);
         console.log("Manager:", managerAddress);
-        console.log("Decoder:", collateralTrackerDecoderAndSanitizer);
+        console.log("DecoderAndSantizer:", collateralTrackerDecoderAndSanitizer);
         console.log("Authority:", authorityAddress);
 
         // TODO: be mindful msg sender is owner still. transfer ownership if necessary
