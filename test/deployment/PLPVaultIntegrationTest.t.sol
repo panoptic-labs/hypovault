@@ -198,19 +198,22 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         );
 
         address PanopticMultisig = 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1;
+        address owner = PanopticMultisig;
         address TurnkeyAccount0 = address(0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8);
         address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
         ERC20S sepoliaWeth = ERC20S(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
+        address wethUsdc500bpsV3Collateral0 = 0x1AF0D98626d53397BA5613873D3b19cc25235d52; // Underlying: WETH9 | 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
+        address wethUsdc500bpsV3PanopticPool = 0x00002c1c2EF3E4b606F8361d975Cdc2834668e9F; // Underlying: WETH9 | receives deposited assets
 
         /*
            STEP 1: Deployments
         */
 
         // Acting as multisig, deploy PanopticVaultAccountant, HypoVault via Factory, and HypoVaultManager, and set HypoVaultManager as manager of HypoVault
-        vm.startPrank(PanopticMultisig);
+        vm.startPrank(owner);
 
         // Accountant
-        PanopticVaultAccountant panopticVaultAccountant = new PanopticVaultAccountant();
+        PanopticVaultAccountant panopticVaultAccountant = new PanopticVaultAccountant(owner);
 
         // Vault
         // need to create new factory to link new HypoVault bytecode
@@ -223,7 +226,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
             payable(
                 factory.createVault(
                     address(sepoliaWeth),
-                    PanopticMultisig,
+                    owner,
                     IVaultAccountant(address(panopticVaultAccountant)),
                     performanceFeeBps,
                     "povLendWETH",
@@ -237,7 +240,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
 
         // Manager
         HypoVaultManagerWithMerkleVerification wethPlpVaultManager = new HypoVaultManagerWithMerkleVerification(
-                PanopticMultisig,
+                owner,
                 address(wethPlpVault),
                 BalancerVault
             );
@@ -250,9 +253,6 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         /*
            STEP 2: Set merkle root for Strategists. Give Turnkey signer & Safe Strategist role + identical manageRoots.
         */
-
-        address wethUsdc500bpsV3Collateral0 = 0x1AF0D98626d53397BA5613873D3b19cc25235d52; // Underlying: WETH9 | 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
-        address wethUsdc500bpsV3PanopticPool = 0x00002c1c2EF3E4b606F8361d975Cdc2834668e9F; // Underlying: WETH9 | receives deposited assets
 
         // Set up leafs
         address collateralTrackerDecoderAndSanitizer = address(
@@ -280,7 +280,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
         _generateLeafs(filePath, leafs, manageRoot, manageTree);
 
-        vm.startPrank(PanopticMultisig);
+        vm.startPrank(owner);
         wethPlpVaultManager.setManageRoot(TurnkeyAccount0, manageRoot);
         wethPlpVaultManager.setManageRoot(PanopticMultisig, manageRoot);
         assertEq(wethPlpVaultManager.manageRoot(TurnkeyAccount0), manageRoot);
@@ -290,17 +290,17 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         console2.log("=== Step 3: Set up AccessManager and grant curator permissions ===");
 
         // Deploy Authority
-        vm.prank(PanopticMultisig);
-        RolesAuthority rolesAuthority = new RolesAuthority(PanopticMultisig, Authority(address(0)));
+        vm.prank(owner);
+        RolesAuthority rolesAuthority = new RolesAuthority(owner, Authority(address(0)));
 
         // Set RolesAuthority as authority
-        vm.prank(PanopticMultisig);
+        vm.prank(owner);
         wethPlpVaultManager.setAuthority(Authority(address(rolesAuthority)));
         assertEq(address(wethPlpVaultManager.authority()), address(rolesAuthority));
 
         // Grant role w/ ability to call hypovault manager functions
         uint8 STRATEGIST_ROLE = 7;
-        vm.prank(PanopticMultisig);
+        vm.prank(owner);
         rolesAuthority.setUserRole(TurnkeyAccount0, STRATEGIST_ROLE, true);
 
         // Set abilities for curator role to call manager functions
@@ -314,7 +314,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
             )
         );
 
-        vm.startPrank(PanopticMultisig);
+        vm.startPrank(owner);
         for (uint256 i = 0; i < selectors.length; i++) {
             rolesAuthority.setRoleCapability(
                 STRATEGIST_ROLE,
@@ -349,8 +349,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         wethPlpVaultManager.setManageRoot(TurnkeyAccount0, manageRoot);
         vm.stopPrank();
 
-        // Verify Safe CAN still update manageRoot
-        vm.prank(PanopticMultisig);
+        // Verify Owner CAN still update manageRoot
+        vm.prank(owner);
         wethPlpVaultManager.setManageRoot(TurnkeyAccount0, manageRoot);
 
         console2.log("=== Step 4: Test curator can fulfill deposits ===");
@@ -369,7 +369,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         // Initialize pools in Accountant that Vault is allowed interact with
         // NOTE: there is an optimization that can be made - poolsHash is not necessary thanks to HypoVaultManagerWithMerkleVerification's checking of target addresses used in calldata against an allowlist of targets in the merkle tree. Checking hash of PoolInfo is redundant.
         PanopticVaultAccountant.PoolInfo[] memory poolInfos = createDefaultPools();
-        vm.prank(PanopticMultisig);
+        vm.prank(owner);
         bytes32 poolInfosHash = keccak256(abi.encode(poolInfos));
         panopticVaultAccountant.updatePoolsHash(address(wethPlpVault), poolInfosHash);
         assertEq(panopticVaultAccountant.vaultPools(address(wethPlpVault)), poolInfosHash);
@@ -494,6 +494,206 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
 
         console2.log("=== Integration test completed successfully! ===");
     }
+
+    // TODO: test that turnkey signer can manage recently deployed vault (0xae56271f76a19d6246e239C86433E6e16B7e4C39)
+    // https://sepolia.etherscan.io/address/0xae56271f76a19d6246e239C86433E6e16B7e4C39#code
+    // then port to SDK test
+    function test_turnkey_can_manage_vault() public {
+        console2.log("=== Init ===");
+        uint256 forkId = vm.createSelectFork(
+            string.concat("https://eth-sepolia.g.alchemy.com/v2/", vm.envString("ALCHEMY_API_KEY"))
+        );
+
+        address PanopticMultisig = 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1;
+        address owner = 0x7643c4F21661691fb851AfedaF627695672C9fac;
+        address TurnkeyAccount0 = address(0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8);
+        address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
+        ERC20S sepoliaWeth = ERC20S(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
+        address wethUsdc500bpsV3Collateral0 = 0x1AF0D98626d53397BA5613873D3b19cc25235d52; // Underlying: WETH9 | 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
+        address wethUsdc500bpsV3PanopticPool = 0x00002c1c2EF3E4b606F8361d975Cdc2834668e9F; // Underlying: WETH9 | receives deposited assets
+
+        // use contract suite deployed from EOA
+        HypoVault wethPlpVault = HypoVault(payable(0xae56271f76a19d6246e239C86433E6e16B7e4C39));
+        HypoVaultManagerWithMerkleVerification wethPlpVaultManager = HypoVaultManagerWithMerkleVerification(0x406ad508f215C0EB9D2Da996c1f2F6CC62Bc47B7);
+        PanopticVaultAccountant panopticVaultAccountant = PanopticVaultAccountant(0x2296535c2F05d6A0d8EA65508FFB8df7926B3ca3);
+        RolesAuthority rolesAuthority = RolesAuthority(0x3d9ecf53613b70f8a85315b20475a667008fb734);
+
+
+        /////////////////////////////
+        // rebuild merkle tree to show full manage flow
+        ///////////////////////
+        address collateralTrackerDecoderAndSanitizer = 0xEd5B1b5B57973D03F7F48A23Aea0F03568c5D1EA;
+        setSourceChainName(sepolia);
+        setAddress(false, sepolia, "boringVault", address(wethPlpVault));
+        setAddress(false, sepolia, "managerAddress", address(wethPlpVaultManager));
+        setAddress(false, sepolia, "accountantAddress", address(panopticVaultAccountant));
+        setAddress(
+            false,
+            sepolia,
+            "rawDataDecoderAndSanitizer",
+            collateralTrackerDecoderAndSanitizer
+        );
+
+        ManageLeaf[] memory leafs = new ManageLeaf[](8); // limit to smallest power of 2 that is grater than leaf size
+
+        _addCollateralTrackerLeafs(leafs, ERC4626(wethUsdc500bpsV3Collateral0));
+
+        bytes32[][] memory manageTree = _generateMerkleTree(leafs);
+
+        bytes32 manageRoot = manageTree[manageTree.length - 1][0];
+        ////////////////////// end manageroot set up
+        
+        // Confirm TurnkeyAccount0 can manage before doing the whole thing
+        assertTrue(
+            rolesAuthority.canCall(
+                TurnkeyAccount0,
+                address(wethPlpVaultManager),
+                ManagerWithMerkleVerification.manageVaultWithMerkleVerification.selector
+            )
+        );
+
+        console2.log("=== Step 4: Test curator can fulfill deposits ===");
+
+        // Alice requests a WETH deposit
+        deal(address(sepoliaWeth), Alice, 100 ether);
+        vm.startPrank(Alice);
+        sepoliaWeth.approve(address(wethPlpVault), type(uint256).max);
+        wethPlpVault.requestDeposit(100 ether);
+        vm.stopPrank();
+
+        assertGe(sepoliaWeth.balanceOf(address(wethPlpVault)), 100 ether);
+        // assumes epoch is 0. may not be the case. should use HypoVault.depositEpoch instead
+        assertEq(wethPlpVault.queuedDeposit(Alice, 0), 100 ether);
+
+        // Initialize pools in Accountant that Vault is allowed interact with
+        // NOTE: there is an optimization that can be made - poolsHash is not necessary thanks to HypoVaultManagerWithMerkleVerification's checking of target addresses used in calldata against an allowlist of targets in the merkle tree. Checking hash of PoolInfo is redundant.
+        PanopticVaultAccountant.PoolInfo[] memory poolInfos = createDefaultPools();
+        vm.prank(owner);
+        bytes32 poolInfosHash = keccak256(abi.encode(poolInfos));
+        panopticVaultAccountant.updatePoolsHash(address(wethPlpVault), poolInfosHash);
+        assertEq(panopticVaultAccountant.vaultPools(address(wethPlpVault)), poolInfosHash);
+
+        int24 TWAP_TICK = 100;
+        PanopticVaultAccountant.ManagerPrices[]
+            memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
+        managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
+            poolPrice: TWAP_TICK, // token1 to token0 (aka underlyingToken)
+            token0Price: 0, // token0 == underlyingToken
+            token1Price: TWAP_TICK // token1 to token0 (aka underlyingToken)
+        });
+
+        bytes memory managerInput = abi.encode(managerPrices, poolInfos, new TokenId[][](1));
+        vm.prank(TurnkeyAccount0);
+        wethPlpVaultManager.fulfillDeposits(100 ether, managerInput);
+
+        // Check deposit was fulfilled
+        assertEq(wethPlpVault.depositEpoch(), 1);
+        (uint128 assetsDeposited, , uint128 assetsFulfilled) = wethPlpVault.depositEpochState(0);
+        assertEq(assetsDeposited, 100 ether);
+        assertEq(assetsFulfilled, 100 ether);
+
+        console2.log("=== Step 5: Execute deposit and test withdrawals ===");
+
+        wethPlpVault.executeDeposit(Alice, 0);
+        uint256 aliceShares = wethPlpVault.balanceOf(Alice);
+        assertGt(aliceShares, 0);
+
+        // Alice requests 50% withdrawal
+        vm.prank(Alice);
+        wethPlpVault.requestWithdrawal(uint128(aliceShares / 2));
+
+        // TurnkeyAccount0 fulfills withdrawals
+        vm.prank(TurnkeyAccount0);
+        wethPlpVaultManager.fulfillWithdrawals(aliceShares / 2, 50 ether, managerInput);
+
+        // Execute withdrawal
+        uint256 aliceBalanceBefore = sepoliaWeth.balanceOf(Alice);
+        wethPlpVault.executeWithdrawal(Alice, 0);
+        assertGt(sepoliaWeth.balanceOf(Alice), aliceBalanceBefore);
+
+        console2.log(
+            "=== Step 6: Test CollateralTracker deposit call with Merkle verification ==="
+        );
+        // Create call to approve collateral0 to spend sepoliaWeth. Allowed because we set the manage root earlier.
+        // Remember targets, targetData, manageProofs (so manageLeafs too), values, decodersAndSanitizers arrays must all be the same length
+        address[] memory targets = new address[](2);
+        targets[0] = address(sepoliaWeth);
+        targets[1] = address(wethUsdc500bpsV3Collateral0);
+
+        bytes[] memory targetData = new bytes[](2);
+        targetData[0] = abi.encodeWithSelector(
+            ERC20S.approve.selector,
+            wethUsdc500bpsV3Collateral0,
+            type(uint256).max
+        );
+        targetData[1] = abi.encodeWithSelector(ERC4626.deposit.selector, 50 ether, wethPlpVault);
+
+        ManageLeaf[] memory manageLeafs = new ManageLeaf[](2);
+        // To determine which index of leaf to use, easiest to look at
+        // JSON output from _generateLeafs, especially when multiple leafs adding helpers are used (like _addCollateralTrackerLeafs)
+        manageLeafs[0] = leafs[0];
+        manageLeafs[1] = leafs[1];
+        bytes32[][] memory manageProofs = _getProofsUsingTree(manageLeafs, manageTree);
+        console.log("got proofs");
+
+        // Log manageLeafs
+        for (uint256 i = 0; i < manageLeafs.length; i++) {
+            console.log("manageLeafs[%s]:", i);
+            logManageLeaf(manageLeafs[i]);
+        }
+
+        // Log manageProofs
+        for (uint256 i = 0; i < manageTree.length; i++) {
+            console.log("manageTree[%s]:", i);
+            for (uint256 j = 0; j < manageTree[i].length; j++) {
+                console.logBytes32(manageTree[i][j]);
+            }
+        }
+
+        // Log manageProofs
+        for (uint256 i = 0; i < manageProofs.length; i++) {
+            console.log("manageProofs[%s]:", i);
+            for (uint256 j = 0; j < manageProofs[i].length; j++) {
+                console.logBytes32(manageProofs[i][j]);
+            }
+        }
+
+        // leave values empty since we're not sending native assets
+        uint256[] memory values = new uint256[](2);
+
+        address[] memory decodersAndSanitizers = new address[](2);
+        decodersAndSanitizers[0] = collateralTrackerDecoderAndSanitizer;
+        decodersAndSanitizers[1] = collateralTrackerDecoderAndSanitizer;
+
+        vm.startPrank(TurnkeyAccount0);
+        uint256 initialCollateralWethAllowance = sepoliaWeth.allowance(
+            address(wethPlpVault),
+            wethUsdc500bpsV3Collateral0
+        );
+        uint256 initialPPWethBalance = sepoliaWeth.balanceOf(wethUsdc500bpsV3PanopticPool);
+
+        wethPlpVaultManager.manageVaultWithMerkleVerification(
+            manageProofs,
+            decodersAndSanitizers,
+            targets,
+            targetData,
+            values
+        );
+
+        uint256 newCollateralWethAllowance = sepoliaWeth.allowance(
+            address(wethPlpVault),
+            wethUsdc500bpsV3Collateral0
+        );
+        uint256 newPPWethBalance = sepoliaWeth.balanceOf(wethUsdc500bpsV3PanopticPool);
+
+        assertGt(newCollateralWethAllowance, initialCollateralWethAllowance);
+        assertGt(newPPWethBalance, initialPPWethBalance);
+
+        vm.stopPrank();
+
+        console2.log("=== Integration test completed successfully! ===");
+    }
+
 
     function createDefaultPools() internal returns (PanopticVaultAccountant.PoolInfo[] memory) {
         int24 TWAP_TICK = 100;

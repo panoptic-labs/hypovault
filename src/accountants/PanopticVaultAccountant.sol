@@ -70,7 +70,7 @@ contract PanopticVaultAccountant is Ownable {
     /// @notice Whether the list of pools for the vault is locked
     mapping(address vault => bool isLocked) public vaultLocked;
 
-    constructor() Ownable(msg.sender) {}
+    constructor(address owner) Ownable(owner) {}
 
     /// @notice Updates the pools hash for a vault.
     /// @dev This function can only be called by the owner of the contract.

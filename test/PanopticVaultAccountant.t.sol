@@ -284,7 +284,7 @@ contract PanopticVaultAccountantTest is Test {
     uint32 constant TWAP_WINDOW = 600; // 10 minutes
 
     function setUp() public {
-        accountant = new PanopticVaultAccountant();
+        accountant = new PanopticVaultAccountant(msg.sender);
         token0 = new MockERC20Partial("Token0", "T0");
         token1 = new MockERC20Partial("Token1", "T1");
         underlyingToken = new MockERC20Partial("Underlying", "UND");
