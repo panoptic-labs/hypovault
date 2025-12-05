@@ -367,7 +367,6 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         assertEq(wethPlpVault.queuedDeposit(Alice, 0), 100 ether);
 
         // Initialize pools in Accountant that Vault is allowed interact with
-        // NOTE: there is an optimization that can be made - poolsHash is not necessary thanks to HypoVaultManagerWithMerkleVerification's checking of target addresses used in calldata against an allowlist of targets in the merkle tree. Checking hash of PoolInfo is redundant.
         PanopticVaultAccountant.PoolInfo[] memory poolInfos = createDefaultPools();
         vm.prank(owner);
         bytes32 poolInfosHash = keccak256(abi.encode(poolInfos));
@@ -499,7 +498,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
     function test_turnkey_can_manage_vault() public {
         console2.log("=== Init ===");
         uint256 forkId = vm.createSelectFork(
-            string.concat("https://eth-sepolia.g.alchemy.com/v2/", vm.envString("ALCHEMY_API_KEY"))
+            string.concat("https://eth-sepolia.g.alchemy.com/v2/", vm.envString("ALCHEMY_API_KEY")),
+            9775660
         );
 
         address PanopticMultisig = 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1;
@@ -567,20 +567,26 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         assertEq(wethPlpVault.queuedDeposit(Alice, 0), 100 ether);
 
         // Initialize pools in Accountant that Vault is allowed interact with
-        // NOTE: there is an optimization that can be made - poolsHash is not necessary thanks to HypoVaultManagerWithMerkleVerification's checking of target addresses used in calldata against an allowlist of targets in the merkle tree. Checking hash of PoolInfo is redundant.
         PanopticVaultAccountant.PoolInfo[] memory poolInfos = createDefaultPools();
         vm.prank(owner);
         bytes32 poolInfosHash = keccak256(abi.encode(poolInfos));
         panopticVaultAccountant.updatePoolsHash(address(wethPlpVault), poolInfosHash);
         assertEq(panopticVaultAccountant.vaultPools(address(wethPlpVault)), poolInfosHash);
 
-        int24 TWAP_TICK = 100;
+        // Get latest tick to create managerInput
+        (
+            int24 currentTick,
+            int24 fastOracleTick,
+            int24 slowOracleTick,
+            int24 latestObservation,
+            uint256 medianData
+        ) = PanopticPool(wethUsdc500bpsV3PanopticPool).getOracleTicks();
         PanopticVaultAccountant.ManagerPrices[]
             memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
         managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
-            poolPrice: TWAP_TICK, // token1 to token0 (aka underlyingToken)
+            poolPrice: currentTick, // token1 to token0 (aka underlyingToken)
             token0Price: 0, // token0 == underlyingToken
-            token1Price: TWAP_TICK // token1 to token0 (aka underlyingToken)
+            token1Price: currentTick // token1 to token0 (aka underlyingToken)
         });
 
         bytes memory managerInput = abi.encode(managerPrices, poolInfos, new TokenId[][](1));
