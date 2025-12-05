@@ -1,12 +1,24 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
+import "forge-std/StdUtils.sol";
+import "forge-std/StdCheats.sol";
 import "forge-std/Test.sol";
 import "forge-std/console2.sol";
 import "../src/HypoVaultFactory.sol";
 import "../src/HypoVault.sol";
+import "../src/accountants/PanopticVaultAccountant.sol";
+import {CollateralTrackerDecoderAndSanitizer} from "../src/DecodersAndSanitizers/CollateralTrackerDecoderAndSanitizer.sol";
 import {ERC20S} from "lib/panoptic-v1.1/test/foundry/testUtils/ERC20S.sol";
+import {ERC4626} from "lib/boring-vault/lib/solmate/src/tokens/ERC4626.sol";
+import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC20Partial.sol";
 import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
+
+import {HypoVaultManagerWithMerkleVerification} from "../src/managers/HypoVaultManagerWithMerkleVerification.sol";
+import {ManagerWithMerkleVerification} from "lib/boring-vault/src/base/Roles/ManagerWithMerkleVerification.sol";
+import {AccessManager} from "lib/boring-vault/lib/openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
+import {Authority} from "lib/boring-vault/lib/solmate/src/auth/Auth.sol";
+import {MerkleTreeHelper} from "lib/boring-vault/test/resources/MerkleTreeHelper/MerkleTreeHelper.sol";
 
 contract VaultAccountantMock {
     uint256 public nav;
@@ -80,7 +92,7 @@ contract MockTarget {
     }
 }
 
-contract HypoVaultTest is Test {
+contract HypoVaultTest is Test, MerkleTreeHelper {
     VaultAccountantMock public accountant;
     HypoVaultFactory public vaultFactory;
     HypoVault public vault;
@@ -4362,4 +4374,115 @@ contract MockTokenWithoutDecimals {
     mapping(address => uint256) public balanceOf;
 
     // Intentionally not implementing decimals() function to test fallback behavior
+}
+
+contract MockV3CompatibleOracle is IV3CompatibleOracle {
+    int56[] public tickCumulatives;
+    uint160[] public sqrtPriceX96s;
+    uint32 public windowSize;
+    int24 public currentTick;
+    uint160 public currentSqrtPriceX96;
+    uint16 public currentObservationCardinality;
+
+    constructor() {
+        // Default tick cumulatives for a 20-slot observation
+        for (uint i = 0; i < 20; i++) {
+            tickCumulatives.push(int56(int256(1000 + i * 100))); // Increasing tick cumulatives
+        }
+        windowSize = 600; // 10 minutes
+        currentTick = 100;
+        currentSqrtPriceX96 = Math.getSqrtRatioAtTick(currentTick);
+        currentObservationCardinality = 20;
+    }
+
+    function observe(
+        uint32[] memory secondsAgos
+    ) external view override returns (int56[] memory, uint160[] memory) {
+        int56[] memory ticks = new int56[](secondsAgos.length);
+        uint160[] memory prices = new uint160[](secondsAgos.length);
+
+        for (uint i = 0; i < secondsAgos.length; i++) {
+            if (i < tickCumulatives.length) {
+                ticks[i] = tickCumulatives[i];
+            } else {
+                ticks[i] = tickCumulatives[tickCumulatives.length - 1];
+            }
+            prices[i] = Math.getSqrtRatioAtTick(int24(ticks[i] / 100));
+        }
+
+        return (ticks, prices);
+    }
+
+    function slot0()
+        external
+        view
+        override
+        returns (
+            uint160 sqrtPriceX96,
+            int24 tick,
+            uint16 observationIndex,
+            uint16 observationCardinality,
+            uint16 observationCardinalityNext,
+            uint8 feeProtocol,
+            bool unlocked
+        )
+    {
+        return (
+            currentSqrtPriceX96,
+            currentTick,
+            0,
+            currentObservationCardinality,
+            currentObservationCardinality,
+            0,
+            true
+        );
+    }
+
+    function observations(
+        uint256
+    )
+        external
+        view
+        override
+        returns (
+            uint32 blockTimestamp,
+            int56 tickCumulative,
+            uint160 secondsPerLiquidityCumulativeX128,
+            bool initialized
+        )
+    {
+        return (uint32(block.timestamp), 0, 0, true);
+    }
+
+    function increaseObservationCardinalityNext(uint16) external override {
+        // Mock implementation - do nothing
+    }
+
+    function setTickCumulatives(int56[] memory _tickCumulatives) external {
+        delete tickCumulatives;
+        for (uint i = 0; i < _tickCumulatives.length; i++) {
+            tickCumulatives.push(_tickCumulatives[i]);
+        }
+    }
+
+    function setObservation(uint256 index, int56 tickCumulative, uint160 sqrtPriceX96) external {
+        if (index >= tickCumulatives.length) {
+            for (uint i = tickCumulatives.length; i <= index; i++) {
+                tickCumulatives.push(0);
+                sqrtPriceX96s.push(0);
+            }
+        }
+        tickCumulatives[index] = tickCumulative;
+        sqrtPriceX96s[index] = sqrtPriceX96;
+    }
+
+    function setCurrentState(
+        int24 tick,
+        uint160 sqrtPriceX96,
+        uint16 observationCardinality
+    ) external {
+        currentTick = tick;
+        currentSqrtPriceX96 = sqrtPriceX96;
+        currentObservationCardinality = observationCardinality;
+    }
 }
