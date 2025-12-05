@@ -194,7 +194,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
     function test_complete_manager_no_fork_with_panoptic_collateral_integration_flow() public {
         console2.log("=== Step 1: Deploy ===");
         uint256 forkId = vm.createSelectFork(
-            string.concat("https://eth-sepolia.g.alchemy.com/v2/", vm.envString("ALCHEMY_API_KEY"))
+            string.concat("https://eth-sepolia.g.alchemy.com/v2/", vm.envString("ALCHEMY_API_KEY")),
+            9775660
         );
 
         address PanopticMultisig = 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1;
@@ -494,8 +495,9 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         console2.log("=== Integration test completed successfully! ===");
     }
 
-    // TODO: Port this example of turnkey signer managing recently deployed vault into SDK in typescript (https://sepolia.etherscan.io/address/0x5B61131B0b2589b5C8f6B93C6F989b5dAdFF0FB4)
     function test_turnkey_can_manage_vault() public {
+        // Used only as example for SDK. Does not need to be run every time.
+        vm.skip(true);
         console2.log("=== Init ===");
         uint256 forkId = vm.createSelectFork(
             string.concat("https://eth-sepolia.g.alchemy.com/v2/", vm.envString("ALCHEMY_API_KEY")),
