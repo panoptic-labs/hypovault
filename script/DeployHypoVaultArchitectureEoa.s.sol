@@ -115,7 +115,8 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         _addCollateralTrackerLeafs(leafs, ERC4626(wethUsdc500bpsV3Collateral0));
         bytes32[][] memory manageTree = _generateMerkleTree(leafs);
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
-        string memory filePath = "./leafs/ProductionWETHPLPStrategistLeaves.json";
+        string
+            memory filePath = "./hypoVaultManagerArtifacts/ProductionWETHPLPStrategistLeaves.json";
         _generateLeafs(filePath, leafs, manageRoot, manageTree); // Dump tree and leaves to JSON. Useful for SDK later.
 
         console.log("Generated manageRoot:");
@@ -161,7 +162,8 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         console.log("STRATEGIST_ROLE capabilities set");
 
         // 15. Update PanopticVaultAccountant pools hash for vault
-        PanopticVaultAccountant.PoolInfo[] memory poolInfos = createDefaultPools();
+        PanopticVaultAccountant.PoolInfo[] memory poolInfos = createPanopticAccountantPoolInfos();
+        _writePoolInfosToJson(address(wethPlpVault), poolInfos);
         bytes32 poolInfosHash = keccak256(abi.encode(poolInfos));
         console.log("Generated poolInfosHash:");
         console.logBytes32(poolInfosHash);
@@ -183,9 +185,15 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         // TODO: be mindful msg sender is owner still. transfer ownership if necessary
     }
 
-    function createDefaultPools() internal returns (PanopticVaultAccountant.PoolInfo[] memory) {
+    // TODO: Use safe tick price deviation!
+    // TODO: Output PoolInfos structs to json just like manage leaves.json, as this will be needed by managers
+    // to build managerInput() when fulfilling deposits and withdrawals
+    function createPanopticAccountantPoolInfos()
+        internal
+        returns (PanopticVaultAccountant.PoolInfo[] memory)
+    {
         int24 TWAP_TICK = 100;
-        int24 MAX_PRICE_DEVIATION = 1700000; // basically no price deviation check for deployment
+        int24 MAX_PRICE_DEVIATION = 1700000; // basically no price deviation check for deployment. TODO: use 100 instead. should be a safe amount, and matches the largest standard uni pool tick spacing
         uint32 TWAP_WINDOW = 600; // 10 minutes
 
         IV3CompatibleOracle wethUsdc500bpsV3UniswapPool = IV3CompatibleOracle(
@@ -213,5 +221,50 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
             twapWindow: TWAP_WINDOW
         });
         return pools;
+    }
+
+    function _writePoolInfosToJson(
+        address vault,
+        PanopticVaultAccountant.PoolInfo[] memory poolInfos
+    ) private {
+        string memory filePath = string.concat(
+            vm.projectRoot(),
+            "/hypoVaultManagerArtifacts/ProductionWETHPLPVaultPoolInfos.json"
+        );
+        if (vm.exists(filePath)) {
+            vm.removeFile(filePath);
+        }
+
+        vm.writeLine(filePath, "{");
+        // Write vault address manually - serializeAddress returns a full JSON object, we just need the key-value pair
+        vm.writeLine(filePath, string.concat('"vaultAddress":"', vm.toString(vault), '",'));
+        vm.writeLine(filePath, '"poolInfos": [');
+
+        for (uint256 i; i < poolInfos.length; ++i) {
+            vm.writeLine(filePath, _serializePoolInfo(poolInfos[i]));
+            if (i != poolInfos.length - 1) {
+                vm.writeLine(filePath, ",");
+            }
+        }
+
+        vm.writeLine(filePath, "]");
+        vm.writeLine(filePath, "}");
+    }
+
+    function _serializePoolInfo(
+        PanopticVaultAccountant.PoolInfo memory info
+    ) private returns (string memory) {
+        string memory poolJson = "poolInfo";
+        vm.serializeAddress(poolJson, "pool", address(info.pool));
+        vm.serializeAddress(poolJson, "token0", address(info.token0));
+        vm.serializeAddress(poolJson, "token1", address(info.token1));
+        vm.serializeAddress(poolJson, "poolOracle", address(info.poolOracle));
+        vm.serializeAddress(poolJson, "oracle0", address(info.oracle0));
+        vm.serializeBool(poolJson, "isUnderlyingToken0InOracle0", info.isUnderlyingToken0InOracle0);
+        vm.serializeAddress(poolJson, "oracle1", address(info.oracle1));
+        vm.serializeBool(poolJson, "isUnderlyingToken0InOracle1", info.isUnderlyingToken0InOracle1);
+        vm.serializeInt(poolJson, "maxPriceDeviation", info.maxPriceDeviation);
+        string memory finalJson = vm.serializeUint(poolJson, "twapWindow", info.twapWindow);
+        return finalJson;
     }
 }

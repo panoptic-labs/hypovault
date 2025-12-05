@@ -5,7 +5,7 @@ libs = ["lib"]
 optimizer = true
 optimizer_runs = 200
 via_ir = true
-fs_permissions = [{ access = "read-write", path = "./leafs"}]
+fs_permissions = [{ access = "read-write", path = "./hypoVaultManagerArtifacts"}]
 solc_version = "0.8.28"
 bytecode_hash = "none"
 cbor_metadata = false
