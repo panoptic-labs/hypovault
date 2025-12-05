@@ -112,6 +112,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
     // Events
     event WithdrawalRequested(address indexed user, uint256 shares, bool shouldRedeposit);
     event DepositRequested(address indexed user, uint256 amount);
+    event DepositCancelled(address indexed user, uint256 amount);
     event RedepositStatusChanged(address indexed user, uint256 indexed epoch, bool shouldRedeposit);
 
     /*//////////////////////////////////////////////////////////////
@@ -308,6 +309,20 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
 
         assertEq(vault.balanceOf(Alice), expectedShares);
         assertEq(vault.userBasis(Alice), depositAmount);
+    }
+
+    function test_cancelDeposit_user_initiated_events() public {
+        uint256 depositAmount = 100 ether;
+
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+
+        // Expect the DepositCancelled event
+        vm.expectEmit(true, true, false, true);
+        emit DepositCancelled(Alice, depositAmount);
+
+        vm.prank(Alice);
+        vault.cancelDeposit();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -805,6 +820,238 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         assertEq(token.balanceOf(address(vault)), 0);
     }
 
+    function test_cancelDeposit_user_initiated_basic() public {
+        uint256 depositAmount = 100 ether;
+
+        // Alice requests deposit
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+
+        uint256 aliceBalanceBefore = token.balanceOf(Alice);
+        assertEq(vault.queuedDeposit(Alice, 0), depositAmount);
+
+        // Alice cancels her own deposit
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        // Verify cancellation
+        assertEq(vault.queuedDeposit(Alice, 0), 0);
+        assertEq(token.balanceOf(Alice), aliceBalanceBefore + depositAmount);
+        assertEq(token.balanceOf(address(vault)), 0);
+
+        // Verify epoch state updated correctly
+        (uint128 assetsDeposited, , ) = vault.depositEpochState(0);
+        assertEq(assetsDeposited, 0);
+    }
+
+    function test_cancelDeposit_user_initiated_with_zero_amount() public {
+        // User with no deposit tries to cancel
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        // Should succeed but do nothing
+        assertEq(vault.queuedDeposit(Alice, 0), 0);
+        assertEq(token.balanceOf(Alice), INITIAL_BALANCE);
+    }
+
+    function test_cancelDeposit_user_initiated_multiple_users() public {
+        uint256 aliceDeposit = 100 ether;
+        uint256 bobDeposit = 200 ether;
+        uint256 charlieDeposit = 150 ether;
+
+        // Multiple users request deposits
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(aliceDeposit));
+        vm.prank(Bob);
+        vault.requestDeposit(uint128(bobDeposit));
+        vm.prank(Charlie);
+        vault.requestDeposit(uint128(charlieDeposit));
+
+        // Bob cancels his deposit
+        uint256 bobBalanceBefore = token.balanceOf(Bob);
+        vm.prank(Bob);
+        vault.cancelDeposit();
+
+        // Verify only Bob's deposit is cancelled
+        assertEq(vault.queuedDeposit(Alice, 0), aliceDeposit);
+        assertEq(vault.queuedDeposit(Bob, 0), 0);
+        assertEq(vault.queuedDeposit(Charlie, 0), charlieDeposit);
+        assertEq(token.balanceOf(Bob), bobBalanceBefore + bobDeposit);
+
+        // Verify epoch state reflects only Bob's cancellation
+        (uint128 assetsDeposited, , ) = vault.depositEpochState(0);
+        assertEq(assetsDeposited, aliceDeposit + charlieDeposit);
+    }
+
+    function test_cancelDeposit_user_initiated_after_epoch_advance() public {
+        uint256 depositAmount = 100 ether;
+
+        // Alice deposits in epoch 0
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+
+        // Manager fulfills epoch 0, moving to epoch 1
+        vm.startPrank(Manager);
+        accountant.setNav(depositAmount);
+        vault.fulfillDeposits(depositAmount, "");
+        vm.stopPrank();
+
+        assertEq(vault.depositEpoch(), 1);
+
+        // Alice tries to cancel her epoch 0 deposit (should fail as epoch fulfilled)
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        // Nothing should happen as Alice has no deposit in epoch 1
+        assertEq(vault.queuedDeposit(Alice, 0), depositAmount); // Already fulfilled, funds are still queued
+        assertEq(vault.queuedDeposit(Alice, 1), 0); // No deposit in new epoch
+        vault.executeDeposit(Alice, 0);
+        assertEq(vault.queuedDeposit(Alice, 0), 0); // no funds in queue
+    }
+
+    function test_cancelDeposit_user_initiated_partial_epoch_state() public {
+        uint256 aliceDeposit = 100 ether;
+        uint256 bobDeposit = 200 ether;
+        uint256 charlieDeposit = 300 ether;
+
+        // Multiple deposits
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(aliceDeposit));
+        vm.prank(Bob);
+        vault.requestDeposit(uint128(bobDeposit));
+        vm.prank(Charlie);
+        vault.requestDeposit(uint128(charlieDeposit));
+
+        // Verify initial epoch state
+        (uint128 assetsDeposited, , ) = vault.depositEpochState(0);
+        assertEq(assetsDeposited, aliceDeposit + bobDeposit + charlieDeposit);
+
+        // Users cancel in sequence
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        (assetsDeposited, , ) = vault.depositEpochState(0);
+        assertEq(assetsDeposited, bobDeposit + charlieDeposit);
+
+        vm.prank(Charlie);
+        vault.cancelDeposit();
+
+        (assetsDeposited, , ) = vault.depositEpochState(0);
+        assertEq(assetsDeposited, bobDeposit);
+    }
+
+    function test_cancelDeposit_user_initiated_after_partial_fulfillment() public {
+        uint256 depositAmount = 100 ether;
+
+        // Alice deposits in epoch 0
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+
+        // Manager partially fulfills epoch 0
+        vm.startPrank(Manager);
+        accountant.setNav(200 ether);
+        vault.fulfillDeposits(60 ether, "");
+        vault.executeDeposit(Alice, 0);
+        vm.stopPrank();
+
+        // Alice executes her partial deposit
+
+        // Verify Alice has 40 ether moved to epoch 1
+        assertEq(vault.queuedDeposit(Alice, 1), 40 ether);
+
+        // Alice cancels her epoch 1 deposit
+        uint256 aliceBalanceBefore = token.balanceOf(Alice);
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        // Verify cancellation of epoch 1 deposit
+        assertEq(vault.queuedDeposit(Alice, 1), 0);
+        assertEq(token.balanceOf(Alice), aliceBalanceBefore + 40 ether);
+    }
+
+    function test_cancelDeposit_user_vs_manager_permissions() public {
+        uint256 aliceDeposit = 100 ether;
+        uint256 bobDeposit = 200 ether;
+
+        // Both users deposit
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(aliceDeposit));
+        vm.prank(Bob);
+        vault.requestDeposit(uint128(bobDeposit));
+
+        // Alice cannot cancel Bob's deposit with user function
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        // Bob's deposit should remain
+        assertEq(vault.queuedDeposit(Bob, 0), bobDeposit);
+        assertEq(vault.queuedDeposit(Alice, 0), 0);
+
+        // Manager can cancel Bob's deposit
+        vm.prank(Manager);
+        vault.cancelDeposit(Bob);
+
+        assertEq(vault.queuedDeposit(Bob, 0), 0);
+    }
+
+    function test_cancelDeposit_user_initiated_multiple_epochs() public {
+        // Alice deposits across multiple epochs
+        vm.prank(Alice);
+        vault.requestDeposit(100 ether);
+
+        // Advance epoch
+        vm.startPrank(Manager);
+        accountant.setNav(100 ether);
+        vault.fulfillDeposits(100 ether, "");
+        vm.stopPrank();
+
+        // Alice deposits in new epoch
+        vm.prank(Alice);
+        vault.requestDeposit(200 ether);
+
+        // Alice can only cancel current epoch deposit
+        uint256 aliceBalanceBefore = token.balanceOf(Alice);
+        assertEq(vault.queuedDeposit(Alice, 0), 100 ether);
+        assertEq(vault.queuedDeposit(Alice, 1), 200 ether);
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        assertEq(vault.queuedDeposit(Alice, 1), 0);
+        assertEq(token.balanceOf(Alice), aliceBalanceBefore + 200 ether);
+
+        // Previous epoch deposit remains fulfilled
+        assertEq(vault.balanceOf(Alice), 0);
+        vm.prank(Alice);
+        vault.executeDeposit(Alice, 0);
+        assertEq(vault.queuedDeposit(Alice, 0), 0);
+        assertEq(vault.balanceOf(Alice), 100 ether * 1000000);
+    }
+
+    function test_cancelDeposit_user_initiated_concurrent_operations() public {
+        // Test interaction with other operations happening simultaneously
+        uint256 depositAmount = 100 ether;
+
+        // Alice and Bob deposit
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+        vm.prank(Bob);
+        vault.requestDeposit(uint128(depositAmount));
+
+        // Alice cancels while Bob executes a new deposit
+        vm.prank(Alice);
+        vault.cancelDeposit();
+
+        vm.prank(Bob);
+        vault.requestDeposit(uint128(depositAmount)); // Bob deposits more
+
+        // Verify state consistency
+        assertEq(vault.queuedDeposit(Alice, 0), 0);
+        assertEq(vault.queuedDeposit(Bob, 0), depositAmount * 2);
+
+        (uint128 assetsDeposited, , ) = vault.depositEpochState(0);
+        assertEq(assetsDeposited, depositAmount * 2); // Only Bob's deposits
+    }
+
     function test_cancel_unfulfilled_withdrawal() public {
         // Setup: Multiple users to avoid division by zero
         vm.prank(Alice);
@@ -877,14 +1124,15 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         vault.requestWithdrawal(uint128(bobSharesToWithdraw));
 
         // Verify shares were burned and basis reduced proportionally
-        uint256 aliceSharesAfterRequest = vault.balanceOf(Alice);
         uint256 aliceBasisAfterRequest = vault.userBasis(Alice);
-        uint256 bobSharesAfterRequest = vault.balanceOf(Bob);
         uint256 bobBasisAfterRequest = vault.userBasis(Bob);
 
-        assertEq(aliceSharesAfterRequest, aliceSharesInitial - aliceSharesToWithdraw);
-        assertEq(bobSharesAfterRequest, bobSharesInitial - bobSharesToWithdraw);
-
+        {
+            uint256 aliceSharesAfterRequest = vault.balanceOf(Alice);
+            assertEq(aliceSharesAfterRequest, aliceSharesInitial - aliceSharesToWithdraw);
+            uint256 bobSharesAfterRequest = vault.balanceOf(Bob);
+            assertEq(bobSharesAfterRequest, bobSharesInitial - bobSharesToWithdraw);
+        }
         // Calculate expected basis after withdrawal request (allow for rounding)
         uint256 expectedAliceBasisAfterRequest = (aliceBasisInitial *
             (aliceSharesInitial - aliceSharesToWithdraw)) / aliceSharesInitial;
@@ -903,7 +1151,6 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
             1,
             "Bob's basis should be reduced proportionally"
         );
-
         // Check withdrawal queue state
         (uint128 aliceQueuedAmount, uint128 aliceQueuedBasis, ) = vault.queuedWithdrawal(Alice, 0);
         (uint128 bobQueuedAmount, uint128 bobQueuedBasis, ) = vault.queuedWithdrawal(Bob, 0);
@@ -911,13 +1158,16 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         assertEq(aliceQueuedAmount, aliceSharesToWithdraw);
         assertEq(bobQueuedAmount, bobSharesToWithdraw);
 
-        // The queued basis should be the withdrawn basis amount
-        uint256 expectedAliceQueuedBasis = aliceBasisInitial - aliceBasisAfterRequest;
-        uint256 expectedBobQueuedBasis = bobBasisInitial - bobBasisAfterRequest;
+        {
+            uint256 _a = aliceBasisInitial;
+            // The queued basis should be the withdrawn basis amount
+            uint256 expectedAliceQueuedBasis = _a - aliceBasisAfterRequest;
+            uint256 _b = bobBasisInitial;
+            uint256 expectedBobQueuedBasis = _b - bobBasisAfterRequest;
 
-        assertEq(aliceQueuedBasis, expectedAliceQueuedBasis);
-        assertEq(bobQueuedBasis, expectedBobQueuedBasis);
-
+            assertEq(aliceQueuedBasis, expectedAliceQueuedBasis);
+            assertEq(bobQueuedBasis, expectedBobQueuedBasis);
+        }
         // Manager cancels both withdrawals
         vm.startPrank(Manager);
         vault.cancelWithdrawal(Alice);
@@ -3840,277 +4090,6 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         assertEq(newAmount, originalAmount);
         assertEq(newBasis, originalBasis);
         assertFalse(shouldRedeposit);
-    }
-
-    // function test_complete_manager_integration_flow() public {
-    //     console2.log("=== Step 1: Deploy HypoVault with dummy manager ===");
-
-    //     address VaultOwner = address(0x1111);
-    //     address InitialManagerOwner = address(0x3333);
-    //     address Curator = address(0x4444);
-    //     address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
-
-    //     // Deploy HypoVault with dummy manager
-    //     vm.prank(VaultOwner);
-    //     HypoVault testVault = new HypoVault(
-    //         address(token),
-    //         VaultOwner,
-    //         IVaultAccountant(address(accountant)),
-    //         100, // 1% performance fee
-    //         "TEST_INTEGRATION",
-    //         "Test Integration Token"
-    //     );
-
-    //     // Alice already has tokens from setUp(), but needs to approve the new vault
-    //     vm.prank(Alice);
-    //     token.approve(address(testVault), type(uint256).max);
-
-    //     // Also approve for any other users you'll use in this test
-    //     vm.prank(Bob);
-    //     token.approve(address(testVault), type(uint256).max);
-
-    //     assertEq(testVault.manager(), VaultOwner);
-    //     assertEq(testVault.owner(), VaultOwner);
-
-    //     console2.log("=== Step 2: Deploy HypoVaultManagerWithMerkleVerification ===");
-
-    //     // Deploy the real manager (msg.sender becomes owner automatically)
-    //     HypoVaultManagerWithMerkleVerification vaultManager = new HypoVaultManagerWithMerkleVerification(
-    //             InitialManagerOwner, // owner
-    //             address(testVault), // hypovault
-    //             BalancerVault // balancerVault
-    //         );
-
-    //     assertEq(address(vaultManager.vault()), address(testVault));
-    //     assertEq(vaultManager.owner(), InitialManagerOwner);
-
-    //     console2.log("=== Step 3: Set vault manager as the actual manager ===");
-
-    //     vm.prank(VaultOwner);
-    //     testVault.setManager(address(vaultManager));
-    //     assertEq(testVault.manager(), address(vaultManager));
-
-    //     console2.log("=== Step 4: Set up Merkle root for curator ===");
-
-    //     // Create a mock target for testing manage calls
-    //     MockTarget manageTarget = new MockTarget();
-
-    //     // Create merkle tree with allowed targets and function calls
-    //     bytes memory targetCalldata = abi.encodeWithSignature("simpleFunction(uint256)", 12345);
-    //     NoopDecoder decoder = new NoopDecoder();
-    //     // Call the decoder to get the exact same output
-    //     (bool success, bytes memory returnData) = address(decoder).staticcall(targetCalldata);
-    //     bytes memory packedArgumentAddresses = abi.decode(returnData, (bytes));
-    //     uint256 valueToSend = 0.5 ether;
-    //     bool valueNonZero = valueToSend > 0; // This should be true
-    //     bytes32 leaf = keccak256(
-    //         abi.encodePacked(
-    //             address(decoder),
-    //             address(manageTarget),
-    //             valueNonZero, // valueNonZero (we send 0.5 ether later on)
-    //             bytes4(targetCalldata), // selector for simpleFunction
-    //             packedArgumentAddresses // packedArgumentAddresses (should be empty - the decoder always returns empty)
-    //         )
-    //     );
-    //     bytes32 merkleRoot = leaf;
-
-    //     // Set the manage root for the curator - manager may call manageTarget with targetCalldata
-    //     vm.prank(InitialManagerOwner);
-    //     vaultManager.setManageRoot(Curator, merkleRoot);
-    //     assertEq(vaultManager.manageRoot(Curator), merkleRoot);
-
-    //     console2.log("=== Step 5: Set up AccessManager and grant curator permissions ===");
-
-    //     // Deploy AccessManager
-    //     vm.prank(InitialManagerOwner);
-    //     AccessManager accessManager = new AccessManager(InitialManagerOwner);
-
-    //     // Set AccessManager as authority
-    //     vm.prank(InitialManagerOwner);
-    //     vaultManager.setAuthority(Authority(address(accessManager)));
-    //     assertEq(address(vaultManager.authority()), address(accessManager));
-
-    //     // Grant curator role
-    //     uint64 CURATOR_ROLE = 1;
-    //     vm.prank(InitialManagerOwner);
-    //     accessManager.grantRole(CURATOR_ROLE, Curator, 0); // 0 = no delay
-
-    //     // Set permissions for curator role to call manager functions
-    //     bytes4[] memory selectors = new bytes4[](4);
-    //     selectors[0] = HypoVaultManagerWithMerkleVerification.fulfillDeposits.selector;
-    //     selectors[1] = HypoVaultManagerWithMerkleVerification.fulfillWithdrawals.selector;
-    //     selectors[2] = HypoVaultManagerWithMerkleVerification.cancelDeposit.selector;
-    //     selectors[3] = bytes4(
-    //         keccak256(
-    //             "manageVaultWithMerkleVerification(bytes32[][],address[],address[],bytes[],uint256[])"
-    //         )
-    //     );
-
-    //     vm.prank(InitialManagerOwner);
-    //     accessManager.setTargetFunctionRole(address(vaultManager), selectors, CURATOR_ROLE);
-
-    //     // Verify access manager setup
-    //     (bool canCall, ) = accessManager.canCall(
-    //         Curator,
-    //         address(vaultManager),
-    //         HypoVaultManagerWithMerkleVerification.fulfillDeposits.selector
-    //     );
-    //     assertTrue(canCall);
-
-    //     console2.log("=== Step 6: Test curator can fulfill deposits ===");
-
-    //     // Alice requests a deposit
-    //     vm.prank(Alice);
-    //     testVault.requestDeposit(100 ether);
-
-    //     assertEq(token.balanceOf(address(testVault)), 100 ether);
-    //     assertEq(testVault.queuedDeposit(Alice, 0), 100 ether);
-
-    //     // Curator fulfills deposits via the manager
-    //     accountant.setExpectedVault(address(testVault));
-    //     accountant.setNav(100 ether);
-
-    //     vm.prank(Curator);
-    //     vaultManager.fulfillDeposits(100 ether, "");
-
-    //     // Check deposit was fulfilled
-    //     assertEq(testVault.depositEpoch(), 1);
-    //     (uint128 assetsDeposited, , uint128 assetsFulfilled) = testVault.depositEpochState(0);
-    //     assertEq(assetsDeposited, 100 ether);
-    //     assertEq(assetsFulfilled, 100 ether);
-
-    //     console2.log("=== Step 7: Execute deposit and test withdrawals ===");
-
-    //     testVault.executeDeposit(Alice, 0);
-    //     uint256 aliceShares = testVault.balanceOf(Alice);
-    //     assertGt(aliceShares, 0);
-
-    //     // Alice requests withdrawal
-    //     vm.prank(Alice);
-    //     testVault.requestWithdrawal(uint128(aliceShares / 2));
-
-    //     // Curator fulfills withdrawals
-    //     vm.prank(Curator);
-    //     vaultManager.fulfillWithdrawals(aliceShares / 2, 50 ether, "");
-
-    //     // Execute withdrawal
-    //     uint256 aliceBalanceBefore = token.balanceOf(Alice);
-    //     testVault.executeWithdrawal(Alice, 0);
-    //     assertGt(token.balanceOf(Alice), aliceBalanceBefore);
-
-    //     console2.log("=== Step 8: Test arbitrary manage calls with Merkle verification ===");
-    //     vm.deal(address(testVault), 1 ether); // Fund vault for the call
-
-    //     // Prepare arrays for the new function signature
-    //     bytes32[][] memory manageProofs = new bytes32[][](1);
-    //     manageProofs[0] = new bytes32[](0); // Empty proof for single-leaf tree
-
-    //     address[] memory decodersAndSanitizers = new address[](1);
-    //     decodersAndSanitizers[0] = address(decoder);
-
-    //     address[] memory targets = new address[](1);
-    //     targets[0] = address(manageTarget);
-
-    //     bytes[] memory targetDatas = new bytes[](1);
-    //     targetDatas[0] = targetCalldata;
-
-    //     uint256[] memory values = new uint256[](1);
-    //     values[0] = 0.5 ether;
-
-    //     uint256 vaultEthBefore = address(testVault).balance;
-    //     vm.prank(Curator);
-    //     vaultManager.manageVaultWithMerkleVerification(
-    //         manageProofs,
-    //         decodersAndSanitizers,
-    //         targets,
-    //         targetDatas,
-    //         values
-    //     );
-
-    //     // Verify the target was called correctly
-    //     assertTrue(manageTarget.wasCalled());
-    //     assertEq(manageTarget.value(), 12345);
-    //     assertEq(manageTarget.lastCaller(), address(testVault));
-    //     assertEq(manageTarget.lastValue(), 0.5 ether);
-    //     assertEq(address(testVault).balance, vaultEthBefore - 0.5 ether, "Vault ETH debited");
-
-    //     console2.log("=== Step 9: Test unauthorized access fails ===");
-    //     // Try to call without proper authorization
-    //     vm.prank(Bob);
-    //     vm.expectRevert();
-    //     vaultManager.fulfillDeposits(0, "");
-
-    //     // Try to call manage without authorization (should revert via authority)
-    //     vm.prank(Bob);
-    //     vm.expectRevert();
-    //     vaultManager.manageVaultWithMerkleVerification(
-    //         manageProofs,
-    //         decodersAndSanitizers,
-    //         targets,
-    //         targetDatas,
-    //         values
-    //     );
-
-    //     // Try to call from permissioned account, but with invalid merkle proof
-    //     bytes32[][] memory invalidProofs = new bytes32[][](1);
-    //     invalidProofs[0] = new bytes32[](1);
-    //     invalidProofs[0][0] = bytes32(uint256(0x1234));
-
-    //     vm.prank(Curator);
-    //     vm.expectRevert();
-    //     vaultManager.manageVaultWithMerkleVerification(
-    //         invalidProofs, // swap in bad proof
-    //         decodersAndSanitizers, // reuse from above
-    //         targets, // reuse from above
-    //         targetDatas, // reuse from above
-    //         values // reuse from above
-    //     );
-
-    //     console2.log("=== Integration test completed successfully! ===");
-    // }
-
-    function createDefaultPools() internal returns (PanopticVaultAccountant.PoolInfo[] memory) {
-        int24 TWAP_TICK = 100;
-        int24 MAX_PRICE_DEVIATION = 1700000; // basically no price deviation check for test
-        uint32 TWAP_WINDOW = 600; // 10 minutes
-        // TODO: use real sepolia oracles
-        MockV3CompatibleOracle poolOracle;
-        MockV3CompatibleOracle oracle0;
-        MockV3CompatibleOracle oracle1;
-        poolOracle = new MockV3CompatibleOracle();
-        oracle0 = new MockV3CompatibleOracle();
-        oracle1 = new MockV3CompatibleOracle();
-
-        address token0 = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14; // sepolia weth9
-        address token1 = 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A; // sepolia mock USDC
-        address wethUsdc500bpsV3PanopticPool = 0x00002c1c2EF3E4b606F8361d975Cdc2834668e9F;
-
-        PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
-        pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: PanopticPool(wethUsdc500bpsV3PanopticPool),
-            token0: IERC20Partial(token0),
-            token1: IERC20Partial(token1),
-            poolOracle: poolOracle,
-            oracle0: oracle0,
-            isUnderlyingToken0InOracle0: false,
-            oracle1: oracle1,
-            isUnderlyingToken0InOracle1: false,
-            maxPriceDeviation: MAX_PRICE_DEVIATION,
-            twapWindow: TWAP_WINDOW
-        });
-        return pools;
-    }
-}
-
-contract NoopDecoder {
-    fallback() external {
-        // Return empty bytes, ABI-encoded as a single dynamic bytes (offset=0x20, length=0)
-        assembly {
-            let ptr := mload(0x40)
-            mstore(ptr, 0x20) // offset to data
-            mstore(add(ptr, 0x20), 0) // length of bytes (0)
-            return(ptr, 0x40) // return 64 bytes total
-        }
     }
 }
 
