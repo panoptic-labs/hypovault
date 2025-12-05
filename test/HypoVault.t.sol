@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "forge-std/console2.sol";
+import "../src/HypoVaultFactory.sol";
 import "../src/HypoVault.sol";
 import {ERC20S} from "lib/panoptic-v1.1/test/foundry/testUtils/ERC20S.sol";
 import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
@@ -81,6 +82,7 @@ contract MockTarget {
 
 contract HypoVaultTest is Test {
     VaultAccountantMock public accountant;
+    HypoVaultFactory public vaultFactory;
     HypoVault public vault;
     ERC20S public token;
 
@@ -144,17 +146,28 @@ contract HypoVaultTest is Test {
     function setUp() public {
         accountant = new VaultAccountantMock();
         token = new ERC20S("Test Token", "TEST", 18);
-        vault = new HypoVault(
-            address(token),
-            Manager,
-            IVaultAccountant(address(accountant)),
-            100,
-            "TEST",
-            "Test Token"
-        ); // 1% performance fee
+
+        address implementation = address(new HypoVault());
+
+        vaultFactory = new HypoVaultFactory(implementation);
+
+        vault = HypoVault(
+            payable(
+                vaultFactory.createVault(
+                    address(token),
+                    Manager,
+                    IVaultAccountant(address(accountant)),
+                    100, // 1% performance fee
+                    "TEST",
+                    "Test Token",
+                    keccak256("test-vault-salt")
+                )
+            )
+        );
         accountant.setExpectedVault(address(vault));
 
         // Set fee wallet
+        vm.prank(Manager);
         vault.setFeeWallet(FeeWallet);
 
         // Mint tokens and approve vault for all users
@@ -179,6 +192,27 @@ contract HypoVaultTest is Test {
         assertEq(vault.totalSupply(), BOOTSTRAP_SHARES);
         assertEq(vault.depositEpoch(), 0);
         assertEq(vault.withdrawalEpoch(), 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                             DEPLOYMENT
+    //////////////////////////////////////////////////////////////*/
+
+    function test_duplicateVaultSaltDeploymentReverts() public {
+        vm.expectRevert();
+        HypoVault duplicateVault = HypoVault(
+            payable(
+                vaultFactory.createVault(
+                    address(token),
+                    Manager,
+                    IVaultAccountant(address(accountant)),
+                    100, // 1% performance fee
+                    "TEST",
+                    "Test Token",
+                    keccak256("test-vault-salt")
+                )
+            )
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -1206,10 +1240,12 @@ contract HypoVaultTest is Test {
 
         vm.stopPrank();
 
-        // Test that owner can call these functions
+        // Test that owner can call these functions (initial owner is manager arg in HypoVault creation)
+        vm.startPrank(Manager);
         vault.setManager(Alice);
         vault.setAccountant(IVaultAccountant(address(accountant)));
         vault.setFeeWallet(Alice);
+        vm.stopPrank();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -2463,29 +2499,48 @@ contract HypoVaultTest is Test {
         ERC20S token8 = new ERC20S("8 Decimal Token", "T8", 8);
         ERC20S token12 = new ERC20S("12 Decimal Token", "T12", 12);
 
-        HypoVault vault6 = new HypoVault(
-            address(token6),
-            Manager,
-            IVaultAccountant(address(accountant)),
-            100,
-            "V6",
-            "6 Decimal Vault"
+        bytes32 salt6 = keccak256("vault-6-decimals");
+        bytes32 salt8 = keccak256("vault-8-decimals");
+        bytes32 salt12 = keccak256("vault-12-decimals");
+
+        HypoVault vault6 = HypoVault(
+            payable(
+                vaultFactory.createVault(
+                    address(token6),
+                    Manager,
+                    IVaultAccountant(address(accountant)),
+                    100,
+                    "V6",
+                    "6 Decimal Vault",
+                    salt6
+                )
+            )
         );
-        HypoVault vault8 = new HypoVault(
-            address(token8),
-            Manager,
-            IVaultAccountant(address(accountant)),
-            100,
-            "V8",
-            "8 Decimal Vault"
+        HypoVault vault8 = HypoVault(
+            payable(
+                vaultFactory.createVault(
+                    address(token8),
+                    Manager,
+                    IVaultAccountant(address(accountant)),
+                    100,
+                    "V8",
+                    "8 Decimal Vault",
+                    salt8
+                )
+            )
         );
-        HypoVault vault12 = new HypoVault(
-            address(token12),
-            Manager,
-            IVaultAccountant(address(accountant)),
-            100,
-            "V12",
-            "12 Decimal Vault"
+        HypoVault vault12 = HypoVault(
+            payable(
+                vaultFactory.createVault(
+                    address(token12),
+                    Manager,
+                    IVaultAccountant(address(accountant)),
+                    100,
+                    "V12",
+                    "12 Decimal Vault",
+                    salt12
+                )
+            )
         );
 
         assertEq(vault6.decimals(), 6, "6-decimal vault should return 6 decimals");
@@ -2495,13 +2550,18 @@ contract HypoVaultTest is Test {
 
     function test_decimals_with_non_standard_token() public {
         MockTokenWithoutDecimals badToken = new MockTokenWithoutDecimals();
-        HypoVault vaultBad = new HypoVault(
-            address(badToken),
-            Manager,
-            IVaultAccountant(address(accountant)),
-            100,
-            "VB",
-            "Bad Token Vault"
+        HypoVault vaultBad = HypoVault(
+            payable(
+                vaultFactory.createVault(
+                    address(badToken),
+                    Manager,
+                    IVaultAccountant(address(accountant)),
+                    100,
+                    "VB",
+                    "Bad Token Vault",
+                    keccak256("bad-token-vault")
+                )
+            )
         );
 
         assertEq(vaultBad.decimals(), 0, "Vault should return 0 decimals for non-standard token");
@@ -2807,13 +2867,18 @@ contract HypoVaultTest is Test {
         vm.stopPrank();
 
         // Create new vault for comparison
-        HypoVault vault2 = new HypoVault(
-            address(token),
-            Manager,
-            IVaultAccountant(address(accountant)),
-            100,
-            "TEST2",
-            "Test Token 2"
+        HypoVault vault2 = HypoVault(
+            payable(
+                vaultFactory.createVault(
+                    address(token),
+                    Manager,
+                    IVaultAccountant(address(accountant)),
+                    100,
+                    "TEST2",
+                    "Test Token 2",
+                    keccak256("test-token-2-vault")
+                )
+            )
         );
         accountant.setExpectedVault(address(vault2));
 

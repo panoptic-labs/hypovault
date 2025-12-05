@@ -1,0 +1,17 @@
+{
+  "lib/boring-vault": {
+    "rev": "3cabfd773de18ddf9363d74512390e3f9b032ed9"
+  },
+  "lib/openzeppelin-contracts-upgradeable": {
+    "tag": {
+      "name": "v5.5.0",
+      "rev": "aa677e9d28ed78fc427ec47ba2baef2030c58e7c"
+    }
+  },
+  "lib/panoptic-v1.1": {
+    "branch": {
+      "name": "v1.1.x",
+      "rev": "1b8cb9fc51ad0befd23edcd1a0c9bc5f59cccf41"
+    }
+  }
+}

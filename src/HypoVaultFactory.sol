@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {HypoVault} from "./HypoVault.sol";
 import {IVaultAccountant} from "./interfaces/IVaultAccountant.sol";
+import "lib/boring-vault/lib/openzeppelin-contracts/contracts/proxy/Clones.sol";
 
 /// @title HypoVault Factory
 /// @author Axicon Labs Limited
@@ -31,8 +32,20 @@ contract HypoVaultFactory {
     );
 
     /*//////////////////////////////////////////////////////////////
+                                STORAGE
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Reference implementation of the `HypoVault` to clone.
+    address public immutable hypoVaultReference;
+
+    /*//////////////////////////////////////////////////////////////
                                FACTORY LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Initializes the factory with a HypoVault implementation
+    /// @param _hypoVaultReference The address of the HypoVault implementation contract
+    constructor(address _hypoVaultReference) {
+        hypoVaultReference = _hypoVaultReference;
+    }
 
     /// @notice Creates a new HypoVault instance.
     /// @param underlyingToken The token used to denominate deposits and withdrawals
@@ -48,10 +61,18 @@ contract HypoVaultFactory {
         IVaultAccountant accountant,
         uint256 performanceFeeBps,
         string memory symbol,
-        string memory name
-    ) external returns (address vault) {
-        vault = address(
-            new HypoVault(underlyingToken, manager, accountant, performanceFeeBps, symbol, name)
+        string memory name,
+        bytes32 salt
+    ) external returns (address payable vault) {
+        vault = payable(Clones.cloneDeterministic(hypoVaultReference, salt));
+
+        HypoVault(vault).initialize(
+            underlyingToken,
+            manager,
+            accountant,
+            performanceFeeBps,
+            symbol,
+            name
         );
 
         emit VaultCreated(
