@@ -157,14 +157,22 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
     function setUp() public {
         accountant = new VaultAccountantMock();
         token = new ERC20S("Test Token", "TEST", 18);
-        vault = new HypoVault(
-            address(token),
-            Manager,
-            IVaultAccountant(address(accountant)),
-            100,
-            "TEST",
-            "Test Token"
-        ); // 1% performance fee
+
+        address implementation = address(new HypoVault());
+        HypoVaultFactory factory = new HypoVaultFactory(implementation);
+        vault = HypoVault(
+            payable(
+                factory.createVault(
+                    address(token),
+                    Manager,
+                    IVaultAccountant(address(accountant)),
+                    100, // 1% performance fee
+                    "TEST",
+                    "Test Token",
+                    keccak256("test-vault-salt")
+                )
+            )
+        );
         accountant.setExpectedVault(address(vault));
 
         // Set fee wallet
@@ -452,7 +460,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
 
         // Vault
         // need to create new factory to link new HypoVault bytecode
-        HypoVaultFactory factory = new HypoVaultFactory();
+        address implementation = address(new HypoVault());
+        HypoVaultFactory factory = new HypoVaultFactory(implementation);
         uint256 performanceFeeBps = 1000; // 10%
         HypoVault wethPlpVault = HypoVault(
             payable(
@@ -462,7 +471,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
                     IVaultAccountant(address(panopticVaultAccountant)),
                     performanceFeeBps,
                     "povLendWETH",
-                    "Panoptic Lend Vault | WETH"
+                    "Panoptic Lend Vault | WETH",
+                    keccak256("test-vault-salt")
                 )
             )
         );

@@ -178,44 +178,46 @@ contract PanopticVaultAccountant is Ownable {
 
             if (address(pools[i].token0) == address(0))
                 pools[i].token0 = IERC20Partial(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
-
-            bool skipToken0 = false;
-            bool skipToken1 = false;
-
-            // optimized for small number of pools
-            for (uint256 j = 0; j < underlyingTokens.length; j++) {
-                if (underlyingTokens[j] == address(pools[i].token0)) skipToken0 = true;
-                if (underlyingTokens[j] == address(pools[i].token1)) skipToken1 = true;
-
-                if (underlyingTokens[j] == address(0)) {
-                    if (!skipToken0) underlyingTokens[j] = address(pools[i].token0);
-                    // ensure a gap is not created in the underlyingTokens array
-                    if (!skipToken1)
-                        underlyingTokens[j + (skipToken0 ? 0 : 1)] = address(pools[i].token1);
-                    break;
-                }
-            }
-
             uint256 token0Exposure;
             uint256 token1Exposure;
 
-            if (!skipToken0)
-                token0Exposure = address(pools[i].token0) ==
-                    address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)
-                    ? address(_vault).balance
-                    : pools[i].token0.balanceOf(_vault);
-            if (!skipToken1) token1Exposure = pools[i].token1.balanceOf(_vault);
+            {
+                bool skipToken0 = false;
+                bool skipToken1 = false;
 
-            uint256 collateralBalance = pools[i].pool.collateralToken0().balanceOf(_vault);
-            poolExposure0 += int256(
-                pools[i].pool.collateralToken0().previewRedeem(collateralBalance)
-            );
+                // optimized for small number of pools
+                for (uint256 j = 0; j < underlyingTokens.length; j++) {
+                    if (underlyingTokens[j] == address(pools[i].token0)) skipToken0 = true;
+                    if (underlyingTokens[j] == address(pools[i].token1)) skipToken1 = true;
 
-            collateralBalance = pools[i].pool.collateralToken1().balanceOf(_vault);
-            poolExposure1 += int256(
-                pools[i].pool.collateralToken1().previewRedeem(collateralBalance)
-            );
+                    if (underlyingTokens[j] == address(0)) {
+                        if (!skipToken0) underlyingTokens[j] = address(pools[i].token0);
+                        // ensure a gap is not created in the underlyingTokens array
+                        if (!skipToken1)
+                            underlyingTokens[j + (skipToken0 ? 0 : 1)] = address(pools[i].token1);
+                        break;
+                    }
+                }
 
+                {
+                    if (!skipToken0)
+                        token0Exposure = address(pools[i].token0) ==
+                            address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)
+                            ? address(_vault).balance
+                            : pools[i].token0.balanceOf(_vault);
+                    if (!skipToken1) token1Exposure = pools[i].token1.balanceOf(_vault);
+
+                    uint256 collateralBalance = pools[i].pool.collateralToken0().balanceOf(_vault);
+                    poolExposure0 += int256(
+                        pools[i].pool.collateralToken0().previewRedeem(collateralBalance)
+                    );
+
+                    collateralBalance = pools[i].pool.collateralToken1().balanceOf(_vault);
+                    poolExposure1 += int256(
+                        pools[i].pool.collateralToken1().previewRedeem(collateralBalance)
+                    );
+                }
+            }
             // convert position & token values to underlying
             if (address(pools[i].token0) != underlyingToken) {
                 int24 conversionTick = PanopticMath.twapFilter(

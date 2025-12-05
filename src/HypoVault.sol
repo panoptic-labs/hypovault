@@ -10,7 +10,9 @@ import {IVaultAccountant} from "./interfaces/IVaultAccountant.sol";
 import {ERC721Holder} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC721/utils/ERC721Holder.sol";
 import {ERC1155Holder} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import {Multicall} from "lib/panoptic-v1.1/contracts/base/Multicall.sol";
-import {Ownable} from "lib/boring-vault/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import {Initializable} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
+
 // Libraries
 import {Address} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/utils/Address.sol";
 import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
@@ -18,7 +20,7 @@ import {SafeTransferLib} from "lib/panoptic-v1.1/contracts/libraries/SafeTransfe
 
 /// @author Axicon Labs Limited
 /// @notice A vault in which a manager allocates assets deposited by users and distributes profits asynchronously.
-contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Holder {
+contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder, ERC1155Holder {
     using Math for uint256;
     using Address for address;
     /*//////////////////////////////////////////////////////////////
@@ -161,10 +163,10 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Token used to denominate deposits and withdrawals.
-    address public immutable underlyingToken;
+    address public underlyingToken;
 
     /// @notice Performance fee, in basis points, taken on each profitable withdrawal.
-    uint256 public immutable performanceFeeBps;
+    uint256 public performanceFeeBps;
 
     /// @notice Symbol of the share token.
     string public symbol;
@@ -206,6 +208,11 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @notice Records the cost basis of a user's shares for the purpose of calculating performance fees.
     mapping(address user => uint256 basis) public userBasis;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /// @notice Initializes the vault.
     /// @param _underlyingToken The token used to denominate deposits and withdrawals.
     /// @param _manager The account authorized to execute deposits, withdrawals, and make arbitrary function calls from the vault.
@@ -213,14 +220,16 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @param _performanceFeeBps The performance fee, in basis points, taken on each profitable withdrawal.
     /// @param _symbol The symbol of the share token.
     /// @param _name The name of the share token.
-    constructor(
+    function initialize(
         address _underlyingToken,
         address _manager,
         IVaultAccountant _accountant,
         uint256 _performanceFeeBps,
         string memory _symbol,
         string memory _name
-    ) Ownable(_manager) {
+    ) external initializer {
+        __Ownable_init(_manager);
+
         underlyingToken = _underlyingToken;
         manager = _manager;
         accountant = _accountant;
@@ -353,6 +362,23 @@ contract HypoVault is ERC20Minimal, Multicall, Ownable, ERC721Holder, ERC1155Hol
     /// @dev If deposited funds in previous epochs have not been completely fulfilled, the manager can execute those deposits to move the unfulfilled amount to the current epoch.
     /// @param depositor The address that requested the deposit
     function cancelDeposit(address depositor) external onlyManager {
+        _cancelDeposit(depositor);
+    }
+
+    /// @notice Cancels the caller's deposit in the current (unfulfilled) epoch.
+    /// @dev If prior-epoch deposits exist, anyone may call executeDeposit(user, epoch) to advance
+    ///      that epoch; any unfulfilled remainder rolls forward to epoch+1 (repeat as needed).
+    function cancelDeposit() external {
+        _cancelDeposit(msg.sender);
+    }
+
+    /// @notice Internal logic to cancel a deposit for the current, unfulfilled epoch.
+    /// @dev This function retrieves the depositor's queued amount for the current
+    /// deposit epoch, sets it to zero, and decrements the total assets
+    /// deposited in that epoch's state. It then transfers the token
+    /// amount back to the depositor.
+    /// @param depositor The address of the user whose deposit is being cancelled.
+    function _cancelDeposit(address depositor) internal {
         uint256 currentEpoch = depositEpoch;
 
         uint256 queuedDepositAmount = queuedDeposit[depositor][currentEpoch];
