@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
-import {CollateralTrackerDecoderAndSanitizer} from "../../src/DecodersAndSanitizers/CollateralTrackerDecoderAndSanitizer.sol";
+import {CollateralTrackerDecoderAndSanitizer} from "../src/DecodersAndSanitizers/CollateralTrackerDecoderAndSanitizer.sol";
 
 /// @title CollateralTrackerDecoderAndSanitizer Deploy Script
 /// @notice Script to deploy the CollateralTrackerDecoderAndSanitizer contract
