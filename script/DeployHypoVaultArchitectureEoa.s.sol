@@ -11,8 +11,8 @@ import {DeployHypoVault} from "./helpers/DeployHypoVault.sol";
 // Intended to be run from an EOA using vm.startBroadcast/stopBroadcast
 contract DeployHypoVaultArchitectureEoa is DeployHypoVault {
     // CREATE2 salt
-    bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v7"));
-
+    bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v6"));
+    
     IERC20Partial sepoliaWeth = IERC20Partial(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
 
     function run() public {
