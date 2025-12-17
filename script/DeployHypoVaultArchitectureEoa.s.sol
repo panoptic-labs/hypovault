@@ -57,8 +57,20 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         console.log("Accountant Address:", accountantAddress);
 
         // 4. Deploy HypoVault via Factory
+        deployVault(address(vaultFactory), address(accountant));
+
+        vm.stopBroadcast();
+
+        // TODO: be mindful msg sender is deployer still. transfer deployership if necessary
+    }
+
+    function deployVault(
+        address vaultFactory,
+        address accountantAddress
+    ) internal {
+        // 1. Deploy HypoVault via Factory
         uint256 performanceFeeBps = 1000; // 10%
-        address wethPlpVaultAddress = vaultFactory.createVault(
+        address wethPlpVaultAddress = HypoVaultFactory(vaultFactory).createVault(
             address(sepoliaWeth),
             deployer,
             IVaultAccountant(accountantAddress),
@@ -70,22 +82,22 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         HypoVault wethPlpVault = HypoVault(payable(wethPlpVaultAddress));
         console.log("wethPlpVaultAddress: ", wethPlpVaultAddress);
 
-        // 5. Set Fee Wallet
+        // 2. Set Fee Wallet
         wethPlpVault.setFeeWallet(TurnkeyAccount0);
         console.log("Set fee wallet to:", TurnkeyAccount0);
 
-        // 6. Deploy HypoVaultManagerWithMerkleVerification with CREATE2
+        // 3. Deploy HypoVaultManagerWithMerkleVerification with CREATE2
         HypoVaultManagerWithMerkleVerification manager = new HypoVaultManagerWithMerkleVerification{
             salt: salt
         }(deployer, address(wethPlpVault), BalancerVaultAddr);
         address managerAddress = address(manager);
         console.log("Manager Address:", managerAddress);
 
-        // 7. Set HypoVault manager
+        // 4. Set HypoVault manager
         wethPlpVault.setManager(managerAddress);
         console.log("Manager set on vault");
 
-        // 8. Deploy CollateralTrackerDecoderAndSanitizer with CREATE2
+        // 5. Deploy CollateralTrackerDecoderAndSanitizer with CREATE2
         address wethUsdc500bpsV3Collateral0 = 0x1AF0D98626d53397BA5613873D3b19cc25235d52;
         CollateralTrackerDecoderAndSanitizer decoder = new CollateralTrackerDecoderAndSanitizer{
             salt: salt
@@ -97,7 +109,7 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
             collateralTrackerDecoderAndSanitizer
         );
 
-        // 9. Build merkle tree for manage operations
+        // 6. Build merkle tree for manage operations
         setSourceChainName(sepolia);
         setAddress(false, sepolia, "boringVault", address(wethPlpVault));
         setAddress(false, sepolia, "managerAddress", managerAddress);
@@ -120,26 +132,26 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         console.log("Generated manageRoot:");
         console.logBytes32(manageRoot);
 
-        // 10. Set manageRoot for both multisig and turnkey
+        // 7. Set manageRoot for both multisig and turnkey
         manager.setManageRoot(PanopticMultisig, manageRoot);
         manager.setManageRoot(TurnkeyAccount0, manageRoot);
         console.log("ManageRoot set for multisig and turnkey");
 
-        // 11. Deploy and configure RolesAuthority with CREATE2
+        // 8. Deploy and configure RolesAuthority with CREATE2
         RolesAuthority authority = new RolesAuthority{salt: salt}(deployer, Authority(address(0)));
         address authorityAddress = address(authority);
         console.log("RolesAuthority Address:", authorityAddress);
 
-        // 12. Set RolesAuthority as authority on HypoVaultManagerWithMerkleVerification
+        // 9. Set RolesAuthority as authority on HypoVaultManagerWithMerkleVerification
         manager.setAuthority(Authority(authorityAddress));
         console.log("Authority set on manager");
 
-        // 13. Grant STRATEGIST_ROLE to TurnkeyAccount0
+        // 10. Grant STRATEGIST_ROLE to TurnkeyAccount0
         uint8 STRATEGIST_ROLE = 7;
         authority.setUserRole(TurnkeyAccount0, STRATEGIST_ROLE, true);
         console.log("STRATEGIST_ROLE granted to:", TurnkeyAccount0);
 
-        // 14. Set abilities/capabilities for STRATEGIST_ROLE
+        // 11. Set abilities/capabilities for STRATEGIST_ROLE
         bytes4[] memory strategistSelectors = new bytes4[](4);
         strategistSelectors[0] = HypoVaultManagerWithMerkleVerification.fulfillDeposits.selector;
         strategistSelectors[1] = HypoVaultManagerWithMerkleVerification.fulfillWithdrawals.selector;
@@ -159,28 +171,15 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         }
         console.log("STRATEGIST_ROLE capabilities set");
 
-        // 15. Update PanopticVaultAccountant pools hash for vault
+        // 12. Update PanopticVaultAccountant pools hash for vault
         PanopticVaultAccountant.PoolInfo[] memory poolInfos = createPanopticAccountantPoolInfos();
         _writePoolInfosToJson(address(wethPlpVault), poolInfos);
         bytes32 poolInfosHash = keccak256(abi.encode(poolInfos));
         console.log("Generated poolInfosHash:");
         console.logBytes32(poolInfosHash);
 
-        accountant.updatePoolsHash(address(wethPlpVault), poolInfosHash);
+        PanopticVaultAccountant(accountantAddress).updatePoolsHash(address(wethPlpVault), poolInfosHash);
         console.log("Pools hash updated");
-
-        vm.stopBroadcast();
-
-        console.log("=== Deployment Complete ===");
-        console.log("HypoVault Implementation:", hypoVaultImplAddress);
-        console.log("Factory:", vaultFactoryAddress);
-        console.log("Accountant:", accountantAddress);
-        console.log("Vault:", wethPlpVaultAddress);
-        console.log("Manager:", managerAddress);
-        console.log("DecoderAndSantizer:", collateralTrackerDecoderAndSanitizer);
-        console.log("Authority:", authorityAddress);
-
-        // TODO: be mindful msg sender is deployer still. transfer deployership if necessary
     }
 
     // TODO: Use safe tick price deviation!
