@@ -151,6 +151,14 @@ contract DeployHypoVault is Script, MerkleTreeHelper {
 
         PanopticVaultAccountant(accountantAddress).updatePoolsHash(address(vault), poolInfosHash);
         console.log("Pools hash updated");
+
+        // 13. Transfer ownership to multisig
+        console.log("=== Transferring Ownership to Multisig ===");
+        vault.transferOwnership(PanopticMultisig);
+        console.log("Vault ownership transferred to:", PanopticMultisig);
+
+        manager.transferOwnership(PanopticMultisig);
+        console.log("Manager ownership transferred to:", PanopticMultisig);
     }
 
     // TODO: Use safe tick price deviation!

@@ -9,8 +9,8 @@ import {console} from "forge-std/console.sol";
 
 contract DeployUSDCVault is DeployHypoVault {
     // Addresses from the initial deployment
-    address constant FACTORY_ADDRESS = address(0xAC387fD49d0031529235dEf909C70522AD7655b6);
-    address constant ACCOUNTANT_ADDRESS = address(0xb50E60c7f2c57735C48166a612143649Cd143e49);
+    address constant FACTORY_ADDRESS = address(0x6305aacd3d046B09bf991314031c59B1EFEEE12B);
+    address constant ACCOUNTANT_ADDRESS = address(0x4d05d5396D13E40B1b868BfF883696A45682ca9B);
 
     bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v6-usdc"));
 
