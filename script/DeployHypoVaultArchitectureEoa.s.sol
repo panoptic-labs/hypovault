@@ -33,8 +33,6 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
     bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v6"));
 
     function run() public {
-        address owner = msg.sender;
-
         console.log("=== Deployer Address ===");
         console.log("Deployer:", deployer);
 
@@ -53,7 +51,7 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         console.log("Factory Address:", vaultFactoryAddress);
 
         // 3. Deploy new Accountant with CREATE2
-        PanopticVaultAccountant accountant = new PanopticVaultAccountant{salt: salt}(owner);
+        PanopticVaultAccountant accountant = new PanopticVaultAccountant{salt: salt}(deployer);
         address accountantAddress = address(accountant);
         console.log("=== CREATE2 Deployment Info ===");
         console.log("Accountant Address:", accountantAddress);
@@ -62,7 +60,7 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         uint256 performanceFeeBps = 1000; // 10%
         address wethPlpVaultAddress = vaultFactory.createVault(
             address(sepoliaWeth),
-            owner,
+            deployer,
             IVaultAccountant(accountantAddress),
             performanceFeeBps,
             "povLendWETH",
@@ -79,7 +77,7 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         // 6. Deploy HypoVaultManagerWithMerkleVerification with CREATE2
         HypoVaultManagerWithMerkleVerification manager = new HypoVaultManagerWithMerkleVerification{
             salt: salt
-        }(owner, address(wethPlpVault), BalancerVaultAddr);
+        }(deployer, address(wethPlpVault), BalancerVaultAddr);
         address managerAddress = address(manager);
         console.log("Manager Address:", managerAddress);
 
@@ -128,7 +126,7 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         console.log("ManageRoot set for multisig and turnkey");
 
         // 11. Deploy and configure RolesAuthority with CREATE2
-        RolesAuthority authority = new RolesAuthority{salt: salt}(owner, Authority(address(0)));
+        RolesAuthority authority = new RolesAuthority{salt: salt}(deployer, Authority(address(0)));
         address authorityAddress = address(authority);
         console.log("RolesAuthority Address:", authorityAddress);
 
@@ -182,7 +180,7 @@ contract DeployHypoVaultArchitectureEoa is Script, MerkleTreeHelper {
         console.log("DecoderAndSantizer:", collateralTrackerDecoderAndSanitizer);
         console.log("Authority:", authorityAddress);
 
-        // TODO: be mindful msg sender is owner still. transfer ownership if necessary
+        // TODO: be mindful msg sender is deployer still. transfer deployership if necessary
     }
 
     // TODO: Use safe tick price deviation!
