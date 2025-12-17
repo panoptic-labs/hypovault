@@ -6,6 +6,7 @@ import {HypoVault} from "../src/HypoVault.sol";
 import {HypoVaultFactory} from "../src/HypoVaultFactory.sol";
 import "../src/accountants/PanopticVaultAccountant.sol";
 import {Script} from "forge-std/Script.sol";
+
 // import {DeployHypoVault} from "./helpers/DeployHypoVault.sol";
 
 // Intended to be run from an EOA using vm.startBroadcast/stopBroadcast
@@ -15,7 +16,7 @@ contract DeployHypoVaultArchitectureEoa is Script {
     bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v7"));
     uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.addr(deployerPrivateKey);
-    
+
     IERC20Partial sepoliaWeth = IERC20Partial(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
 
     function run() public {
@@ -44,12 +45,12 @@ contract DeployHypoVaultArchitectureEoa is Script {
 
         // 4. Deploy WETH vault
         // deployVault(
-            // address(vaultFactory),
-            // address(accountant),
-            // address(sepoliaWeth),
-            // "povLendWETH",
-            // "Panoptic Lend Vault | WETH",
-            // salt
+        // address(vaultFactory),
+        // address(accountant),
+        // address(sepoliaWeth),
+        // "povLendWETH",
+        // "Panoptic Lend Vault | WETH",
+        // salt
         // );
 
         vm.stopBroadcast();
