@@ -16,10 +16,10 @@ import "lib/boring-vault/src/base/Roles/ManagerWithMerkleVerification.sol";
 import {HypoVaultManagerWithMerkleVerification} from "../../src/managers/HypoVaultManagerWithMerkleVerification.sol";
 import {RolesAuthority, Authority} from "lib/boring-vault/lib/solmate/src/auth/authorities/RolesAuthority.sol";
 
-/// @notice Helper contract for deploying HypoVaults
-/// @dev Contains all vault deployment logic separated from infrastructure deployment
 contract DeployHypoVault is Script, MerkleTreeHelper {
-    // Panoptic multisig
+    // Real Panoptic multisig
+    // ISafe PanopticMultisig = ISafe(0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1);
+    // @dev - test Safe on sepolia. NOT the real multisig.
     address PanopticMultisig = address(0x9C44C2B07380DA62a5ea572b886048410b0c44fd);
 
     // Deployment addresses
