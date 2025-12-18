@@ -16,11 +16,10 @@ contract DeployHypoVaultArchitectureEoa is Script {
 
     // Deployer address
     function run() public {
-
         vm.startBroadcast();
-        
+
         address deployer = msg.sender;
-        
+
         console.log("=== Deployer Address ===");
         console.log("Deployer:", deployer);
 
@@ -65,7 +64,10 @@ contract DeployHypoVaultArchitectureEoa is Script {
         console.log("HypoVault Implementation:", hypoVaultImplAddress);
         console.log("Factory:", vaultFactoryAddress);
         console.log("Accountant:", accountantAddress);
-        console.log("CollateralTrackerDecoderAndSanitizer:", collateralTrackerDecoderAndSanitizerAddress);
+        console.log(
+            "CollateralTrackerDecoderAndSanitizer:",
+            collateralTrackerDecoderAndSanitizerAddress
+        );
         console.log("RolesAuthority:", authorityAddress);
     }
 }

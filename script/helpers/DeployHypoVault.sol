@@ -145,7 +145,8 @@ contract DeployHypoVault is Script, MerkleTreeHelper {
     // TODO: Output PoolInfos structs to json just like manage leaves.json, as this will be needed by managers
     // to build managerInput() when fulfilling deposits and withdrawals
     function createPanopticAccountantPoolInfos()
-        internal pure
+        internal
+        pure
         returns (PanopticVaultAccountant.PoolInfo[] memory)
     {
         // int24 TWAP_TICK = 100;
@@ -226,4 +227,3 @@ contract DeployHypoVault is Script, MerkleTreeHelper {
         return finalJson;
     }
 }
-

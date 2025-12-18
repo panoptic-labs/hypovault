@@ -8,7 +8,6 @@ import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC2
 import {console} from "forge-std/console.sol";
 
 contract DeployUSDCVault is DeployHypoVault {
-
     address constant FACTORY_ADDRESS = address(0x57d2aD92Ff81d3860a6177e15DaAd3E860fb65bE);
     address constant ACCOUNTANT_ADDRESS = address(0xb77fb362e84988e99A08c048a31e94b2CB46Da58);
     address constant DECODER_ADDRESS = address(0xF5680D4B0424ba6431012B2e618838048462eFf8);
