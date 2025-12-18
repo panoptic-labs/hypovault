@@ -6,20 +6,23 @@ import {HypoVault} from "../src/HypoVault.sol";
 import {HypoVaultFactory} from "../src/HypoVaultFactory.sol";
 import "../src/accountants/PanopticVaultAccountant.sol";
 import {Script} from "forge-std/Script.sol";
-import {DeployHypoVault} from "./helpers/DeployHypoVault.sol";
+import {CollateralTrackerDecoderAndSanitizer} from "../src/DecodersAndSanitizers/CollateralTrackerDecoderAndSanitizer.sol";
+import {RolesAuthority, Authority} from "lib/boring-vault/lib/solmate/src/auth/authorities/RolesAuthority.sol";
 
-// Intended to be run from an EOA using vm.startBroadcast/stopBroadcast
-contract DeployHypoVaultArchitectureEoa is DeployHypoVault {
+// Deploys core HypoVault infrastructure using --private-key or --turnkey
+contract DeployHypoVaultArchitectureEoa is Script {
     // CREATE2 salt
-    bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v8"));
-    
-    IERC20Partial sepoliaWeth = IERC20Partial(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
+    bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v9"));
 
+    // Deployer address
     function run() public {
+
+        vm.startBroadcast();
+        
+        address deployer = msg.sender;
+        
         console.log("=== Deployer Address ===");
         console.log("Deployer:", deployer);
-
-        vm.startBroadcast(deployerPrivateKey);
 
         // 1. Deploy reference HypoVault implementation with CREATE2
         HypoVault hypoVaultImpl = new HypoVault{salt: salt}();
@@ -39,19 +42,22 @@ contract DeployHypoVaultArchitectureEoa is DeployHypoVault {
         console.log("=== CREATE2 Deployment Info ===");
         console.log("Accountant Address:", accountantAddress);
 
-        // 4. Deploy WETH vault
-        deployVault(
-            address(vaultFactory),
-            address(accountant),
-            address(sepoliaWeth),
-            "povLendWETH",
-            "Panoptic Lend Vault | WETH",
-            salt
+        // 4. Deploy CollateralTrackerDecoderAndSanitizer with CREATE2
+        CollateralTrackerDecoderAndSanitizer decoder = new CollateralTrackerDecoderAndSanitizer{
+            salt: salt
+        }(hypoVaultImplAddress);
+        address collateralTrackerDecoderAndSanitizerAddress = address(decoder);
+        console.log("=== CREATE2 Deployment Info ===");
+        console.log(
+            "CollateralTrackerDecoderAndSanitizer Address:",
+            collateralTrackerDecoderAndSanitizerAddress
         );
 
-        // 5. Transfer infrastructure ownership to multisig
-        accountant.transferOwnership(PanopticMultisig);
-        console.log("Accountant ownership transferred to:", PanopticMultisig);
+        // 5. Deploy and configure RolesAuthority with CREATE2
+        RolesAuthority authority = new RolesAuthority{salt: salt}(deployer, Authority(address(0)));
+        address authorityAddress = address(authority);
+        console.log("=== CREATE2 Deployment Info ===");
+        console.log("RolesAuthority Address:", authorityAddress);
 
         vm.stopBroadcast();
 
@@ -59,5 +65,7 @@ contract DeployHypoVaultArchitectureEoa is DeployHypoVault {
         console.log("HypoVault Implementation:", hypoVaultImplAddress);
         console.log("Factory:", vaultFactoryAddress);
         console.log("Accountant:", accountantAddress);
+        console.log("CollateralTrackerDecoderAndSanitizer:", collateralTrackerDecoderAndSanitizerAddress);
+        console.log("RolesAuthority:", authorityAddress);
     }
 }
