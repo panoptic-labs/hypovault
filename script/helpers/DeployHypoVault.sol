@@ -29,8 +29,8 @@ contract DeployHypoVault is Script, MerkleTreeHelper {
         address accountantAddress,
         address collateralTrackerDecoderAndSanitizer,
         address authorityAddress,
-        address underlyingToken,
         address turnkeyAccount,
+        address underlyingToken,
         string memory symbol,
         string memory name,
         bytes32 salt
