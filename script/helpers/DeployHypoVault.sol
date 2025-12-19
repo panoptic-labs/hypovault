@@ -150,7 +150,7 @@ contract DeployHypoVault is Script, MerkleTreeHelper {
         returns (PanopticVaultAccountant.PoolInfo[] memory)
     {
         // int24 TWAP_TICK = 100;
-        int24 MAX_PRICE_DEVIATION = 1700000; // basically no price deviation check for deployment. TODO: use 100 instead. should be a safe amount, and matches the largest standard uni pool tick spacing
+        int24 MAX_PRICE_DEVIATION = 100;
         uint32 TWAP_WINDOW = 600; // 10 minutes
 
         IV3CompatibleOracle wethUsdc500bpsV3UniswapPool = IV3CompatibleOracle(
