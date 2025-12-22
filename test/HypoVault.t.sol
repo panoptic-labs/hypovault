@@ -3764,6 +3764,150 @@ contract HypoVaultTest is Test {
         assertEq(newBasis, originalBasis);
         assertFalse(shouldRedeposit);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                        TOTAL ASSETS / CONVERT TO ASSETS TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_totalAssets_noDepositsNoReserved() public {
+        uint256 nav = 500 ether;
+        accountant.setNav(nav);
+
+        // With no pending deposits and no reserved withdrawals,
+        // totalAssets should be nav + 1
+        uint256 expected = nav + 1;
+        assertEq(vault.totalAssets(""), expected);
+    }
+
+    function test_totalAssets_withPendingDeposits() public {
+        uint256 nav = 500 ether;
+        uint256 depositAmount = 100 ether;
+
+        // Create a pending deposit
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+
+        accountant.setNav(nav);
+
+        // totalAssets should subtract pending deposits
+        // nav + 1 - depositAmount
+        uint256 expected = nav + 1 - depositAmount;
+        assertEq(vault.totalAssets(""), expected);
+    }
+
+    function test_totalAssets_withReservedWithdrawals() public {
+        uint256 depositAmount = 100 ether;
+        uint256 nav = 100 ether;
+
+        // Setup: deposit and fulfill so user gets shares
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+
+        vm.startPrank(Manager);
+        accountant.setNav(nav);
+        vault.fulfillDeposits(depositAmount, "");
+        vm.stopPrank();
+
+        vm.prank(Alice);
+        vault.executeDeposit(Alice, 0);
+
+        // Request withdrawal
+        uint256 sharesToWithdraw = vault.balanceOf(Alice);
+        vm.prank(Alice);
+        vault.requestWithdrawal(uint128(sharesToWithdraw));
+
+        // Fulfill withdrawal (this reserves assets)
+        uint256 navAfter = 150 ether; // vault grew
+        vm.startPrank(Manager);
+        accountant.setNav(navAfter);
+        vault.fulfillWithdrawals(sharesToWithdraw, type(uint256).max, "");
+        vm.stopPrank();
+
+        // Now totalAssets should exclude reserved withdrawal assets
+        uint256 reservedAssets = vault.reservedWithdrawalAssets();
+        uint256 expected = navAfter + 1 - reservedAssets;
+        assertEq(vault.totalAssets(""), expected);
+    }
+
+    function test_convertToAssets_basic() public {
+        uint256 nav = 500 ether;
+        accountant.setNav(nav);
+
+        uint256 totalSupply = vault.totalSupply(); // 1_000_000 bootstrap shares
+        uint256 shares = 100_000;
+
+        // Expected: shares * totalAssets / totalSupply
+        uint256 totalAssets = nav + 1; // no deposits or reserved
+        uint256 expected = Math.mulDiv(shares, totalAssets, totalSupply);
+
+        assertEq(vault.convertToAssets(shares, ""), expected);
+    }
+
+    function test_convertToAssets_afterDeposit() public {
+        uint256 depositAmount = 100 ether;
+        uint256 nav = 100 ether;
+
+        // Deposit and fulfill
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+
+        vm.startPrank(Manager);
+        accountant.setNav(nav);
+        vault.fulfillDeposits(depositAmount, "");
+        vm.stopPrank();
+
+        vm.prank(Alice);
+        vault.executeDeposit(Alice, 0);
+
+        // Now test convertToAssets with the new supply
+        uint256 aliceShares = vault.balanceOf(Alice);
+        uint256 totalSupply = vault.totalSupply();
+
+        // Simulate NAV growth
+        uint256 newNav = 200 ether;
+        accountant.setNav(newNav);
+
+        uint256 totalAssets = newNav + 1; // no pending deposits now
+        uint256 expected = Math.mulDiv(aliceShares, totalAssets, totalSupply);
+
+        assertEq(vault.convertToAssets(aliceShares, ""), expected);
+    }
+
+    function test_convertToAssets_matchesFulfillWithdrawalCalculation() public {
+        uint256 depositAmount = 100 ether;
+        uint256 nav = 100 ether;
+
+        // Setup user with shares
+        vm.prank(Alice);
+        vault.requestDeposit(uint128(depositAmount));
+
+        vm.startPrank(Manager);
+        accountant.setNav(nav);
+        vault.fulfillDeposits(depositAmount, "");
+        vm.stopPrank();
+
+        vm.prank(Alice);
+        vault.executeDeposit(Alice, 0);
+
+        uint256 aliceShares = vault.balanceOf(Alice);
+
+        // Get estimate from helper
+        uint256 newNav = 150 ether;
+        accountant.setNav(newNav);
+        uint256 estimatedAssets = vault.convertToAssets(aliceShares, "");
+
+        // Now actually withdraw and verify the estimate matches
+        vm.prank(Alice);
+        vault.requestWithdrawal(uint128(aliceShares));
+
+        vm.startPrank(Manager);
+        vault.fulfillWithdrawals(aliceShares, type(uint256).max, "");
+        vm.stopPrank();
+
+        // Check that the actual fulfilled amount matches our estimate
+        (, uint128 assetsReceived, ) = vault.withdrawalEpochState(0);
+        assertEq(uint256(assetsReceived), estimatedAssets);
+    }
 }
 
 contract MockERC1155 {
