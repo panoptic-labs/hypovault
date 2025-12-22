@@ -9,14 +9,14 @@ import {console} from "forge-std/console.sol";
 
 contract DeployWETHVault is DeployHypoVault {
     // Addresses from the initial deployment
-    address constant FACTORY_ADDRESS = address(0x57d2aD92Ff81d3860a6177e15DaAd3E860fb65bE);
-    address constant ACCOUNTANT_ADDRESS = address(0xb77fb362e84988e99A08c048a31e94b2CB46Da58);
-    address constant DECODER_ADDRESS = address(0xF5680D4B0424ba6431012B2e618838048462eFf8);
-    address constant AUTHORITY_ADDRESS = address(0xb722bd369B7ac2388b82A8ecbDeC1dEA02ABe540);
+    address constant FACTORY_ADDRESS = address(0xebb431ca19A7B245A0827BFA08b5167694B75F38);
+    address constant ACCOUNTANT_ADDRESS = address(0x529e41f74221963D43B0b4466674EA24A19F1c27);
+    address constant DECODER_ADDRESS = address(0x045AB155Ee70f57fc1672f100FE4939a0d052731);
+    address constant AUTHORITY_ADDRESS = address(0xa1FC02EEeDb96F9C0231234DB2824c1FfFeD60CD);
 
     address constant VAULT_TURNKEY_ADDRESS = address(0x8FfA6DAB99f8afc64F61BeF83F0966eD6362f24F);
 
-    bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v8-weth"));
+    bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v9-weth"));
 
     // Sepolia WETH address
     IERC20Partial sepoliaWeth = IERC20Partial(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
