@@ -635,14 +635,14 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
 
         DepositEpochState memory epochState = depositEpochState[currentEpoch];
 
-        uint256 totalAssets = accountant.computeNAV(address(this), underlyingToken, managerInput) +
+        uint256 _totalAssets = accountant.computeNAV(address(this), underlyingToken, managerInput) +
             1 -
             epochState.assetsDeposited -
             reservedWithdrawalAssets;
 
         uint256 _totalSupply = totalSupply;
 
-        uint256 sharesReceived = Math.mulDiv(assetsToFulfill, _totalSupply, totalAssets);
+        uint256 sharesReceived = Math.mulDiv(assetsToFulfill, _totalSupply, _totalAssets);
 
         uint256 assetsRemaining = epochState.assetsDeposited - assetsToFulfill;
 
@@ -677,7 +677,7 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
         bytes memory managerInput
     ) external onlyManager {
         uint256 _reservedWithdrawalAssets = reservedWithdrawalAssets;
-        uint256 totalAssets = accountant.computeNAV(address(this), underlyingToken, managerInput) +
+        uint256 _totalAssets = accountant.computeNAV(address(this), underlyingToken, managerInput) +
             1 -
             depositEpochState[depositEpoch].assetsDeposited -
             _reservedWithdrawalAssets;
@@ -688,7 +688,7 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
 
         uint256 _totalSupply = totalSupply;
 
-        uint256 assetsReceived = Math.mulDiv(sharesToFulfill, totalAssets, _totalSupply);
+        uint256 assetsReceived = Math.mulDiv(sharesToFulfill, _totalAssets, _totalSupply);
 
         if (assetsReceived > maxAssetsReceived) revert WithdrawalNotFulfillable();
 
@@ -737,6 +737,22 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
         balanceOf[from] -= amount;
 
         emit Transfer(from, address(0), amount);
+    }
+
+    function totalAssets(bytes memory managerInput) public view returns (uint256) {
+        // add 1 to prevent divide by zeroes
+        return
+            accountant.computeNAV(address(this), underlyingToken, managerInput) +
+            1 -
+            depositEpochState[depositEpoch].assetsDeposited -
+            reservedWithdrawalAssets;
+    }
+
+    function convertToAssets(
+        uint256 shares,
+        bytes memory managerInput
+    ) external view returns (uint256) {
+        return Math.mulDiv(shares, totalAssets(managerInput), totalSupply);
     }
 
     receive() external payable {}
