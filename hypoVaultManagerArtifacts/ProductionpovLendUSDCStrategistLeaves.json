@@ -1,0 +1,140 @@
+{
+  "metadata": {
+    "AccountantAddress": "0x529e41f74221963D43B0b4466674EA24A19F1c27",
+    "BoringVaultAddress": "0xE616b9aE29644f8c45c15C7B823841bf304A4165",
+    "DecoderAndSanitizerAddress": "0x045AB155Ee70f57fc1672f100FE4939a0d052731",
+    "DigestComposition": [
+      "Bytes20(DECODER_AND_SANITIZER_ADDRESS)",
+      "Bytes20(TARGET_ADDRESS)",
+      "Bytes1(CAN_SEND_VALUE)",
+      "Bytes4(TARGET_FUNCTION_SELECTOR)",
+      "Bytes{N*20}(ADDRESS_ARGUMENT_0,...,ADDRESS_ARGUMENT_N)"
+    ],
+    "LeafCount": 6,
+    "ManageRoot": "0x78b670a137d177eb1755e5e3606eeda57a9fb530a3e38a0ad6fb3b8c54cdd6d8",
+    "ManagerAddress": "0x22f9f14AC9f4572978db3641fD1d83c593deBf8E",
+    "TreeCapacity": 8
+  },
+  "leafs": [
+    {
+      "AddressArguments": ["0x1AF0D98626d53397BA5613873D3b19cc25235d52"],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x045AB155Ee70f57fc1672f100FE4939a0d052731",
+      "Description": "Approve poWETH to spend WETH",
+      "FunctionSelector": "0x095ea7b3",
+      "FunctionSignature": "approve(address,uint256)",
+      "LeafDigest": "0x9dfbbb54c9cbb21e639f2ed99c474edbbf55942ca5fad5c12cbe2ab01d23186c",
+      "PackedArgumentAddresses": "0x1af0d98626d53397ba5613873d3b19cc25235d52",
+      "TargetAddress": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14"
+    },
+    {
+      "AddressArguments": ["0xE616b9aE29644f8c45c15C7B823841bf304A4165"],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x045AB155Ee70f57fc1672f100FE4939a0d052731",
+      "Description": "Deposit WETH for poWETH",
+      "FunctionSelector": "0x6e553f65",
+      "FunctionSignature": "deposit(uint256,address)",
+      "LeafDigest": "0x5ce54100f17bcf57f288ae83f5f3118214d741718dfcb2d3b5cdb1f2ddf1b3ff",
+      "PackedArgumentAddresses": "0xe616b9ae29644f8c45c15c7b823841bf304a4165",
+      "TargetAddress": "0x1AF0D98626d53397BA5613873D3b19cc25235d52"
+    },
+    {
+      "AddressArguments": [
+        "0xE616b9aE29644f8c45c15C7B823841bf304A4165",
+        "0xE616b9aE29644f8c45c15C7B823841bf304A4165"
+      ],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x045AB155Ee70f57fc1672f100FE4939a0d052731",
+      "Description": "Withdraw WETH from poWETH",
+      "FunctionSelector": "0xb460af94",
+      "FunctionSignature": "withdraw(uint256,address,address)",
+      "LeafDigest": "0x15caea5b419522cb906108387200233750d2ee000af073df9c2287256429fdb4",
+      "PackedArgumentAddresses": "0xe616b9ae29644f8c45c15c7b823841bf304a4165e616b9ae29644f8c45c15c7b823841bf304a4165",
+      "TargetAddress": "0x1AF0D98626d53397BA5613873D3b19cc25235d52"
+    },
+    {
+      "AddressArguments": [
+        "0xE616b9aE29644f8c45c15C7B823841bf304A4165",
+        "0xE616b9aE29644f8c45c15C7B823841bf304A4165"
+      ],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x045AB155Ee70f57fc1672f100FE4939a0d052731",
+      "Description": "Withdraw WETH from poWETH",
+      "FunctionSelector": "0x795a1f0d",
+      "FunctionSignature": "withdraw(uint256,address,address,uint256[])",
+      "LeafDigest": "0xbe1172e388db5bfc2d56e661ef0210de1b31bb2b32bc92a5168e711db242fad0",
+      "PackedArgumentAddresses": "0xe616b9ae29644f8c45c15c7b823841bf304a4165e616b9ae29644f8c45c15c7b823841bf304a4165",
+      "TargetAddress": "0x1AF0D98626d53397BA5613873D3b19cc25235d52"
+    },
+    {
+      "AddressArguments": ["0xE616b9aE29644f8c45c15C7B823841bf304A4165"],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x045AB155Ee70f57fc1672f100FE4939a0d052731",
+      "Description": "Mint poWETH using WETH",
+      "FunctionSelector": "0x94bf804d",
+      "FunctionSignature": "mint(uint256,address)",
+      "LeafDigest": "0xfac0ed1852649e0caf5c82af25862c2eb1cd8938345639d9ea2b90d1ac27618f",
+      "PackedArgumentAddresses": "0xe616b9ae29644f8c45c15c7b823841bf304a4165",
+      "TargetAddress": "0x1AF0D98626d53397BA5613873D3b19cc25235d52"
+    },
+    {
+      "AddressArguments": [
+        "0xE616b9aE29644f8c45c15C7B823841bf304A4165",
+        "0xE616b9aE29644f8c45c15C7B823841bf304A4165"
+      ],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x045AB155Ee70f57fc1672f100FE4939a0d052731",
+      "Description": "Redeem poWETH for WETH",
+      "FunctionSelector": "0xba087652",
+      "FunctionSignature": "redeem(uint256,address,address)",
+      "LeafDigest": "0x78518d31bdc4c2a73042700de1867a9f251bee6391cb0686cb1698eedc2582ac",
+      "PackedArgumentAddresses": "0xe616b9ae29644f8c45c15c7b823841bf304a4165e616b9ae29644f8c45c15c7b823841bf304a4165",
+      "TargetAddress": "0x1AF0D98626d53397BA5613873D3b19cc25235d52"
+    },
+    {
+      "AddressArguments": [],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x0000000000000000000000000000000000000000",
+      "Description": "",
+      "FunctionSelector": "0xc5d24601",
+      "FunctionSignature": "",
+      "LeafDigest": "0xa7a0fd846665d92e66be6155c6221b3acd7145ca7c4e4b67a594e4c516969400",
+      "PackedArgumentAddresses": "0x",
+      "TargetAddress": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "AddressArguments": [],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x0000000000000000000000000000000000000000",
+      "Description": "",
+      "FunctionSelector": "0xc5d24601",
+      "FunctionSignature": "",
+      "LeafDigest": "0xa7a0fd846665d92e66be6155c6221b3acd7145ca7c4e4b67a594e4c516969400",
+      "PackedArgumentAddresses": "0x",
+      "TargetAddress": "0x0000000000000000000000000000000000000000"
+    }
+  ],
+  "MerkleTree": {
+    "0": ["0x78b670a137d177eb1755e5e3606eeda57a9fb530a3e38a0ad6fb3b8c54cdd6d8"],
+    "1": [
+      "0xab5f9af70a8bd14d74b975a83e6c4d59df9c04acd542fbfe6afc62acb9a6d52e",
+      "0x5d154b1c1800a61eaa25789cc3ddf98c8caed1e5441250add5c1c479fe4a1cde"
+    ],
+    "2": [
+      "0xf75ad8f57115006b40db67e51dba06519854d00581a5bbc3a0d3bdc53f3b9b53",
+      "0x4b234dc35093712ad3c9c2b5653a277f574f74558655e3b21b0f287638757fbc",
+      "0x443970e5322ad992af71396bd005feeed24750cffbd635297063fcc77f0fca59",
+      "0xc5a36f3b7b955966d5ed3135dcc612f978306d73bce3697e230afae57fbaeeba"
+    ],
+    "3": [
+      "0x9dfbbb54c9cbb21e639f2ed99c474edbbf55942ca5fad5c12cbe2ab01d23186c",
+      "0x5ce54100f17bcf57f288ae83f5f3118214d741718dfcb2d3b5cdb1f2ddf1b3ff",
+      "0x15caea5b419522cb906108387200233750d2ee000af073df9c2287256429fdb4",
+      "0xbe1172e388db5bfc2d56e661ef0210de1b31bb2b32bc92a5168e711db242fad0",
+      "0xfac0ed1852649e0caf5c82af25862c2eb1cd8938345639d9ea2b90d1ac27618f",
+      "0x78518d31bdc4c2a73042700de1867a9f251bee6391cb0686cb1698eedc2582ac",
+      "0xa7a0fd846665d92e66be6155c6221b3acd7145ca7c4e4b67a594e4c516969400",
+      "0xa7a0fd846665d92e66be6155c6221b3acd7145ca7c4e4b67a594e4c516969400"
+    ]
+  }
+}
