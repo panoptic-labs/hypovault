@@ -149,9 +149,6 @@ contract DeployHypoVault is MerkleTreeHelper {
         return (address(vault), address(managerAddress), leafs, manageTree);
     }
 
-    // TODO: Use safe tick price deviation!
-    // TODO: Output PoolInfos structs to json just like manage leaves.json, as this will be needed by managers
-    // to build managerInput() when fulfilling deposits and withdrawals
     function createPanopticAccountantPoolInfos()
         internal
         pure
