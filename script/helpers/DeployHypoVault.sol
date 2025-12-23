@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import {ERC4626} from "lib/boring-vault/lib/solmate/src/tokens/ERC4626.sol";
-import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {HypoVault} from "../../src/HypoVault.sol";
 import {HypoVaultFactory} from "../../src/HypoVaultFactory.sol";
@@ -14,8 +13,7 @@ import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC2
 import "lib/boring-vault/src/base/Roles/ManagerWithMerkleVerification.sol";
 import {HypoVaultManagerWithMerkleVerification} from "../../src/managers/HypoVaultManagerWithMerkleVerification.sol";
 import {RolesAuthority, Authority} from "lib/boring-vault/lib/solmate/src/auth/authorities/RolesAuthority.sol";
-
-contract DeployHypoVault is Script, MerkleTreeHelper {
+contract DeployHypoVault is MerkleTreeHelper {
     // Real Panoptic multisig
     // ISafe PanopticMultisig = ISafe(0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1);
     // @dev - test Safe on sepolia. NOT the real multisig.
@@ -25,6 +23,7 @@ contract DeployHypoVault is Script, MerkleTreeHelper {
     address BalancerVaultAddr = address(0x7777); // Required by ManagerWithMerkleVerification
 
     function deployVault(
+        address deployer,
         address vaultFactory,
         address accountantAddress,
         address collateralTrackerDecoderAndSanitizer,
@@ -34,9 +33,15 @@ contract DeployHypoVault is Script, MerkleTreeHelper {
         string memory symbol,
         string memory name,
         bytes32 salt
-    ) internal {
-        address deployer = msg.sender;
-
+    )
+        internal
+        returns (
+            address vault,
+            address manager,
+            ManageLeaf[] memory leafs,
+            bytes32[][] memory manageTree
+        )
+    {
         // 1. Deploy HypoVault via Factory
         uint256 performanceFeeBps = 1000; // 10%
         address vaultAddress = HypoVaultFactory(vaultFactory).createVault(
@@ -98,17 +103,17 @@ contract DeployHypoVault is Script, MerkleTreeHelper {
         manager.setManageRoot(turnkeyAccount, manageRoot); // vault turnkey
         console.log("ManageRoot set for multisig and turnkey");
 
-        // 8. Set RolesAuthority as authority on HypoVaultManagerWithMerkleVerification
+        // 7. Set RolesAuthority as authority on HypoVaultManagerWithMerkleVerification
         manager.setAuthority(Authority(authorityAddress));
         console.log("Authority set on manager");
 
-        // 9. Grant STRATEGIST_ROLE to TurnkeyAccount0
+        // 8. Grant STRATEGIST_ROLE to TurnkeyAccount0
         uint8 STRATEGIST_ROLE = 7;
         RolesAuthority authority = RolesAuthority(authorityAddress);
         authority.setUserRole(turnkeyAccount, STRATEGIST_ROLE, true); // vault turnkey
         console.log("STRATEGIST_ROLE granted to:", turnkeyAccount);
 
-        // 10. Set abilities/capabilities for STRATEGIST_ROLE
+        // 9. Set abilities/capabilities for STRATEGIST_ROLE
         bytes4[] memory strategistSelectors = new bytes4[](4);
         strategistSelectors[0] = HypoVaultManagerWithMerkleVerification.fulfillDeposits.selector;
         strategistSelectors[1] = HypoVaultManagerWithMerkleVerification.fulfillWithdrawals.selector;
@@ -139,6 +144,8 @@ contract DeployHypoVault is Script, MerkleTreeHelper {
         console.log("Pools hash updated");
 
         // TODO: Add transfer ownership calls to the multisig
+
+        return (address(vault), address(managerAddress), leafs, manageTree);
     }
 
     // TODO: Use safe tick price deviation!

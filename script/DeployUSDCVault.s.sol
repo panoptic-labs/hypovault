@@ -6,8 +6,9 @@ import {HypoVaultFactory} from "../src/HypoVaultFactory.sol";
 import {PanopticVaultAccountant} from "../src/accountants/PanopticVaultAccountant.sol";
 import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC20Partial.sol";
 import {console} from "forge-std/console.sol";
+import {Script} from "forge-std/Script.sol";
 
-contract DeployUSDCVault is DeployHypoVault {
+contract DeployUSDCVault is Script, DeployHypoVault {
     address constant FACTORY_ADDRESS = address(0x57d2aD92Ff81d3860a6177e15DaAd3E860fb65bE);
     address constant ACCOUNTANT_ADDRESS = address(0xb77fb362e84988e99A08c048a31e94b2CB46Da58);
     address constant DECODER_ADDRESS = address(0xF5680D4B0424ba6431012B2e618838048462eFf8);
@@ -32,6 +33,7 @@ contract DeployUSDCVault is DeployHypoVault {
         console.log("Using Authority:", AUTHORITY_ADDRESS);
 
         deployVault(
+            deployer,
             FACTORY_ADDRESS,
             ACCOUNTANT_ADDRESS,
             DECODER_ADDRESS,
