@@ -257,11 +257,11 @@ sequenceDiagram
 
 ## Roles
 
-| Role | Account | Can Do |
-|------|---------|--------|
-| Authority Owner | Turnkey0 (later multisig) | Configure roles and permissions on RolesAuthority |
-| Vault Owner | Turnkey0 | Update manager, accountant, and fee wallet |
-| Strategist / Manager | Turnkey1/2/3 | Fulfill deposits/withdrawals, cancel deposits, manage vault operations |
+| Role                 | Account                   | Can Do                                                                 |
+| -------------------- | ------------------------- | ---------------------------------------------------------------------- |
+| Authority Owner      | Turnkey0 (later multisig) | Configure roles and permissions on RolesAuthority                      |
+| Vault Owner          | Turnkey0                  | Update manager, accountant, and fee wallet                             |
+| Strategist / Manager | Turnkey1/2/3              | Fulfill deposits/withdrawals, cancel deposits, manage vault operations |
 
 ## Adapting to new Protocols
 
