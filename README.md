@@ -255,6 +255,14 @@ sequenceDiagram
     end
 ```
 
+## Roles
+
+| Role | Account | Can Do |
+|------|---------|--------|
+| Authority Owner | Turnkey0 (later multisig) | Configure roles and permissions on RolesAuthority |
+| Vault Owner | Turnkey0 | Update manager, accountant, and fee wallet |
+| Strategist / Manager | Turnkey1/2/3 | Fulfill deposits/withdrawals, cancel deposits, manage vault operations |
+
 ## Adapting to new Protocols
 
 For each new protocol a vault will want to interact with, there will need to be an appropriate DecoderAndSanitizer (or multiple DecoderAndSanitizers), as well as an accountant (like PanopticVaultAccountant). See more in the BoringVault docs here: https://docs.veda.tech/integrations/boringvault-protocol-integration
