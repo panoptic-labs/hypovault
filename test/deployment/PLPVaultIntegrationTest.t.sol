@@ -231,25 +231,25 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             MerkleTreeHelper.ManageLeaf[] memory leafs,
             bytes32[][] memory manageTree
         ) = deployVault(
-            owner,
-            vaultFactory,
-            accountant,
-            collateralTrackerDecoderAndSanitizer,
-            authorityAddress,
-            TurnkeyAccount0,
-            address(sepoliaWeth),
-            "povLendWETH",
-            "Panoptic Lend Vault | WETH",
-            salt
-        );
+                owner,
+                vaultFactory,
+                accountant,
+                collateralTrackerDecoderAndSanitizer,
+                authorityAddress,
+                TurnkeyAccount0,
+                address(sepoliaWeth),
+                "povLendWETH",
+                "Panoptic Lend Vault | WETH",
+                salt
+            );
 
         vm.stopPrank();
 
         // Get references to deployed contracts
         HypoVault wethPlpVault = HypoVault(payable(vaultAddress));
         HypoVaultManagerWithMerkleVerification wethPlpVaultManager = HypoVaultManagerWithMerkleVerification(
-            managerAddress
-        );
+                managerAddress
+            );
         PanopticVaultAccountant panopticVaultAccountant = PanopticVaultAccountant(accountant);
         RolesAuthority rolesAuthority = RolesAuthority(authorityAddress);
 

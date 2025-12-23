@@ -13,6 +13,7 @@ import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC2
 import "lib/boring-vault/src/base/Roles/ManagerWithMerkleVerification.sol";
 import {HypoVaultManagerWithMerkleVerification} from "../../src/managers/HypoVaultManagerWithMerkleVerification.sol";
 import {RolesAuthority, Authority} from "lib/boring-vault/lib/solmate/src/auth/authorities/RolesAuthority.sol";
+
 contract DeployHypoVault is MerkleTreeHelper {
     // Real Panoptic multisig
     // ISafe PanopticMultisig = ISafe(0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1);
