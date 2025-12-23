@@ -20,6 +20,8 @@ import {ManagerWithMerkleVerification} from "lib/boring-vault/src/base/Roles/Man
 import {RolesAuthority, Authority} from "lib/boring-vault/lib/solmate/src/auth/authorities/RolesAuthority.sol";
 import {Authority} from "lib/boring-vault/lib/solmate/src/auth/Auth.sol";
 import {MerkleTreeHelper} from "test/resources/MerkleTreeHelper/MerkleTreeHelper.sol";
+import {DeployArchitecture} from "../../script/helpers/DeployArchitecture.sol";
+import {DeployHypoVault} from "../../script/helpers/DeployHypoVault.sol";
 
 contract VaultAccountantMock {
     uint256 public nav;
@@ -93,7 +95,7 @@ contract MockTarget {
     }
 }
 
-contract HypoVaultTest is Test, MerkleTreeHelper {
+contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypoVault {
     VaultAccountantMock public accountant;
     HypoVaultFactory public vaultFactory;
     HypoVault public vault;
@@ -210,124 +212,59 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
            STEP 1: Deployments
         */
 
-        // Acting as multisig, deploy PanopticVaultAccountant, HypoVault via Factory, and HypoVaultManager, and set HypoVaultManager as manager of HypoVault
         vm.startPrank(owner);
 
-        // Accountant
-        PanopticVaultAccountant panopticVaultAccountant = new PanopticVaultAccountant(owner);
+        // Deploy core architecture
+        bytes32 salt = keccak256("test-vault-salt");
+        (
+            ,
+            address vaultFactory,
+            address accountant,
+            address collateralTrackerDecoderAndSanitizer,
+            address authorityAddress
+        ) = deployArchitecture(salt, owner);
 
-        // Vault
-        // need to create new factory to link new HypoVault bytecode
-        address implementation = address(new HypoVault());
-
-        HypoVaultFactory factory = new HypoVaultFactory(implementation);
-
-        uint256 performanceFeeBps = 1000; // 10%
-        HypoVault wethPlpVault = HypoVault(
-            payable(
-                factory.createVault(
-                    address(sepoliaWeth),
-                    owner,
-                    IVaultAccountant(address(panopticVaultAccountant)),
-                    performanceFeeBps,
-                    "povLendWETH",
-                    "Panoptic Lend Vault | WETH",
-                    keccak256("test-vault-salt")
-                )
-            )
-        );
-
-        wethPlpVault.setFeeWallet(FeeWallet);
-
-        // Manager
-        HypoVaultManagerWithMerkleVerification wethPlpVaultManager = new HypoVaultManagerWithMerkleVerification(
+        // Deploy vault using the helper
+        (
+            address vaultAddress,
+            address managerAddress,
+            MerkleTreeHelper.ManageLeaf[] memory leafs,
+            bytes32[][] memory manageTree
+        ) = deployVault(
                 owner,
-                address(wethPlpVault),
-                BalancerVault
+                vaultFactory,
+                accountant,
+                collateralTrackerDecoderAndSanitizer,
+                authorityAddress,
+                TurnkeyAccount0,
+                address(sepoliaWeth),
+                "povLendWETH",
+                "Panoptic Lend Vault | WETH",
+                salt
             );
 
-        wethPlpVault.setManager(address(wethPlpVaultManager));
-        assertEq(wethPlpVault.manager(), address(wethPlpVaultManager));
         vm.stopPrank();
 
-        console2.log("=== Step 2: Set merkle root for Strategists. ===");
+        // Get references to deployed contracts
+        HypoVault wethPlpVault = HypoVault(payable(vaultAddress));
+        HypoVaultManagerWithMerkleVerification wethPlpVaultManager = HypoVaultManagerWithMerkleVerification(
+                managerAddress
+            );
+        PanopticVaultAccountant panopticVaultAccountant = PanopticVaultAccountant(accountant);
+        RolesAuthority rolesAuthority = RolesAuthority(authorityAddress);
+
+        assertEq(wethPlpVault.manager(), address(wethPlpVaultManager));
+
+        console2.log("=== Step 2: Verify deployment setup ===");
         /*
-           STEP 2: Set merkle root for Strategists. Give Turnkey signer & Safe Strategist role + identical manageRoots.
+           STEP 2: Verify that deployVault() set everything up correctly
         */
 
-        // Set up leafs
-        address collateralTrackerDecoderAndSanitizer = address(
-            new CollateralTrackerDecoderAndSanitizer(address(wethPlpVault))
-        );
-        setSourceChainName(sepolia);
-        setAddress(false, sepolia, "boringVault", address(wethPlpVault));
-        setAddress(false, sepolia, "managerAddress", address(wethPlpVaultManager));
-        setAddress(false, sepolia, "accountantAddress", address(panopticVaultAccountant));
-        setAddress(
-            false,
-            sepolia,
-            "rawDataDecoderAndSanitizer",
-            collateralTrackerDecoderAndSanitizer
-        );
+        // Verify authority is set
+        assertEq(address(wethPlpVaultManager.authority()), authorityAddress);
 
-        ManageLeaf[] memory leafs = new ManageLeaf[](8); // limit to smallest power of 2 that is grater than leaf size
-
-        _addCollateralTrackerLeafs(leafs, ERC4626(wethUsdc500bpsV3Collateral0));
-
-        bytes32[][] memory manageTree = _generateMerkleTree(leafs);
-
-        // Save tree to JSON for debugging
-        bytes32 manageRoot = manageTree[manageTree.length - 1][0];
-        string memory filePath = "./hypoVaultManagerArtifacts/TestPanopticPLPStrategistLeaves.json";
-        _generateLeafs(filePath, leafs, manageRoot, manageTree);
-
-        vm.startPrank(owner);
-        wethPlpVaultManager.setManageRoot(TurnkeyAccount0, manageRoot);
-        wethPlpVaultManager.setManageRoot(PanopticMultisig, manageRoot);
-        assertEq(wethPlpVaultManager.manageRoot(TurnkeyAccount0), manageRoot);
-        assertEq(wethPlpVaultManager.manageRoot(PanopticMultisig), manageRoot);
-        vm.stopPrank();
-
-        console2.log("=== Step 3: Set up AccessManager and grant curator permissions ===");
-
-        // Deploy Authority
-        vm.prank(owner);
-        RolesAuthority rolesAuthority = new RolesAuthority(owner, Authority(address(0)));
-
-        // Set RolesAuthority as authority
-        vm.prank(owner);
-        wethPlpVaultManager.setAuthority(Authority(address(rolesAuthority)));
-        assertEq(address(wethPlpVaultManager.authority()), address(rolesAuthority));
-
-        // Grant role w/ ability to call hypovault manager functions
+        // Verify Turnkey signer has role and can call manage functions
         uint8 STRATEGIST_ROLE = 7;
-        vm.prank(owner);
-        rolesAuthority.setUserRole(TurnkeyAccount0, STRATEGIST_ROLE, true);
-
-        // Set abilities for curator role to call manager functions
-        bytes4[] memory selectors = new bytes4[](4);
-        selectors[0] = HypoVaultManagerWithMerkleVerification.fulfillDeposits.selector;
-        selectors[1] = HypoVaultManagerWithMerkleVerification.fulfillWithdrawals.selector;
-        selectors[2] = HypoVaultManagerWithMerkleVerification.cancelDeposit.selector;
-        selectors[3] = bytes4(
-            keccak256(
-                "manageVaultWithMerkleVerification(bytes32[][],address[],address[],bytes[],uint256[])"
-            )
-        );
-
-        vm.startPrank(owner);
-        for (uint256 i = 0; i < selectors.length; i++) {
-            rolesAuthority.setRoleCapability(
-                STRATEGIST_ROLE,
-                address(wethPlpVaultManager),
-                selectors[i],
-                true
-            );
-        }
-        vm.stopPrank();
-
-        // Verify access manager setup
-        // Verify Turnkey signer can call manage functions
         assertTrue(rolesAuthority.doesUserHaveRole(TurnkeyAccount0, STRATEGIST_ROLE));
         assertTrue(
             rolesAuthority.canCall(
@@ -345,6 +282,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         );
 
         // Verify Turnkey CANNOT update manageRoot
+        bytes32 manageRoot = manageTree[manageTree.length - 1][0];
+        assertNotEq(manageRoot, bytes32(0)); // Verify manageRoot was set
         vm.startPrank(TurnkeyAccount0);
         vm.expectRevert();
         wethPlpVaultManager.setManageRoot(TurnkeyAccount0, manageRoot);
@@ -354,7 +293,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         vm.prank(owner);
         wethPlpVaultManager.setManageRoot(TurnkeyAccount0, manageRoot);
 
-        console2.log("=== Step 4: Test curator can fulfill deposits ===");
+        console2.log("=== Step 3: Test curator can fulfill deposits ===");
 
         // Alice requests a WETH deposit
         deal(address(sepoliaWeth), Alice, 100 ether);
