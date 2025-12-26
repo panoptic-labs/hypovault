@@ -27,7 +27,7 @@ contract DeployHypoVault is MerkleTreeHelper {
         address deployer,
         address vaultFactory,
         address accountantAddress,
-        address collateralTrackerDecoderAndSanitizer,
+        address panopticDecoderAndSanitizer,
         address authorityAddress,
         address turnkeyAccount,
         address underlyingToken,
@@ -82,27 +82,37 @@ contract DeployHypoVault is MerkleTreeHelper {
             true,
             sepolia,
             "rawDataDecoderAndSanitizer",
-            collateralTrackerDecoderAndSanitizer
+            panopticDecoderAndSanitizer
         );
 
-        ManageLeaf[] memory leafs = new ManageLeaf[](8);
+        console.log('adding leafs');
+        ManageLeaf[] memory leafs = new ManageLeaf[](12);
+        leafIndex = type(uint256).max; // Reset leaf index before adding leafs. Unchecked increment as first line of each `_add*Leafs` function ensures this starts at 0
+        _addHypoVaultManagerLeafs(leafs, managerAddress); // Add manager leafs first (fulfillDeposits, fulfillWithdrawals)
         _addCollateralTrackerLeafs(leafs, ERC4626(wethUsdc500bpsV3Collateral0));
+        console.log('leafs added');
+        console.log('leafs length: ', leafs.length);
         bytes32[][] memory manageTree = _generateMerkleTree(leafs);
+        console.log('manage tree generated');
+        console.log('manageTree[manageTree[0].length', manageTree[0].length);
+        console.log('manageTree[manageTree.length - 1].length', manageTree[manageTree.length - 1].length);
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
+        console.log('manage root');
         string memory filePath = string.concat(
             "./hypoVaultManagerArtifacts/Production",
             symbol,
             "StrategistLeaves.json"
         );
-        _generateLeafs(filePath, leafs, manageRoot, manageTree); // Dump tree and leaves to JSON. Useful for SDK later.
+        _generateLeafs(filePath, leafs, manageRoot, manageTree); // Dump tree and leaves to JSON. Useful for debugging & SDK later.
 
         console.log("Generated manageRoot:");
         console.logBytes32(manageRoot);
 
-        // 6. Set manageRoot for both multisig and turnkey
+        // 6. Set manageRoot for multisig, turnkey, and vault itself
         manager.setManageRoot(PanopticMultisig, manageRoot);
         manager.setManageRoot(turnkeyAccount, manageRoot); // vault turnkey
-        console.log("ManageRoot set for multisig and turnkey");
+        manager.setManageRoot(address(vault), manageRoot); // allow vault to call manager functions via manage(). Necessary to call fulfillDeposits and fulfillWithdrawals via managerVaultWithMerkleVerification.
+        console.log("ManageRoot set for multisig, turnkey, and vault");
 
         // 7. Set RolesAuthority as authority on HypoVaultManagerWithMerkleVerification
         manager.setAuthority(Authority(authorityAddress));

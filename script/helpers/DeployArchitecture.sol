@@ -5,7 +5,7 @@ import {console} from "forge-std/console.sol";
 import {HypoVault} from "../../src/HypoVault.sol";
 import {HypoVaultFactory} from "../../src/HypoVaultFactory.sol";
 import "../../src/accountants/PanopticVaultAccountant.sol";
-import {CollateralTrackerDecoderAndSanitizer} from "../../src/DecodersAndSanitizers/CollateralTrackerDecoderAndSanitizer.sol";
+import {PanopticDecoderAndSanitizer} from "../../src/DecodersAndSanitizers/PanopticDecoderAndSanitizer.sol";
 import {RolesAuthority, Authority} from "lib/boring-vault/lib/solmate/src/auth/authorities/RolesAuthority.sol";
 
 contract DeployArchitecture {
@@ -18,7 +18,7 @@ contract DeployArchitecture {
             address hypoVaultImpl,
             address vaultFactory,
             address accountant,
-            address collateralTrackerDecoderAndSanitizer,
+            address panopticDecoderAndSanitizer,
             address rolesAuthority
         )
     {
@@ -43,15 +43,15 @@ contract DeployArchitecture {
         console.log("=== CREATE2 Deployment Info ===");
         console.log("Accountant Address:", accountantAddress);
 
-        // 4. Deploy CollateralTrackerDecoderAndSanitizer with CREATE2
-        CollateralTrackerDecoderAndSanitizer decoder = new CollateralTrackerDecoderAndSanitizer{
+        // 4. Deploy PanopticDecoderAndSanitizer with CREATE2
+        PanopticDecoderAndSanitizer decoder = new PanopticDecoderAndSanitizer{
             salt: salt
         }(hypoVaultImplAddress);
-        address collateralTrackerDecoderAndSanitizerAddress = address(decoder);
+        address panopticDecoderAndSanitizerAddress = address(decoder);
         console.log("=== CREATE2 Deployment Info ===");
         console.log(
-            "CollateralTrackerDecoderAndSanitizer Address:",
-            collateralTrackerDecoderAndSanitizerAddress
+            "PanopticDecoderAndSanitizer Address:",
+            panopticDecoderAndSanitizerAddress
         );
 
         // 5. Deploy and configure RolesAuthority with CREATE2
@@ -64,7 +64,7 @@ contract DeployArchitecture {
             hypoVaultImplAddress,
             vaultFactoryAddress,
             accountantAddress,
-            collateralTrackerDecoderAndSanitizerAddress,
+            panopticDecoderAndSanitizerAddress,
             authorityAddress
         );
     }

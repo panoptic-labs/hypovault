@@ -9,6 +9,7 @@ import "../../src/HypoVault.sol";
 import "../../src/HypoVaultFactory.sol";
 import "../../src/accountants/PanopticVaultAccountant.sol";
 import {CollateralTrackerDecoderAndSanitizer} from "../../src/DecodersAndSanitizers/CollateralTrackerDecoderAndSanitizer.sol";
+import {PanopticDecoderAndSanitizer} from "../../src/DecodersAndSanitizers/PanopticDecoderAndSanitizer.sol";
 import {ERC20S} from "lib/panoptic-v1.1/test/foundry/testUtils/ERC20S.sol";
 import {ERC4626} from "lib/boring-vault/lib/solmate/src/tokens/ERC4626.sol";
 import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC20Partial.sol";
@@ -220,7 +221,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             ,
             address vaultFactory,
             address accountant,
-            address collateralTrackerDecoderAndSanitizer,
+            address panopticDecoderAndSanitizer,
             address authorityAddress
         ) = deployArchitecture(salt, owner);
 
@@ -234,7 +235,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
                 owner,
                 vaultFactory,
                 accountant,
-                collateralTrackerDecoderAndSanitizer,
+                panopticDecoderAndSanitizer,
                 authorityAddress,
                 TurnkeyAccount0,
                 address(sepoliaWeth),
@@ -371,8 +372,9 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         ManageLeaf[] memory manageLeafs = new ManageLeaf[](2);
         // To determine which index of leaf to use, easiest to look at
         // JSON output from _generateLeafs, especially when multiple leafs adding helpers are used (like _addCollateralTrackerLeafs)
-        manageLeafs[0] = leafs[0];
-        manageLeafs[1] = leafs[1];
+        // Note: leafs[0] = fulfillDeposits, leafs[1] = fulfillWithdrawals, leafs[2] = approve, leafs[3] = deposit, etc.
+        manageLeafs[0] = leafs[2]; // approve leaf
+        manageLeafs[1] = leafs[3]; // deposit leaf 
         bytes32[][] memory manageProofs = _getProofsUsingTree(manageLeafs, manageTree);
         console.log("got proofs");
 
@@ -402,8 +404,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         uint256[] memory values = new uint256[](2);
 
         address[] memory decodersAndSanitizers = new address[](2);
-        decodersAndSanitizers[0] = collateralTrackerDecoderAndSanitizer;
-        decodersAndSanitizers[1] = collateralTrackerDecoderAndSanitizer;
+        decodersAndSanitizers[0] = panopticDecoderAndSanitizer;
+        decodersAndSanitizers[1] = panopticDecoderAndSanitizer;
 
         vm.startPrank(TurnkeyAccount0);
         uint256 initialCollateralWethAllowance = sepoliaWeth.allowance(
@@ -640,6 +642,169 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         vm.stopPrank();
 
         console2.log("=== Integration test completed successfully! ===");
+    }
+
+    /// @notice Test atomic fulfillDeposits + fund movement via manageVaultWithMerkleVerification
+    /// @dev This demonstrates the new atomic flow where fulfillDeposits is the first call in manageVaultWithMerkleVerification
+    function test_atomic_fulfillDeposits_and_fund_movement() public {
+        console2.log("=== Init: Test atomic fulfillDeposits and fund movement ===");
+        uint256 forkId = vm.createSelectFork(
+            string.concat("https://eth-sepolia.g.alchemy.com/v2/", vm.envString("ALCHEMY_API_KEY")),
+            9775660
+        );
+
+        address PanopticMultisig = 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1;
+        address owner = PanopticMultisig;
+        address TurnkeyAccount0 = address(0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8);
+        ERC20S sepoliaWeth = ERC20S(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
+        address wethUsdc500bpsV3Collateral0 = 0x1AF0D98626d53397BA5613873D3b19cc25235d52;
+        address wethUsdc500bpsV3PanopticPool = 0x00002c1c2EF3E4b606F8361d975Cdc2834668e9F;
+
+        /*
+           STEP 1: Deployments
+        */
+        vm.startPrank(owner);
+
+        bytes32 salt = keccak256("test-atomic-vault-salt");
+        (
+            ,
+            address vaultFactory,
+            address accountant,
+            address panopticDecoderAndSanitizer,
+            address authorityAddress
+        ) = deployArchitecture(salt, owner);
+
+        (
+            address vaultAddress,
+            address managerAddress,
+            MerkleTreeHelper.ManageLeaf[] memory leafs,
+            bytes32[][] memory manageTree
+        ) = deployVault(
+                owner,
+                vaultFactory,
+                accountant,
+                panopticDecoderAndSanitizer,
+                authorityAddress,
+                TurnkeyAccount0,
+                address(sepoliaWeth),
+                "TESTpovLendWETH",
+                "Panoptic Lend Vault | WETH",
+                salt
+            );
+
+        vm.stopPrank();
+
+        HypoVault wethPlpVault = HypoVault(payable(vaultAddress));
+        HypoVaultManagerWithMerkleVerification wethPlpVaultManager = HypoVaultManagerWithMerkleVerification(
+                managerAddress
+            );
+        PanopticVaultAccountant panopticVaultAccountant = PanopticVaultAccountant(accountant);
+
+        console2.log("=== Step 2: Alice requests deposit ===");
+
+        deal(address(sepoliaWeth), Alice, 100 ether);
+        vm.startPrank(Alice);
+        sepoliaWeth.approve(address(wethPlpVault), type(uint256).max);
+        wethPlpVault.requestDeposit(100 ether);
+        vm.stopPrank();
+
+        assertGe(sepoliaWeth.balanceOf(address(wethPlpVault)), 100 ether);
+        assertEq(wethPlpVault.queuedDeposit(Alice, 0), 100 ether);
+
+        // Initialize pools in Accountant
+        PanopticVaultAccountant.PoolInfo[] memory poolInfos = createDefaultPools();
+        vm.prank(owner);
+        bytes32 poolInfosHash = keccak256(abi.encode(poolInfos));
+        panopticVaultAccountant.updatePoolsHash(address(wethPlpVault), poolInfosHash);
+
+        console2.log("=== Step 3: Atomic fulfillDeposits + approve + deposit via manageVaultWithMerkleVerification ===");
+
+        // Prepare manager input for fulfillDeposits
+        int24 TWAP_TICK = 100;
+        PanopticVaultAccountant.ManagerPrices[]
+            memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
+        managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
+            poolPrice: TWAP_TICK,
+            token0Price: 0,
+            token1Price: TWAP_TICK
+        });
+        bytes memory managerInput = abi.encode(managerPrices, poolInfos, new TokenId[][](1));
+
+        // Build atomic calls: fulfillDeposits + approve + deposit to CollateralTracker
+        address[] memory targets = new address[](3);
+        targets[0] = address(wethPlpVaultManager); // Call manager's fulfillDeposits via vault.manage()
+        targets[1] = address(sepoliaWeth);          // Approve
+        targets[2] = address(wethUsdc500bpsV3Collateral0); // Deposit
+
+        bytes[] memory targetData = new bytes[](3);
+        targetData[0] = abi.encodeWithSelector(
+            HypoVaultManagerWithMerkleVerification.fulfillDeposits.selector,
+            100 ether,
+            managerInput
+        );
+        targetData[1] = abi.encodeWithSelector(
+            ERC20S.approve.selector,
+            wethUsdc500bpsV3Collateral0,
+            type(uint256).max
+        );
+        targetData[2] = abi.encodeWithSelector(ERC4626.deposit.selector, 50 ether, wethPlpVault);
+
+        // Build proofs for all 3 calls
+        // leafs[0] = fulfillDeposits, leafs[1] = fulfillWithdrawals, leafs[2] = approve, leafs[3] = deposit
+        ManageLeaf[] memory manageLeafs = new ManageLeaf[](3);
+        manageLeafs[0] = leafs[0]; // fulfillDeposits
+        manageLeafs[1] = leafs[2]; // approve
+        manageLeafs[2] = leafs[3]; // deposit
+        bytes32[][] memory manageProofs = _getProofsUsingTree(manageLeafs, manageTree);
+
+        uint256[] memory values = new uint256[](3);
+
+        address[] memory decodersAndSanitizers = new address[](3);
+        decodersAndSanitizers[0] = panopticDecoderAndSanitizer;
+        decodersAndSanitizers[1] = panopticDecoderAndSanitizer;
+        decodersAndSanitizers[2] = panopticDecoderAndSanitizer;
+
+        // Record initial state
+        uint256 initialDepositEpoch = wethPlpVault.depositEpoch();
+        uint256 initialCollateralWethAllowance = sepoliaWeth.allowance(
+            address(wethPlpVault),
+            wethUsdc500bpsV3Collateral0
+        );
+        uint256 initialPPWethBalance = sepoliaWeth.balanceOf(wethUsdc500bpsV3PanopticPool);
+
+        // Execute atomic operation
+        vm.prank(TurnkeyAccount0);
+        wethPlpVaultManager.manageVaultWithMerkleVerification(
+            manageProofs,
+            decodersAndSanitizers,
+            targets,
+            targetData,
+            values
+        );
+
+        // Verify fulfillDeposits was executed
+        assertEq(wethPlpVault.depositEpoch(), initialDepositEpoch + 1, "Deposit epoch should increment");
+        (uint128 assetsDeposited, , uint128 assetsFulfilled) = wethPlpVault.depositEpochState(0);
+        assertEq(assetsDeposited, 100 ether, "Assets deposited should match");
+        assertEq(assetsFulfilled, 100 ether, "Assets fulfilled should match");
+
+        // Verify approve and deposit were executed
+        uint256 newCollateralWethAllowance = sepoliaWeth.allowance(
+            address(wethPlpVault),
+            wethUsdc500bpsV3Collateral0
+        );
+        uint256 newPPWethBalance = sepoliaWeth.balanceOf(wethUsdc500bpsV3PanopticPool);
+
+        assertGt(newCollateralWethAllowance, initialCollateralWethAllowance, "Allowance should increase");
+        assertGt(newPPWethBalance, initialPPWethBalance, "Panoptic pool balance should increase");
+
+        console2.log("=== Step 4: Verify Alice can execute deposit and get shares ===");
+
+        wethPlpVault.executeDeposit(Alice, 0);
+        uint256 aliceShares = wethPlpVault.balanceOf(Alice);
+        assertGt(aliceShares, 0, "Alice should have shares");
+
+        console2.log("=== Atomic fulfillDeposits test completed successfully! ===");
     }
 
     function createDefaultPools() internal returns (PanopticVaultAccountant.PoolInfo[] memory) {
