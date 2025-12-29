@@ -257,12 +257,12 @@ sequenceDiagram
 
 ## Roles
 
-| Role | Account | Can Do |
-|------|---------|--------|
-| HypoVault Owner | Turnkey0 (later multisig) | Update manager, accountant, and fee wallet |
-| RolesAuthority Owner | Turnkey0 (later multisig) | Configure roles and permissions; call `setManageRoot()` on ManagerWithMerkleVerification |
-| PanopticVaultAccountant Owner | Turnkey0 (later multisig) | Call `updatePoolsHash()` and `lockVault()` |
-| RolesAuthority.Strategist | Turnkey1/2/3 (1 per vault) | Call `manageVaultWithMerkleVerification()` (uses `requiresAuth` modifier) |
+| Role                            | Account                    | Can Do                                                                                                               |
+| ------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| HypoVault Owner                 | Turnkey0 (later multisig)  | Update manager, accountant, and fee wallet                                                                           |
+| RolesAuthority Owner            | Turnkey0 (later multisig)  | Configure roles and permissions; call `setManageRoot()` on ManagerWithMerkleVerification                             |
+| PanopticVaultAccountant Owner   | Turnkey0 (later multisig)  | Call `updatePoolsHash()` and `lockVault()`                                                                           |
+| RolesAuthority.Strategist       | Turnkey1/2/3 (1 per vault) | Call `manageVaultWithMerkleVerification()` (uses `requiresAuth` modifier)                                            |
 | HypoVaultManager.onlyStrategist | Turnkey1/2/3 (1 per vault) | Call `fulfillDeposits()`, `fulfillWithdrawals()`, `cancelDeposit()`, `cancelWithdrawal()`, `requestWithdrawalFrom()` |
 
 ### Notes
