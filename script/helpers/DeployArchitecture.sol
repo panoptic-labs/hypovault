@@ -44,15 +44,12 @@ contract DeployArchitecture {
         console.log("Accountant Address:", accountantAddress);
 
         // 4. Deploy PanopticDecoderAndSanitizer with CREATE2
-        PanopticDecoderAndSanitizer decoder = new PanopticDecoderAndSanitizer{
-            salt: salt
-        }(hypoVaultImplAddress);
+        PanopticDecoderAndSanitizer decoder = new PanopticDecoderAndSanitizer{salt: salt}(
+            hypoVaultImplAddress
+        );
         address panopticDecoderAndSanitizerAddress = address(decoder);
         console.log("=== CREATE2 Deployment Info ===");
-        console.log(
-            "PanopticDecoderAndSanitizer Address:",
-            panopticDecoderAndSanitizerAddress
-        );
+        console.log("PanopticDecoderAndSanitizer Address:", panopticDecoderAndSanitizerAddress);
 
         // 5. Deploy and configure RolesAuthority with CREATE2
         RolesAuthority authority = new RolesAuthority{salt: salt}(deployer, Authority(address(0)));

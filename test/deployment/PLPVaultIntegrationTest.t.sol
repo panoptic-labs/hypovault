@@ -374,7 +374,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         // JSON output from _generateLeafs, especially when multiple leafs adding helpers are used (like _addCollateralTrackerLeafs)
         // Note: leafs[0] = fulfillDeposits, leafs[1] = fulfillWithdrawals, leafs[2] = approve, leafs[3] = deposit, etc.
         manageLeafs[0] = leafs[2]; // approve leaf
-        manageLeafs[1] = leafs[3]; // deposit leaf 
+        manageLeafs[1] = leafs[3]; // deposit leaf
         bytes32[][] memory manageProofs = _getProofsUsingTree(manageLeafs, manageTree);
         console.log("got proofs");
 
@@ -717,7 +717,9 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         bytes32 poolInfosHash = keccak256(abi.encode(poolInfos));
         panopticVaultAccountant.updatePoolsHash(address(wethPlpVault), poolInfosHash);
 
-        console2.log("=== Step 3: Atomic fulfillDeposits + approve + deposit via manageVaultWithMerkleVerification ===");
+        console2.log(
+            "=== Step 3: Atomic fulfillDeposits + approve + deposit via manageVaultWithMerkleVerification ==="
+        );
 
         // Prepare manager input for fulfillDeposits
         int24 TWAP_TICK = 100;
@@ -733,7 +735,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         // Build atomic calls: fulfillDeposits + approve + deposit to CollateralTracker
         address[] memory targets = new address[](3);
         targets[0] = address(wethPlpVaultManager); // Call manager's fulfillDeposits via vault.manage()
-        targets[1] = address(sepoliaWeth);          // Approve
+        targets[1] = address(sepoliaWeth); // Approve
         targets[2] = address(wethUsdc500bpsV3Collateral0); // Deposit
 
         bytes[] memory targetData = new bytes[](3);
@@ -783,7 +785,11 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         );
 
         // Verify fulfillDeposits was executed
-        assertEq(wethPlpVault.depositEpoch(), initialDepositEpoch + 1, "Deposit epoch should increment");
+        assertEq(
+            wethPlpVault.depositEpoch(),
+            initialDepositEpoch + 1,
+            "Deposit epoch should increment"
+        );
         (uint128 assetsDeposited, , uint128 assetsFulfilled) = wethPlpVault.depositEpochState(0);
         assertEq(assetsDeposited, 100 ether, "Assets deposited should match");
         assertEq(assetsFulfilled, 100 ether, "Assets fulfilled should match");
@@ -795,7 +801,11 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         );
         uint256 newPPWethBalance = sepoliaWeth.balanceOf(wethUsdc500bpsV3PanopticPool);
 
-        assertGt(newCollateralWethAllowance, initialCollateralWethAllowance, "Allowance should increase");
+        assertGt(
+            newCollateralWethAllowance,
+            initialCollateralWethAllowance,
+            "Allowance should increase"
+        );
         assertGt(newPPWethBalance, initialPPWethBalance, "Panoptic pool balance should increase");
 
         console2.log("=== Step 4: Verify Alice can execute deposit and get shares ===");

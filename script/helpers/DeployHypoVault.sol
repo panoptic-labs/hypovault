@@ -78,26 +78,24 @@ contract DeployHypoVault is MerkleTreeHelper {
         setAddress(true, sepolia, "boringVault", address(vault));
         setAddress(true, sepolia, "managerAddress", managerAddress);
         setAddress(true, sepolia, "accountantAddress", accountantAddress);
-        setAddress(
-            true,
-            sepolia,
-            "rawDataDecoderAndSanitizer",
-            panopticDecoderAndSanitizer
-        );
+        setAddress(true, sepolia, "rawDataDecoderAndSanitizer", panopticDecoderAndSanitizer);
 
-        console.log('adding leafs');
-        ManageLeaf[] memory leafs = new ManageLeaf[](8);  // 2 from HypoVaultManager + 6 from CollateralTracker = 8 total
+        console.log("adding leafs");
+        ManageLeaf[] memory leafs = new ManageLeaf[](8); // 2 from HypoVaultManager + 6 from CollateralTracker = 8 total
         leafIndex = type(uint256).max; // Reset leaf index before adding leafs. Unchecked increment as first line of each `_add*Leafs` function ensures this starts at 0
         _addHypoVaultManagerLeafs(leafs, managerAddress); // Add manager leafs first (fulfillDeposits, fulfillWithdrawals)
         _addCollateralTrackerLeafs(leafs, ERC4626(wethUsdc500bpsV3Collateral0));
-        console.log('leafs added');
-        console.log('leafs length: ', leafs.length);
+        console.log("leafs added");
+        console.log("leafs length: ", leafs.length);
         bytes32[][] memory manageTree = _generateMerkleTree(leafs);
-        console.log('manage tree generated');
-        console.log('manageTree[manageTree[0].length', manageTree[0].length);
-        console.log('manageTree[manageTree.length - 1].length', manageTree[manageTree.length - 1].length);
+        console.log("manage tree generated");
+        console.log("manageTree[manageTree[0].length", manageTree[0].length);
+        console.log(
+            "manageTree[manageTree.length - 1].length",
+            manageTree[manageTree.length - 1].length
+        );
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
-        console.log('manage root');
+        console.log("manage root");
         string memory filePath = string.concat(
             "./hypoVaultManagerArtifacts/Production",
             symbol,

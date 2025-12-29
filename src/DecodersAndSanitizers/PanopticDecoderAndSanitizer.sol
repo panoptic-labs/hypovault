@@ -73,4 +73,3 @@ contract PanopticDecoderAndSanitizer is BaseDecoderAndSanitizer {
         addressesFound = "";
     }
 }
-
