@@ -86,7 +86,7 @@ contract DeployHypoVault is MerkleTreeHelper {
         );
 
         console.log('adding leafs');
-        ManageLeaf[] memory leafs = new ManageLeaf[](12);
+        ManageLeaf[] memory leafs = new ManageLeaf[](8);  // 2 from HypoVaultManager + 6 from CollateralTracker = 8 total
         leafIndex = type(uint256).max; // Reset leaf index before adding leafs. Unchecked increment as first line of each `_add*Leafs` function ensures this starts at 0
         _addHypoVaultManagerLeafs(leafs, managerAddress); // Add manager leafs first (fulfillDeposits, fulfillWithdrawals)
         _addCollateralTrackerLeafs(leafs, ERC4626(wethUsdc500bpsV3Collateral0));
