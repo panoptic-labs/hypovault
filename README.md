@@ -255,6 +255,23 @@ sequenceDiagram
     end
 ```
 
+## Roles
+
+| Role                            | Account                    | Can Do                                                                                                               |
+| ------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| HypoVault Owner                 | Turnkey0 (later multisig)  | Update manager, accountant, and fee wallet                                                                           |
+| RolesAuthority Owner            | Turnkey0 (later multisig)  | Configure roles and permissions; call `setManageRoot()` on ManagerWithMerkleVerification                             |
+| PanopticVaultAccountant Owner   | Turnkey0 (later multisig)  | Call `updatePoolsHash()` and `lockVault()`                                                                           |
+| RolesAuthority.Strategist       | Turnkey1/2/3 (1 per vault) | Call `manageVaultWithMerkleVerification()` (uses `requiresAuth` modifier)                                            |
+| HypoVaultManager.onlyStrategist | Turnkey1/2/3 (1 per vault) | Call `fulfillDeposits()`, `fulfillWithdrawals()`, `cancelDeposit()`, `cancelWithdrawal()`, `requestWithdrawalFrom()` |
+
+### Notes
+
+- Each vault uses **one dedicated Turnkey account** (e.g., Turnkey1 for WETH vault, Turnkey2 for USDC vault)
+- The RolesAuthority Owner can call `setManageRoot(strategist, merkleRoot)` to authorize strategists
+- The `onlyStrategist` modifier allows any address with a manageRoot OR the owner
+- In practice, the same Turnkey account receives both the RolesAuthority.Strategist role and a manageRoot for full vault management capabilities
+
 ## Adapting to new Protocols
 
 For each new protocol a vault will want to interact with, there will need to be an appropriate DecoderAndSanitizer (or multiple DecoderAndSanitizers), as well as an accountant (like PanopticVaultAccountant). See more in the BoringVault docs here: https://docs.veda.tech/integrations/boringvault-protocol-integration
