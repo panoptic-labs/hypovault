@@ -31,6 +31,7 @@ contract DeployHypoVault is MerkleTreeHelper {
         address authorityAddress,
         address turnkeyAccount,
         address underlyingToken,
+        address collateralTracker,
         string memory symbol,
         string memory name,
         bytes32 salt
@@ -73,7 +74,6 @@ contract DeployHypoVault is MerkleTreeHelper {
         console.log("Manager set on vault");
 
         // 5. Build merkle tree for manage operations
-        address wethUsdc500bpsV3Collateral0 = 0x1AF0D98626d53397BA5613873D3b19cc25235d52;
         setSourceChainName(sepolia);
         setAddress(true, sepolia, "boringVault", address(vault));
         setAddress(true, sepolia, "managerAddress", managerAddress);
@@ -86,7 +86,7 @@ contract DeployHypoVault is MerkleTreeHelper {
         );
 
         ManageLeaf[] memory leafs = new ManageLeaf[](8);
-        _addCollateralTrackerLeafs(leafs, ERC4626(wethUsdc500bpsV3Collateral0));
+        _addCollateralTrackerLeafs(leafs, ERC4626(collateralTracker));
         bytes32[][] memory manageTree = _generateMerkleTree(leafs);
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
         string memory filePath = string.concat(
