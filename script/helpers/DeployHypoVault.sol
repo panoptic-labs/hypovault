@@ -48,13 +48,13 @@ contract DeployHypoVault is MerkleTreeHelper {
         uint256 performanceFeeBps = 1000; // 10%
         address vaultAddress = 0xE616b9aE29644f8c45c15C7B823841bf304A4165;
         // address vaultAddress = HypoVaultFactory(vaultFactory).createVault(
-            // underlyingToken,
-            // deployer,
-            // IVaultAccountant(accountantAddress),
-            // performanceFeeBps,
-            // symbol,
-            // name,
-            // salt
+        // underlyingToken,
+        // deployer,
+        // IVaultAccountant(accountantAddress),
+        // performanceFeeBps,
+        // symbol,
+        // name,
+        // salt
         // );
         HypoVault vault = HypoVault(payable(vaultAddress));
         console.log("vaultAddress: ", vaultAddress);
@@ -65,11 +65,11 @@ contract DeployHypoVault is MerkleTreeHelper {
 
         // 3. Deploy HypoVaultManagerWithMerkleVerification with CREATE2
         // HypoVaultManagerWithMerkleVerification manager = new HypoVaultManagerWithMerkleVerification{
-            // salt: salt
+        // salt: salt
         // }(deployer, address(vault), BalancerVaultAddr);
         HypoVaultManagerWithMerkleVerification manager = HypoVaultManagerWithMerkleVerification(
             0x22f9f14AC9f4572978db3641fD1d83c593deBf8E
-        ); 
+        );
         address managerAddress = address(manager);
         console.log("Manager Address:", managerAddress);
 
