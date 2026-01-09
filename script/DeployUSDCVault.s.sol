@@ -14,7 +14,8 @@ contract DeployUSDCVault is Script, DeployHypoVault {
     address constant ACCOUNTANT_ADDRESS = address(0x529e41f74221963D43B0b4466674EA24A19F1c27);
     address constant DECODER_ADDRESS = address(0x045AB155Ee70f57fc1672f100FE4939a0d052731);
     address constant AUTHORITY_ADDRESS = address(0xa1FC02EEeDb96F9C0231234DB2824c1FfFeD60CD);
-    address constant COLLATERAL_TRACKER_ADDRESS = address(0x0A9a8e10e6D9601b1eE056D194c77D5a2dE40F77);
+    address constant COLLATERAL_TRACKER_ADDRESS =
+        address(0x0A9a8e10e6D9601b1eE056D194c77D5a2dE40F77);
 
     address constant VAULT_TURNKEY_ADDRESS = address(0x3c1c79d0cfc316Ba959194c89696a8382d7d283b);
 
