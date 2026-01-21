@@ -102,9 +102,8 @@ contract PanopticVaultAccountant is Ownable {
             // Get TWAP from the PanopticPool's internal oracle (V4 compatible)
             (, , int24 slowOracleTick, , ) = pools[i].pool.getOracleTicks();
 
-            if (
-                Math.abs(managerPrices[i].poolPrice - slowOracleTick) > pools[i].maxPriceDeviation
-            ) revert StaleOraclePrice();
+            if (Math.abs(managerPrices[i].poolPrice - slowOracleTick) > pools[i].maxPriceDeviation)
+                revert StaleOraclePrice();
 
             uint256[2][] memory positionBalanceArray;
             int256 poolExposure0;
