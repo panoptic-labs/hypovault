@@ -414,7 +414,9 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             address(wethPlpVault),
             wethUsdc500bpsV4Collateral0
         );
-        uint256 initialCollateralShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(address(wethPlpVault));
+        uint256 initialCollateralShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(
+            address(wethPlpVault)
+        );
 
         wethPlpVaultManager.manageVaultWithMerkleVerification(
             manageProofs,
@@ -428,7 +430,9 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             address(wethPlpVault),
             wethUsdc500bpsV4Collateral0
         );
-        uint256 newCollateralShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(address(wethPlpVault));
+        uint256 newCollateralShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(
+            address(wethPlpVault)
+        );
 
         assertGt(newCollateralWethAllowance, initialCollateralWethAllowance);
         assertGt(newCollateralShares, initialCollateralShares);
@@ -622,7 +626,9 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             address(wethPlpVault),
             wethUsdc500bpsV4Collateral0
         );
-        uint256 initialCollateralShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(address(wethPlpVault));
+        uint256 initialCollateralShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(
+            address(wethPlpVault)
+        );
 
         wethPlpVaultManager.manageVaultWithMerkleVerification(
             manageProofs,
@@ -636,7 +642,9 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             address(wethPlpVault),
             wethUsdc500bpsV4Collateral0
         );
-        uint256 newCollateralShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(address(wethPlpVault));
+        uint256 newCollateralShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(
+            address(wethPlpVault)
+        );
 
         assertGt(newCollateralWethAllowance, initialCollateralWethAllowance);
         assertGt(newCollateralShares, initialCollateralShares);
@@ -646,7 +654,11 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         console2.log("=== Integration test completed successfully! ===");
     }
 
-    function createDefaultPools() internal pure returns (PanopticVaultAccountant.PoolInfo[] memory) {
+    function createDefaultPools()
+        internal
+        pure
+        returns (PanopticVaultAccountant.PoolInfo[] memory)
+    {
         int24 MAX_PRICE_DEVIATION = 1700000; // basically no price deviation check for test
 
         address token0 = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14; // sepolia weth9

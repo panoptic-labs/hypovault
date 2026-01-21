@@ -207,7 +207,11 @@ contract DeployHypoVault is MerkleTreeHelper {
         vm.serializeAddress(poolJson, "pool", address(info.pool));
         vm.serializeAddress(poolJson, "token0", address(info.token0));
         vm.serializeAddress(poolJson, "token1", address(info.token1));
-        string memory finalJson = vm.serializeInt(poolJson, "maxPriceDeviation", info.maxPriceDeviation);
+        string memory finalJson = vm.serializeInt(
+            poolJson,
+            "maxPriceDeviation",
+            info.maxPriceDeviation
+        );
         return finalJson;
     }
 }
