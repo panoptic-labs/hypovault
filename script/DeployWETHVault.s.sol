@@ -15,7 +15,7 @@ contract DeployWETHVault is Script, DeployHypoVault {
     address constant DECODER_ADDRESS = address(0x045AB155Ee70f57fc1672f100FE4939a0d052731);
     address constant AUTHORITY_ADDRESS = address(0xa1FC02EEeDb96F9C0231234DB2824c1FfFeD60CD);
     address constant COLLATERAL_TRACKER_ADDRESS =
-        address(0x1AF0D98626d53397BA5613873D3b19cc25235d52);
+        address(0x5D4AF956762dd67F890467470127574656A641f8);
 
     address constant VAULT_TURNKEY_ADDRESS = address(0x8FfA6DAB99f8afc64F61BeF83F0966eD6362f24F);
 

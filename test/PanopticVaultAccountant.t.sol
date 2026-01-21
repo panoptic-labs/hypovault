@@ -194,6 +194,7 @@ contract MockPanopticPool {
     LeftRightUnsigned public mockShortPremium;
     LeftRightUnsigned public mockLongPremium;
     uint256[2][] public mockPositionBalanceArray;
+    int24 public mockSlowOracleTick;
 
     // Additional state for more comprehensive testing
     mapping(address => mapping(uint256 => bool)) public positionExists;
@@ -202,6 +203,7 @@ contract MockPanopticPool {
     constructor() {
         collateralToken0 = new MockCollateralToken();
         collateralToken1 = new MockCollateralToken();
+        mockSlowOracleTick = 100; // Default TWAP tick
     }
 
     function numberOfLegs(address vault) external view returns (uint256) {
@@ -210,6 +212,24 @@ contract MockPanopticPool {
 
     function setNumberOfLegs(address vault, uint256 legs) external {
         numberOfLegsMapping[vault] = legs;
+    }
+
+    function getOracleTicks()
+        external
+        view
+        returns (
+            int24 currentTick,
+            int24 fastOracleTick,
+            int24 slowOracleTick,
+            int24 latestObservation,
+            uint256 medianData
+        )
+    {
+        return (mockSlowOracleTick, mockSlowOracleTick, mockSlowOracleTick, mockSlowOracleTick, 0);
+    }
+
+    function setMockSlowOracleTick(int24 tick) external {
+        mockSlowOracleTick = tick;
     }
 
     function getAccumulatedFeesAndPositionsData(
@@ -498,13 +518,7 @@ contract PanopticVaultAccountantTest is Test {
             pool: PanopticPool(address(mockPool)),
             token0: underlyingToken, // Same as underlying - no conversion
             token1: token1,
-            isUnderlyingToken0InOracle0: false,
-            isUnderlyingToken0InOracle1: false,
-            oracle0: oracle0,
-            oracle1: oracle1,
-            poolOracle: poolOracle,
-            maxPriceDeviation: MAX_PRICE_DEVIATION,
-            twapWindow: TWAP_WINDOW
+            maxPriceDeviation: MAX_PRICE_DEVIATION
         });
 
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
@@ -549,13 +563,7 @@ contract PanopticVaultAccountantTest is Test {
             pool: PanopticPool(address(mockPool)),
             token0: underlyingToken, // Same as underlying
             token1: underlyingToken, // Same as underlying
-            poolOracle: poolOracle,
-            oracle0: oracle0,
-            isUnderlyingToken0InOracle0: true,
-            oracle1: oracle1,
-            isUnderlyingToken0InOracle1: true,
-            maxPriceDeviation: MAX_PRICE_DEVIATION,
-            twapWindow: TWAP_WINDOW
+            maxPriceDeviation: MAX_PRICE_DEVIATION
         });
 
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
@@ -593,13 +601,7 @@ contract PanopticVaultAccountantTest is Test {
             pool: PanopticPool(address(mockPool)),
             token0: underlyingToken, // Same as underlying
             token1: token1,
-            poolOracle: poolOracle,
-            oracle0: oracle0,
-            isUnderlyingToken0InOracle0: true,
-            oracle1: oracle1,
-            isUnderlyingToken0InOracle1: false,
-            maxPriceDeviation: MAX_PRICE_DEVIATION,
-            twapWindow: TWAP_WINDOW
+            maxPriceDeviation: MAX_PRICE_DEVIATION
         });
 
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
@@ -662,13 +664,7 @@ contract PanopticVaultAccountantTest is Test {
             pool: PanopticPool(address(mockPool)),
             token0: token0,
             token1: token1,
-            poolOracle: poolOracle, // remains at TWAP_TICK=100 (from setupDefaultOracles)
-            oracle0: oracle0,
-            isUnderlyingToken0InOracle0: false, // underlying is token1 in oracle0 (so convert0->1 yields underlying)
-            oracle1: oracle1,
-            isUnderlyingToken0InOracle1: true, // underlying is token0 in oracle1 (so convert1->0 yields underlying)
-            maxPriceDeviation: MAX_PRICE_DEVIATION,
-            twapWindow: TWAP_WINDOW
+            maxPriceDeviation: MAX_PRICE_DEVIATION
         });
 
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
@@ -839,8 +835,6 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_flippedTokens() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        pools[0].isUnderlyingToken0InOracle0 = true;
-        pools[0].isUnderlyingToken0InOracle1 = true;
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
 
         setupBasicScenario();
@@ -997,13 +991,7 @@ contract PanopticVaultAccountantTest is Test {
             pool: PanopticPool(address(mockPool)),
             token0: token0,
             token1: token1,
-            poolOracle: poolOracle,
-            oracle0: oracle0,
-            isUnderlyingToken0InOracle0: false,
-            oracle1: oracle1,
-            isUnderlyingToken0InOracle1: false,
-            maxPriceDeviation: MAX_PRICE_DEVIATION,
-            twapWindow: TWAP_WINDOW
+            maxPriceDeviation: MAX_PRICE_DEVIATION
         });
         return pools;
     }
@@ -2462,8 +2450,6 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_flippedOracles_conversion() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        pools[0].isUnderlyingToken0InOracle0 = true;
-        pools[0].isUnderlyingToken0InOracle1 = true;
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
 
         // Create different underlying to force conversion with flipped oracles

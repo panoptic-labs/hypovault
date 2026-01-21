@@ -12,6 +12,7 @@ import {CollateralTrackerDecoderAndSanitizer} from "../src/DecodersAndSanitizers
 import {ERC20S} from "lib/panoptic-v1.1/test/foundry/testUtils/ERC20S.sol";
 import {ERC4626} from "lib/boring-vault/lib/solmate/src/tokens/ERC4626.sol";
 import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC20Partial.sol";
+import {IV3CompatibleOracle} from "lib/panoptic-v1.1/contracts/interfaces/IV3CompatibleOracle.sol";
 import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
 
 import {HypoVaultManagerWithMerkleVerification} from "../src/managers/HypoVaultManagerWithMerkleVerification.sol";
