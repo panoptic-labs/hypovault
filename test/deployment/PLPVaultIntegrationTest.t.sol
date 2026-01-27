@@ -406,7 +406,9 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         decodersAndSanitizers[1] = collateralTrackerDecoderAndSanitizer;
 
         vm.startPrank(TurnkeyAccount0);
-        uint256 initialCtShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(address(wethPlpVault));
+        uint256 initialCtShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(
+            address(wethPlpVault)
+        );
 
         wethPlpVaultManager.manageVaultWithMerkleVerification(
             manageProofs,
@@ -596,7 +598,9 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         decodersAndSanitizers[1] = collateralTrackerDecoderAndSanitizer;
 
         vm.startPrank(TurnkeyAccount0);
-        uint256 initialCtShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(address(wethPlpVault));
+        uint256 initialCtShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(
+            address(wethPlpVault)
+        );
 
         wethPlpVaultManager.manageVaultWithMerkleVerification(
             manageProofs,
