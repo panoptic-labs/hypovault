@@ -196,8 +196,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
     function test_complete_manager_no_fork_with_panoptic_collateral_integration_flow() public {
         console2.log("=== Step 1: Deploy ===");
         uint256 forkId = vm.createSelectFork(
-            string.concat("https://eth-sepolia.g.alchemy.com/v2/", vm.envString("ALCHEMY_API_KEY")),
-            9775660
+            string.concat("https://eth-sepolia.g.alchemy.com/v2/", vm.envString("ALCHEMY_API_KEY"))
         );
 
         address PanopticMultisig = 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1;
@@ -205,8 +204,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         address TurnkeyAccount0 = address(0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8);
         address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
         ERC20S sepoliaWeth = ERC20S(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
-        address wethUsdc500bpsV3Collateral0 = 0x1AF0D98626d53397BA5613873D3b19cc25235d52; // Underlying: WETH9 | 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
-        address wethUsdc500bpsV3PanopticPool = 0x00002c1c2EF3E4b606F8361d975Cdc2834668e9F; // Underlying: WETH9 | receives deposited assets
+        address wethUsdc500bpsV4Collateral0 = 0x4f29B472bebbFcEEc250a4A5BC33312F00025600; // Underlying: WETH9 | 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
+        address wethUsdc500bpsV4PanopticPool = 0x2aafC1D2Af4dEB9FD8b02cDE5a8C0922cA4D6c78; // Underlying: WETH9 | receives deposited assets
 
         /*
            STEP 1: Deployments
@@ -238,7 +237,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
                 authorityAddress,
                 TurnkeyAccount0,
                 address(sepoliaWeth),
-                wethUsdc500bpsV3Collateral0,
+                wethUsdc500bpsV4Collateral0,
                 "povLendWETH",
                 "Panoptic Lend Vault | WETH",
                 salt
@@ -359,12 +358,12 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         // Remember targets, targetData, manageProofs (so manageLeafs too), values, decodersAndSanitizers arrays must all be the same length
         address[] memory targets = new address[](2);
         targets[0] = address(sepoliaWeth);
-        targets[1] = address(wethUsdc500bpsV3Collateral0);
+        targets[1] = address(wethUsdc500bpsV4Collateral0);
 
         bytes[] memory targetData = new bytes[](2);
         targetData[0] = abi.encodeWithSelector(
             ERC20S.approve.selector,
-            wethUsdc500bpsV3Collateral0,
+            wethUsdc500bpsV4Collateral0,
             type(uint256).max
         );
         targetData[1] = abi.encodeWithSelector(ERC4626.deposit.selector, 50 ether, wethPlpVault);
@@ -407,11 +406,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         decodersAndSanitizers[1] = collateralTrackerDecoderAndSanitizer;
 
         vm.startPrank(TurnkeyAccount0);
-        uint256 initialCollateralWethAllowance = sepoliaWeth.allowance(
-            address(wethPlpVault),
-            wethUsdc500bpsV3Collateral0
-        );
-        uint256 initialPPWethBalance = sepoliaWeth.balanceOf(wethUsdc500bpsV3PanopticPool);
+        uint256 initialCtShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(address(wethPlpVault));
 
         wethPlpVaultManager.manageVaultWithMerkleVerification(
             manageProofs,
@@ -421,14 +416,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             values
         );
 
-        uint256 newCollateralWethAllowance = sepoliaWeth.allowance(
-            address(wethPlpVault),
-            wethUsdc500bpsV3Collateral0
-        );
-        uint256 newPPWethBalance = sepoliaWeth.balanceOf(wethUsdc500bpsV3PanopticPool);
-
-        assertGt(newCollateralWethAllowance, initialCollateralWethAllowance);
-        assertGt(newPPWethBalance, initialPPWethBalance);
+        uint256 newCtShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(address(wethPlpVault));
+        assertGt(newCtShares, initialCtShares);
 
         vm.stopPrank();
 
@@ -440,8 +429,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         vm.skip(true);
         console2.log("=== Init ===");
         uint256 forkId = vm.createSelectFork(
-            string.concat("https://eth-sepolia.g.alchemy.com/v2/", vm.envString("ALCHEMY_API_KEY")),
-            9775660
+            string.concat("https://eth-sepolia.g.alchemy.com/v2/", vm.envString("ALCHEMY_API_KEY"))
         );
 
         address PanopticMultisig = 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1;
@@ -449,23 +437,23 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         address TurnkeyAccount0 = address(0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8);
         address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
         ERC20S sepoliaWeth = ERC20S(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
-        address wethUsdc500bpsV3Collateral0 = 0x1AF0D98626d53397BA5613873D3b19cc25235d52; // Underlying: WETH9 | 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
-        address wethUsdc500bpsV3PanopticPool = 0x00002c1c2EF3E4b606F8361d975Cdc2834668e9F; // Underlying: WETH9 | receives deposited assets
+        address wethUsdc500bpsV4Collateral0 = 0x4f29B472bebbFcEEc250a4A5BC33312F00025600; // Underlying: WETH9 | 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
+        address wethUsdc500bpsV4PanopticPool = 0x2aafC1D2Af4dEB9FD8b02cDE5a8C0922cA4D6c78;
 
         // use contract suite deployed from EOA
-        HypoVault wethPlpVault = HypoVault(payable(0x5B61131B0b2589b5C8f6B93C6F989b5dAdFF0FB4));
+        HypoVault wethPlpVault = HypoVault(payable(0x69a3Dd63BCB02E89a70630294EDCe0e78377B876));
         HypoVaultManagerWithMerkleVerification wethPlpVaultManager = HypoVaultManagerWithMerkleVerification(
-                0x585a97cb89DC2E345D9fb80b84a5038c6D8c8118
+                0xcCaB9842150F19552B137f4dA28DeEB6101542cF
             );
         PanopticVaultAccountant panopticVaultAccountant = PanopticVaultAccountant(
-            0x425379d80bf1ED904006B3C893BEa1903Fc13caF
+            0x6100455aA6637093464E75a9Cb9785F7A8D51E80
         );
-        RolesAuthority rolesAuthority = RolesAuthority(0x8d50AB622417Fa699F19bd125E69E927418c4B2A);
+        RolesAuthority rolesAuthority = RolesAuthority(0x9166293A301CcC805d5171A2D1e62050ba72795D);
 
         /////////////////////////////
         // rebuild merkle tree to show full manage flow
         ///////////////////////
-        address collateralTrackerDecoderAndSanitizer = 0x068C823B047B0cBAEFB1aE57Cf792D05665858b7;
+        address collateralTrackerDecoderAndSanitizer = 0x606c4Aee942f2F0dCd0c0934E4266eb854EA0cBe;
         setSourceChainName(sepolia);
         setAddress(false, sepolia, "boringVault", address(wethPlpVault));
         setAddress(false, sepolia, "managerAddress", address(wethPlpVaultManager));
@@ -479,7 +467,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
 
         ManageLeaf[] memory leafs = new ManageLeaf[](8); // limit to smallest power of 2 that is grater than leaf size
 
-        _addCollateralTrackerLeafs(leafs, ERC4626(wethUsdc500bpsV3Collateral0));
+        _addCollateralTrackerLeafs(leafs, ERC4626(wethUsdc500bpsV4Collateral0));
 
         bytes32[][] memory manageTree = _generateMerkleTree(leafs);
 
@@ -515,20 +503,13 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         panopticVaultAccountant.updatePoolsHash(address(wethPlpVault), poolInfosHash);
         assertEq(panopticVaultAccountant.vaultPools(address(wethPlpVault)), poolInfosHash);
 
-        // Get latest tick to create managerInput
-        (
-            int24 currentTick,
-            int24 fastOracleTick,
-            int24 slowOracleTick,
-            int24 latestObservation,
-            uint256 medianData
-        ) = PanopticPool(wethUsdc500bpsV3PanopticPool).getOracleTicks();
+        int24 twapTick = IPanopticPoolV2(wethUsdc500bpsV4PanopticPool).getTWAP();
         PanopticVaultAccountant.ManagerPrices[]
             memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
         managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
-            poolPrice: currentTick, // token1 to token0 (aka underlyingToken)
+            poolPrice: twapTick, // token1 to token0 (aka underlyingToken)
             token0Price: 0, // token0 == underlyingToken
-            token1Price: currentTick // token1 to token0 (aka underlyingToken)
+            token1Price: twapTick // token1 to token0 (aka underlyingToken)
         });
 
         bytes memory managerInput = abi.encode(managerPrices, poolInfos, new TokenId[][](1));
@@ -567,12 +548,12 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         // Remember targets, targetData, manageProofs (so manageLeafs too), values, decodersAndSanitizers arrays must all be the same length
         address[] memory targets = new address[](2);
         targets[0] = address(sepoliaWeth);
-        targets[1] = address(wethUsdc500bpsV3Collateral0);
+        targets[1] = address(wethUsdc500bpsV4Collateral0);
 
         bytes[] memory targetData = new bytes[](2);
         targetData[0] = abi.encodeWithSelector(
             ERC20S.approve.selector,
-            wethUsdc500bpsV3Collateral0,
+            wethUsdc500bpsV4Collateral0,
             type(uint256).max
         );
         targetData[1] = abi.encodeWithSelector(ERC4626.deposit.selector, 50 ether, wethPlpVault);
@@ -615,11 +596,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         decodersAndSanitizers[1] = collateralTrackerDecoderAndSanitizer;
 
         vm.startPrank(TurnkeyAccount0);
-        uint256 initialCollateralWethAllowance = sepoliaWeth.allowance(
-            address(wethPlpVault),
-            wethUsdc500bpsV3Collateral0
-        );
-        uint256 initialPPWethBalance = sepoliaWeth.balanceOf(wethUsdc500bpsV3PanopticPool);
+        uint256 initialCtShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(address(wethPlpVault));
 
         wethPlpVaultManager.manageVaultWithMerkleVerification(
             manageProofs,
@@ -629,14 +606,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             values
         );
 
-        uint256 newCollateralWethAllowance = sepoliaWeth.allowance(
-            address(wethPlpVault),
-            wethUsdc500bpsV3Collateral0
-        );
-        uint256 newPPWethBalance = sepoliaWeth.balanceOf(wethUsdc500bpsV3PanopticPool);
-
-        assertGt(newCollateralWethAllowance, initialCollateralWethAllowance);
-        assertGt(newPPWethBalance, initialPPWethBalance);
+        uint256 newCtShares = ERC4626(wethUsdc500bpsV4Collateral0).balanceOf(address(wethPlpVault));
+        assertGt(newCtShares, initialCtShares);
 
         vm.stopPrank();
 
@@ -652,11 +623,11 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
 
         address token0 = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14; // sepolia weth9
         address token1 = 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A; // sepolia mock USDC
-        address wethUsdc500bpsV3PanopticPool = 0x00002c1c2EF3E4b606F8361d975Cdc2834668e9F;
+        address wethUsdc500bpsV4PanopticPool = 0x2aafC1D2Af4dEB9FD8b02cDE5a8C0922cA4D6c78;
 
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: PanopticPool(wethUsdc500bpsV3PanopticPool),
+            pool: PanopticPool(wethUsdc500bpsV4PanopticPool),
             token0: IERC20Partial(token0),
             token1: IERC20Partial(token1),
             maxPriceDeviation: MAX_PRICE_DEVIATION
