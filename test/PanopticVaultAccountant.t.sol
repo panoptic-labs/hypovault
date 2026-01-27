@@ -672,7 +672,6 @@ contract PanopticVaultAccountantTest is Test {
         );
     }
 
-    
     function test_computeNAV_negativePnL() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
@@ -2254,7 +2253,6 @@ contract PanopticVaultAccountantTest is Test {
             );
         }
     }
-
 
     /*//////////////////////////////////////////////////////////////
                         INTEGRATION TESTS
