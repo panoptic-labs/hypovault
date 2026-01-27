@@ -6,7 +6,6 @@ import "forge-std/console2.sol";
 import "../src/accountants/PanopticVaultAccountant.sol";
 import "../src/interfaces/IVaultAccountant.sol";
 import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC20Partial.sol";
-import {IV3CompatibleOracle} from "lib/panoptic-v1.1/contracts/interfaces/IV3CompatibleOracle.sol";
 import {PanopticPool} from "lib/panoptic-v1.1/contracts/PanopticPool.sol";
 import {TokenId} from "lib/panoptic-v1.1/contracts/types/TokenId.sol";
 import {LeftRightUnsigned} from "lib/panoptic-v1.1/contracts/types/LeftRight.sol";
@@ -55,117 +54,6 @@ contract MockERC20Partial is IERC20Partial {
     }
 }
 
-contract MockV3CompatibleOracle is IV3CompatibleOracle {
-    int56[] public tickCumulatives;
-    uint160[] public sqrtPriceX96s;
-    uint32 public windowSize;
-    int24 public currentTick;
-    uint160 public currentSqrtPriceX96;
-    uint16 public currentObservationCardinality;
-
-    constructor() {
-        // Default tick cumulatives for a 20-slot observation
-        for (uint i = 0; i < 20; i++) {
-            tickCumulatives.push(int56(int256(1000 + i * 100))); // Increasing tick cumulatives
-        }
-        windowSize = 600; // 10 minutes
-        currentTick = 100;
-        currentSqrtPriceX96 = Math.getSqrtRatioAtTick(currentTick);
-        currentObservationCardinality = 20;
-    }
-
-    function observe(
-        uint32[] memory secondsAgos
-    ) external view override returns (int56[] memory, uint160[] memory) {
-        int56[] memory ticks = new int56[](secondsAgos.length);
-        uint160[] memory prices = new uint160[](secondsAgos.length);
-
-        for (uint i = 0; i < secondsAgos.length; i++) {
-            if (i < tickCumulatives.length) {
-                ticks[i] = tickCumulatives[i];
-            } else {
-                ticks[i] = tickCumulatives[tickCumulatives.length - 1];
-            }
-            prices[i] = Math.getSqrtRatioAtTick(int24(ticks[i] / 100));
-        }
-
-        return (ticks, prices);
-    }
-
-    function slot0()
-        external
-        view
-        override
-        returns (
-            uint160 sqrtPriceX96,
-            int24 tick,
-            uint16 observationIndex,
-            uint16 observationCardinality,
-            uint16 observationCardinalityNext,
-            uint8 feeProtocol,
-            bool unlocked
-        )
-    {
-        return (
-            currentSqrtPriceX96,
-            currentTick,
-            0,
-            currentObservationCardinality,
-            currentObservationCardinality,
-            0,
-            true
-        );
-    }
-
-    function observations(
-        uint256
-    )
-        external
-        view
-        override
-        returns (
-            uint32 blockTimestamp,
-            int56 tickCumulative,
-            uint160 secondsPerLiquidityCumulativeX128,
-            bool initialized
-        )
-    {
-        return (uint32(block.timestamp), 0, 0, true);
-    }
-
-    function increaseObservationCardinalityNext(uint16) external override {
-        // Mock implementation - do nothing
-    }
-
-    function setTickCumulatives(int56[] memory _tickCumulatives) external {
-        delete tickCumulatives;
-        for (uint i = 0; i < _tickCumulatives.length; i++) {
-            tickCumulatives.push(_tickCumulatives[i]);
-        }
-    }
-
-    function setObservation(uint256 index, int56 tickCumulative, uint160 sqrtPriceX96) external {
-        if (index >= tickCumulatives.length) {
-            for (uint i = tickCumulatives.length; i <= index; i++) {
-                tickCumulatives.push(0);
-                sqrtPriceX96s.push(0);
-            }
-        }
-        tickCumulatives[index] = tickCumulative;
-        sqrtPriceX96s[index] = sqrtPriceX96;
-    }
-
-    function setCurrentState(
-        int24 tick,
-        uint160 sqrtPriceX96,
-        uint16 observationCardinality
-    ) external {
-        currentTick = tick;
-        currentSqrtPriceX96 = sqrtPriceX96;
-        currentObservationCardinality = observationCardinality;
-    }
-}
-
 contract MockCollateralToken {
     mapping(address => uint256) public balances;
     uint256 public previewRedeemReturn;
@@ -198,10 +86,12 @@ contract MockPanopticPool {
     // Additional state for more comprehensive testing
     mapping(address => mapping(uint256 => bool)) public positionExists;
     mapping(address => uint256) public totalPositions;
+    int24 public twapTick;
 
     constructor() {
         collateralToken0 = new MockCollateralToken();
         collateralToken1 = new MockCollateralToken();
+        twapTick = 100;
     }
 
     function numberOfLegs(address vault) external view returns (uint256) {
@@ -210,6 +100,14 @@ contract MockPanopticPool {
 
     function setNumberOfLegs(address vault, uint256 legs) external {
         numberOfLegsMapping[vault] = legs;
+    }
+
+    function getTWAP() external view returns (int24) {
+        return twapTick;
+    }
+
+    function setTwapTick(int24 _twapTick) external {
+        twapTick = _twapTick;
     }
 
     function getAccumulatedFeesAndPositionsData(
@@ -269,9 +167,6 @@ contract PanopticVaultAccountantTest is Test {
     MockERC20Partial public token0;
     MockERC20Partial public token1;
     MockERC20Partial public underlyingToken;
-    MockV3CompatibleOracle public poolOracle;
-    MockV3CompatibleOracle public oracle0;
-    MockV3CompatibleOracle public oracle1;
     MockPanopticPool public mockPool;
 
     address public vault = address(0x1234);
@@ -281,38 +176,15 @@ contract PanopticVaultAccountantTest is Test {
     // Standard test parameters
     int24 constant TWAP_TICK = 100;
     int24 constant MAX_PRICE_DEVIATION = 50;
-    uint32 constant TWAP_WINDOW = 600; // 10 minutes
 
     function setUp() public {
         accountant = new PanopticVaultAccountant(owner);
         token0 = new MockERC20Partial("Token0", "T0");
         token1 = new MockERC20Partial("Token1", "T1");
         underlyingToken = new MockERC20Partial("Underlying", "UND");
-        poolOracle = new MockV3CompatibleOracle();
-        oracle0 = new MockV3CompatibleOracle();
-        oracle1 = new MockV3CompatibleOracle();
         mockPool = new MockPanopticPool();
 
-        // Setup default oracle behavior
-        setupDefaultOracles();
-    }
-
-    function setupDefaultOracles() internal {
-        // Setup consistent tick cumulatives for TWAP calculation
-        // The TWAP filter computes (tickCumulative[i] - tickCumulative[i+1]) / (twapWindow / 20)
-        // So for a constant tick of 100, we need cumulative differences of 100 * (twapWindow / 20)
-        int56[] memory defaultTicks = new int56[](20);
-        uint32 intervalDuration = TWAP_WINDOW / 20; // 30 seconds
-
-        // Create tick cumulatives that will result in TWAP_TICK when filtered
-        for (uint i = 0; i < 20; i++) {
-            defaultTicks[i] = int56(
-                int256(TWAP_TICK) * int256(uint256(intervalDuration)) * int256(20 - i)
-            );
-        }
-        poolOracle.setTickCumulatives(defaultTicks);
-        oracle0.setTickCumulatives(defaultTicks);
-        oracle1.setTickCumulatives(defaultTicks);
+        mockPool.setTwapTick(TWAP_TICK);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -460,8 +332,8 @@ contract PanopticVaultAccountantTest is Test {
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
         // Expected: token0(100) + token1(200) + collateral0(50) + collateral1(75) + underlying(1000) = 1425
-        uint160 conversionPrice = Math.getSqrtRatioAtTick(-TWAP_TICK);
-        uint256 token0HoldingsInUnderlying = PanopticMath.convert1to0(
+        uint160 conversionPrice = Math.getSqrtRatioAtTick(TWAP_TICK);
+        uint256 token0HoldingsInUnderlying = PanopticMath.convert0to1(
             uint256(100e18),
             conversionPrice
         );
@@ -469,7 +341,7 @@ contract PanopticVaultAccountantTest is Test {
             uint256(200e18),
             conversionPrice
         );
-        uint256 collateralTrackerRedeemableToken0sInUnderlying = PanopticMath.convert1to0(
+        uint256 collateralTrackerRedeemableToken0sInUnderlying = PanopticMath.convert0to1(
             uint256(50e18),
             conversionPrice
         );
@@ -498,13 +370,7 @@ contract PanopticVaultAccountantTest is Test {
             pool: PanopticPool(address(mockPool)),
             token0: underlyingToken, // Same as underlying - no conversion
             token1: token1,
-            isUnderlyingToken0InOracle0: false,
-            isUnderlyingToken0InOracle1: false,
-            oracle0: oracle0,
-            oracle1: oracle1,
-            poolOracle: poolOracle,
-            maxPriceDeviation: MAX_PRICE_DEVIATION,
-            twapWindow: TWAP_WINDOW
+            maxPriceDeviation: MAX_PRICE_DEVIATION
         });
 
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
@@ -526,7 +392,7 @@ contract PanopticVaultAccountantTest is Test {
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
         // Expected: underlying(1000) + converted(token1) + collateral0(50) + converted(collateral1(75))
-        uint160 token1ToToken0ConversionPrice = Math.getSqrtRatioAtTick(-TWAP_TICK);
+        uint160 token1ToToken0ConversionPrice = Math.getSqrtRatioAtTick(TWAP_TICK);
         uint256 token1HoldingsAndRedeemables = 200e18 + 75e18;
         uint256 token1HoldingsAndRedeemablesInToken0 = PanopticMath.convert1to0(
             token1HoldingsAndRedeemables,
@@ -549,13 +415,7 @@ contract PanopticVaultAccountantTest is Test {
             pool: PanopticPool(address(mockPool)),
             token0: underlyingToken, // Same as underlying
             token1: underlyingToken, // Same as underlying
-            poolOracle: poolOracle,
-            oracle0: oracle0,
-            isUnderlyingToken0InOracle0: true,
-            oracle1: oracle1,
-            isUnderlyingToken0InOracle1: true,
-            maxPriceDeviation: MAX_PRICE_DEVIATION,
-            twapWindow: TWAP_WINDOW
+            maxPriceDeviation: MAX_PRICE_DEVIATION
         });
 
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
@@ -593,13 +453,7 @@ contract PanopticVaultAccountantTest is Test {
             pool: PanopticPool(address(mockPool)),
             token0: underlyingToken, // Same as underlying
             token1: token1,
-            poolOracle: poolOracle,
-            oracle0: oracle0,
-            isUnderlyingToken0InOracle0: true,
-            oracle1: oracle1,
-            isUnderlyingToken0InOracle1: false,
-            maxPriceDeviation: MAX_PRICE_DEVIATION,
-            twapWindow: TWAP_WINDOW
+            maxPriceDeviation: MAX_PRICE_DEVIATION
         });
 
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
@@ -641,7 +495,7 @@ contract PanopticVaultAccountantTest is Test {
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
         // Expected NAV: underlyingToken balance, plus 150e18 of underlyingToken in net premium, plus convert1To0(50e18 token1s) in net premia
-        uint160 conversionPrice = Math.getSqrtRatioAtTick(-TWAP_TICK);
+        uint160 conversionPrice = Math.getSqrtRatioAtTick(TWAP_TICK);
         uint256 netPremium1 = 50e18;
         uint256 expectedNavInUnderlyingToken = 1000e18 +
             150e18 +
@@ -662,29 +516,10 @@ contract PanopticVaultAccountantTest is Test {
             pool: PanopticPool(address(mockPool)),
             token0: token0,
             token1: token1,
-            poolOracle: poolOracle, // remains at TWAP_TICK=100 (from setupDefaultOracles)
-            oracle0: oracle0,
-            isUnderlyingToken0InOracle0: false, // underlying is token1 in oracle0 (so convert0->1 yields underlying)
-            oracle1: oracle1,
-            isUnderlyingToken0InOracle1: true, // underlying is token0 in oracle1 (so convert1->0 yields underlying)
-            maxPriceDeviation: MAX_PRICE_DEVIATION,
-            twapWindow: TWAP_WINDOW
+            maxPriceDeviation: MAX_PRICE_DEVIATION
         });
 
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
-
-        // --- Configure conversion ticks ---
-        // Price target = 2 => tick ~= ln(2)/ln(1.0001) ≈ 6931
-        int24 CONVERSION_TICK = 6931;
-        uint32 intervalDuration = TWAP_WINDOW / 20; // matches setupDefaultOracles()
-        int56[] memory convTicks = new int56[](20);
-        for (uint i = 0; i < 20; i++) {
-            convTicks[i] = int56(
-                int256(CONVERSION_TICK) * int256(uint256(intervalDuration)) * int256(20 - i)
-            );
-        }
-        oracle0.setTickCumulatives(convTicks); // token0 -> underlying at 2:1
-        oracle1.setTickCumulatives(convTicks); // token1 -> underlying at 1:2 via convert1->0
 
         // Underlying balance stays as-is in NAV
         underlyingToken.setBalance(vault, 500e18);
@@ -709,13 +544,13 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.setNumberOfLegs(vault, 0);
         mockPool.setMockPositionBalanceArray(new uint256[2][](0));
 
-        // Manager prices must match the oracles
+        // Manager prices must match the pool's TWAP tick
         PanopticVaultAccountant.ManagerPrices[]
             memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
         managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
-            poolPrice: TWAP_TICK, // matches poolOracle (100)
-            token0Price: CONVERSION_TICK, // matches oracle0 (6931)
-            token1Price: CONVERSION_TICK // matches oracle1 (6931)
+            poolPrice: TWAP_TICK,
+            token0Price: TWAP_TICK,
+            token1Price: TWAP_TICK
         });
 
         bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
@@ -837,30 +672,7 @@ contract PanopticVaultAccountantTest is Test {
         );
     }
 
-    function test_computeNAV_flippedTokens() public {
-        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        pools[0].isUnderlyingToken0InOracle0 = true;
-        pools[0].isUnderlyingToken0InOracle1 = true;
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
-
-        setupBasicScenario();
-
-        bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-
-        uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
-
-        // Expected: token0(100) + token1(200) + collateral0(50) + collateral1(75) + underlying(1000) = 1425
-        // Flipped tokens should still convert to similar values
-        uint256 expectedNav = 100e18 + 200e18 + 50e18 + 75e18 + 1000e18;
-        uint256 tolerance = 10e18; // Tolerance for flipped conversion calculations
-        assertApproxEqAbs(
-            nav,
-            expectedNav,
-            tolerance,
-            "NAV should handle flipped tokens correctly"
-        );
-    }
-
+    
     function test_computeNAV_negativePnL() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
@@ -997,13 +809,7 @@ contract PanopticVaultAccountantTest is Test {
             pool: PanopticPool(address(mockPool)),
             token0: token0,
             token1: token1,
-            poolOracle: poolOracle,
-            oracle0: oracle0,
-            isUnderlyingToken0InOracle0: false,
-            oracle1: oracle1,
-            isUnderlyingToken0InOracle1: false,
-            maxPriceDeviation: MAX_PRICE_DEVIATION,
-            twapWindow: TWAP_WINDOW
+            maxPriceDeviation: MAX_PRICE_DEVIATION
         });
         return pools;
     }
@@ -1633,7 +1439,7 @@ contract PanopticVaultAccountantTest is Test {
             )
         ) +
             uint256(
-                PanopticMath.convert0to1(
+                PanopticMath.convert1to0(
                     int256(token1Balance + collateralTracker1ValueInToken1),
                     underlyingToToken1ConversionPrice
                 )
@@ -1643,7 +1449,7 @@ contract PanopticVaultAccountantTest is Test {
         uint256 expectedNav = uint256(
             int256(baseBalance) +
                 PanopticMath.convert0to1(premiumContribution0, underlyingToToken0ConversionPrice) +
-                PanopticMath.convert0to1(premiumContribution1, underlyingToToken1ConversionPrice)
+                PanopticMath.convert1to0(premiumContribution1, underlyingToToken1ConversionPrice)
         );
 
         uint256 tolerance = 1; // Allow only tolerance of rounding 1 wei - we know exact amounts
@@ -2296,21 +2102,21 @@ contract PanopticVaultAccountantTest is Test {
         //           token0NetPremiumInUnderlyingToken: convert0to1((largeBalance/10 - largeBalance/20), oracle0)
         //           token1NetPremiumInUnderlyingToken: convert0to1((largeBalance/10 - largeBalance/20), oracle0)
         uint160 token0ToUnderlyingTokenConversionPrice = Math.getSqrtRatioAtTick(
-            oracle0.currentTick()
+            mockPool.twapTick()
         );
         uint160 token1ToUnderlyingTokenConversionPrice = Math.getSqrtRatioAtTick(
-            oracle1.currentTick()
+            mockPool.twapTick()
         );
         uint256 expectedNav = PanopticMath.convert0to1(
             largeBalance,
             token0ToUnderlyingTokenConversionPrice
         ) +
-            PanopticMath.convert0to1(largeBalance, token1ToUnderlyingTokenConversionPrice) +
+            PanopticMath.convert1to0(largeBalance, token1ToUnderlyingTokenConversionPrice) +
             PanopticMath.convert0to1(
                 mockPool.collateralToken0().previewRedeem(largeBalance / 2),
                 token0ToUnderlyingTokenConversionPrice
             ) +
-            PanopticMath.convert0to1(
+            PanopticMath.convert1to0(
                 mockPool.collateralToken1().previewRedeem(largeBalance / 2),
                 token1ToUnderlyingTokenConversionPrice
             ) +
@@ -2319,7 +2125,7 @@ contract PanopticVaultAccountantTest is Test {
                 (largeBalance / 10) - (largeBalance / 20),
                 token0ToUnderlyingTokenConversionPrice
             ) +
-            PanopticMath.convert0to1(
+            PanopticMath.convert1to0(
                 (largeBalance / 10) - (largeBalance / 20),
                 token1ToUnderlyingTokenConversionPrice
             );
@@ -2373,20 +2179,9 @@ contract PanopticVaultAccountantTest is Test {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
 
-        // Set specific tick cumulatives for known TWAP result
-        int56[] memory customTicks = new int56[](20);
+        // Set specific TWAP tick via mock pool
         int24 expectedTwap = 150; // Target TWAP
-        uint32 intervalDuration = TWAP_WINDOW / 20;
-
-        for (uint i = 0; i < 20; i++) {
-            customTicks[i] = int56(
-                int256(expectedTwap) * int256(uint256(intervalDuration)) * int256(20 - i)
-            );
-        }
-
-        poolOracle.setTickCumulatives(customTicks);
-        oracle0.setTickCumulatives(customTicks);
-        oracle1.setTickCumulatives(customTicks);
+        mockPool.setTwapTick(expectedTwap);
 
         setupBasicScenario();
 
@@ -2460,36 +2255,6 @@ contract PanopticVaultAccountantTest is Test {
         }
     }
 
-    function test_computeNAV_flippedOracles_conversion() public {
-        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        pools[0].isUnderlyingToken0InOracle0 = true;
-        pools[0].isUnderlyingToken0InOracle1 = true;
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
-
-        // Create different underlying to force conversion with flipped oracles
-        MockERC20Partial flippedUnderlying = new MockERC20Partial("Flipped", "FLIP");
-
-        setupPrecisionTestScenario(
-            100e18, // token0
-            200e18, // token1
-            0, // no underlying balance
-            0,
-            0, // no collateral
-            LeftRightUnsigned.wrap(0),
-            LeftRightUnsigned.wrap(0)
-        );
-
-        bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
-        uint256 nav = accountant.computeNAV(vault, address(flippedUnderlying), managerInput);
-
-        // Expected: token0(100) + token1(200) converted with flipped oracles = ~300 (varies by conversion)
-        uint256 expectedNavMin = 250e18; // Conservative minimum after flipped conversion
-        uint256 expectedNavMax = 350e18; // Conservative maximum after flipped conversion
-        assertTrue(
-            nav >= expectedNavMin && nav <= expectedNavMax,
-            "Flipped oracle conversion should work with expected range"
-        );
-    }
 
     /*//////////////////////////////////////////////////////////////
                         INTEGRATION TESTS
