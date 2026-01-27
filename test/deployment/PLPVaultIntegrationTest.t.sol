@@ -643,24 +643,12 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         console2.log("=== Integration test completed successfully! ===");
     }
 
-    function createDefaultPools() internal returns (PanopticVaultAccountant.PoolInfo[] memory) {
-        int24 TWAP_TICK = 100;
+    function createDefaultPools()
+        internal
+        pure
+        returns (PanopticVaultAccountant.PoolInfo[] memory)
+    {
         int24 MAX_PRICE_DEVIATION = 1700000; // basically no price deviation check for test
-        uint32 TWAP_WINDOW = 600; // 10 minutes
-        // With real sepolia oracles
-        IV3CompatibleOracle wethUsdc500bpsV3UniswapPool = IV3CompatibleOracle(
-            0x1105514b9Eb942F2596A2486093399b59e2F23fC
-        );
-        IV3CompatibleOracle poolOracle = wethUsdc500bpsV3UniswapPool;
-        IV3CompatibleOracle oracle0 = wethUsdc500bpsV3UniswapPool;
-        IV3CompatibleOracle oracle1 = wethUsdc500bpsV3UniswapPool;
-        // with mock oracles
-        // MockV3CompatibleOracle poolOracle;
-        // MockV3CompatibleOracle oracle0;
-        // MockV3CompatibleOracle oracle1;
-        // poolOracle = new MockV3CompatibleOracle();
-        // oracle0 = new MockV3CompatibleOracle();
-        // oracle1 = new MockV3CompatibleOracle();
 
         address token0 = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14; // sepolia weth9
         address token1 = 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A; // sepolia mock USDC
@@ -671,13 +659,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             pool: PanopticPool(wethUsdc500bpsV3PanopticPool),
             token0: IERC20Partial(token0),
             token1: IERC20Partial(token1),
-            poolOracle: poolOracle,
-            oracle0: oracle0,
-            isUnderlyingToken0InOracle0: true, // true for WETH vault
-            oracle1: oracle1,
-            isUnderlyingToken0InOracle1: false,
-            maxPriceDeviation: MAX_PRICE_DEVIATION,
-            twapWindow: TWAP_WINDOW
+            maxPriceDeviation: MAX_PRICE_DEVIATION
         });
         return pools;
     }
@@ -992,115 +974,4 @@ contract MockTokenWithoutDecimals {
     mapping(address => uint256) public balanceOf;
 
     // Intentionally not implementing decimals() function to test fallback behavior
-}
-
-contract MockV3CompatibleOracle is IV3CompatibleOracle {
-    int56[] public tickCumulatives;
-    uint160[] public sqrtPriceX96s;
-    uint32 public windowSize;
-    int24 public currentTick;
-    uint160 public currentSqrtPriceX96;
-    uint16 public currentObservationCardinality;
-
-    constructor() {
-        // Default tick cumulatives for a 20-slot observation
-        for (uint i = 0; i < 20; i++) {
-            tickCumulatives.push(int56(int256(1000 + i * 100))); // Increasing tick cumulatives
-        }
-        windowSize = 600; // 10 minutes
-        currentTick = 100;
-        currentSqrtPriceX96 = Math.getSqrtRatioAtTick(currentTick);
-        currentObservationCardinality = 20;
-    }
-
-    function observe(
-        uint32[] memory secondsAgos
-    ) external view override returns (int56[] memory, uint160[] memory) {
-        int56[] memory ticks = new int56[](secondsAgos.length);
-        uint160[] memory prices = new uint160[](secondsAgos.length);
-
-        for (uint i = 0; i < secondsAgos.length; i++) {
-            if (i < tickCumulatives.length) {
-                ticks[i] = tickCumulatives[i];
-            } else {
-                ticks[i] = tickCumulatives[tickCumulatives.length - 1];
-            }
-            prices[i] = Math.getSqrtRatioAtTick(int24(ticks[i] / 100));
-        }
-
-        return (ticks, prices);
-    }
-
-    function slot0()
-        external
-        view
-        override
-        returns (
-            uint160 sqrtPriceX96,
-            int24 tick,
-            uint16 observationIndex,
-            uint16 observationCardinality,
-            uint16 observationCardinalityNext,
-            uint8 feeProtocol,
-            bool unlocked
-        )
-    {
-        return (
-            currentSqrtPriceX96,
-            currentTick,
-            0,
-            currentObservationCardinality,
-            currentObservationCardinality,
-            0,
-            true
-        );
-    }
-
-    function observations(
-        uint256
-    )
-        external
-        view
-        override
-        returns (
-            uint32 blockTimestamp,
-            int56 tickCumulative,
-            uint160 secondsPerLiquidityCumulativeX128,
-            bool initialized
-        )
-    {
-        return (uint32(block.timestamp), 0, 0, true);
-    }
-
-    function increaseObservationCardinalityNext(uint16) external override {
-        // Mock implementation - do nothing
-    }
-
-    function setTickCumulatives(int56[] memory _tickCumulatives) external {
-        delete tickCumulatives;
-        for (uint i = 0; i < _tickCumulatives.length; i++) {
-            tickCumulatives.push(_tickCumulatives[i]);
-        }
-    }
-
-    function setObservation(uint256 index, int56 tickCumulative, uint160 sqrtPriceX96) external {
-        if (index >= tickCumulatives.length) {
-            for (uint i = tickCumulatives.length; i <= index; i++) {
-                tickCumulatives.push(0);
-                sqrtPriceX96s.push(0);
-            }
-        }
-        tickCumulatives[index] = tickCumulative;
-        sqrtPriceX96s[index] = sqrtPriceX96;
-    }
-
-    function setCurrentState(
-        int24 tick,
-        uint160 sqrtPriceX96,
-        uint16 observationCardinality
-    ) external {
-        currentTick = tick;
-        currentSqrtPriceX96 = sqrtPriceX96;
-        currentObservationCardinality = observationCardinality;
-    }
 }

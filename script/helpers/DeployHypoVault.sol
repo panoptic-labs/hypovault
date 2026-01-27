@@ -154,16 +154,7 @@ contract DeployHypoVault is MerkleTreeHelper {
         pure
         returns (PanopticVaultAccountant.PoolInfo[] memory)
     {
-        // int24 TWAP_TICK = 100;
         int24 MAX_PRICE_DEVIATION = 100;
-        uint32 TWAP_WINDOW = 600; // 10 minutes
-
-        IV3CompatibleOracle wethUsdc500bpsV3UniswapPool = IV3CompatibleOracle(
-            0x1105514b9Eb942F2596A2486093399b59e2F23fC
-        );
-        IV3CompatibleOracle poolOracle = wethUsdc500bpsV3UniswapPool;
-        IV3CompatibleOracle oracle0 = wethUsdc500bpsV3UniswapPool;
-        IV3CompatibleOracle oracle1 = wethUsdc500bpsV3UniswapPool;
 
         address token0 = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14; // sepolia weth9
         address token1 = 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A; // sepolia mock USDC
@@ -174,13 +165,7 @@ contract DeployHypoVault is MerkleTreeHelper {
             pool: PanopticPool(wethUsdc500bpsV3PanopticPool),
             token0: IERC20Partial(token0),
             token1: IERC20Partial(token1),
-            poolOracle: poolOracle,
-            oracle0: oracle0,
-            isUnderlyingToken0InOracle0: true,
-            oracle1: oracle1,
-            isUnderlyingToken0InOracle1: false,
-            maxPriceDeviation: MAX_PRICE_DEVIATION,
-            twapWindow: TWAP_WINDOW
+            maxPriceDeviation: MAX_PRICE_DEVIATION
         });
         return pools;
     }
@@ -222,13 +207,11 @@ contract DeployHypoVault is MerkleTreeHelper {
         vm.serializeAddress(poolJson, "pool", address(info.pool));
         vm.serializeAddress(poolJson, "token0", address(info.token0));
         vm.serializeAddress(poolJson, "token1", address(info.token1));
-        vm.serializeAddress(poolJson, "poolOracle", address(info.poolOracle));
-        vm.serializeAddress(poolJson, "oracle0", address(info.oracle0));
-        vm.serializeBool(poolJson, "isUnderlyingToken0InOracle0", info.isUnderlyingToken0InOracle0);
-        vm.serializeAddress(poolJson, "oracle1", address(info.oracle1));
-        vm.serializeBool(poolJson, "isUnderlyingToken0InOracle1", info.isUnderlyingToken0InOracle1);
-        vm.serializeInt(poolJson, "maxPriceDeviation", info.maxPriceDeviation);
-        string memory finalJson = vm.serializeUint(poolJson, "twapWindow", info.twapWindow);
+        string memory finalJson = vm.serializeInt(
+            poolJson,
+            "maxPriceDeviation",
+            info.maxPriceDeviation
+        );
         return finalJson;
     }
 }
