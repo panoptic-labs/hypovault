@@ -1,17 +1,11 @@
 {
-  "vaultAddress": "0xE616b9aE29644f8c45c15C7B823841bf304A4165",
+  "vaultAddress": "0x91760623ce2BBE50001e18F0973Ffe37c0C6b948",
   "poolInfos": [
     {
-      "isUnderlyingToken0InOracle0": true,
-      "isUnderlyingToken0InOracle1": false,
       "maxPriceDeviation": 100,
-      "oracle0": "0x1105514b9Eb942F2596A2486093399b59e2F23fC",
-      "oracle1": "0x1105514b9Eb942F2596A2486093399b59e2F23fC",
-      "pool": "0x00002c1c2EF3E4b606F8361d975Cdc2834668e9F",
-      "poolOracle": "0x1105514b9Eb942F2596A2486093399b59e2F23fC",
+      "pool": "0x2aafC1D2Af4dEB9FD8b02cDE5a8C0922cA4D6c78",
       "token0": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
-      "token1": "0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A",
-      "twapWindow": 600
+      "token1": "0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A"
     }
   ]
 }

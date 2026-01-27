@@ -10,12 +10,12 @@ import {Script} from "forge-std/Script.sol";
 
 contract DeployUSDCVault is Script, DeployHypoVault {
     // Addresses from the initial deployment
-    address constant FACTORY_ADDRESS = address(0xebb431ca19A7B245A0827BFA08b5167694B75F38);
-    address constant ACCOUNTANT_ADDRESS = address(0x529e41f74221963D43B0b4466674EA24A19F1c27);
-    address constant DECODER_ADDRESS = address(0x045AB155Ee70f57fc1672f100FE4939a0d052731);
-    address constant AUTHORITY_ADDRESS = address(0xa1FC02EEeDb96F9C0231234DB2824c1FfFeD60CD);
+    address constant FACTORY_ADDRESS = address(0x5d24AeA981D6e5F38A21Cfe5b81204D2F6225271);
+    address constant ACCOUNTANT_ADDRESS = address(0x6100455aA6637093464E75a9Cb9785F7A8D51E80);
+    address constant DECODER_ADDRESS = address(0x606c4Aee942f2F0dCd0c0934E4266eb854EA0cBe);
+    address constant AUTHORITY_ADDRESS = address(0x9166293A301CcC805d5171A2D1e62050ba72795D);
     address constant COLLATERAL_TRACKER_ADDRESS =
-        address(0x0A9a8e10e6D9601b1eE056D194c77D5a2dE40F77);
+        address(0x244Bf88435Be52e8dFb642a718ef4b6d0A1166BF);
 
     address constant VAULT_TURNKEY_ADDRESS = address(0x3c1c79d0cfc316Ba959194c89696a8382d7d283b);
 

@@ -158,11 +158,11 @@ contract DeployHypoVault is MerkleTreeHelper {
 
         address token0 = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14; // sepolia weth9
         address token1 = 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A; // sepolia mock USDC
-        address wethUsdc500bpsV3PanopticPool = 0x00002c1c2EF3E4b606F8361d975Cdc2834668e9F;
+        address wethUsdc500bpsV4PanopticPool = 0x2aafC1D2Af4dEB9FD8b02cDE5a8C0922cA4D6c78;
 
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: PanopticPool(wethUsdc500bpsV3PanopticPool),
+            pool: PanopticPool(wethUsdc500bpsV4PanopticPool),
             token0: IERC20Partial(token0),
             token1: IERC20Partial(token1),
             maxPriceDeviation: MAX_PRICE_DEVIATION
