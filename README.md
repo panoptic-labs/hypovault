@@ -255,6 +255,71 @@ sequenceDiagram
     end
 ```
 
+## Deposit and Withdrawal Epoch States
+
+The HypoVault uses an asynchronous deposit and withdrawal system with three distinct states for each epoch: **Requested**, **Fulfilled**, and **Executed**. Understanding these states and their token movements is crucial for users and integrators.
+
+### Deposit Flow States
+
+#### 1. Requested State
+
+- **Who:** Users call `requestDeposit(assets)` on the HypoVault
+- **Token Movement:** Users transfer their underlying assets (e.g., WETH, USDC) to the HypoVault
+- **Vault State:** Assets are queued for the current `depositEpoch` but not yet converted to shares
+- **User State:** User has a pending deposit request but no vault shares yet
+
+#### 2. Fulfilled State
+
+- **Who:** Managers call `fulfillDeposits(assetsToFulfill, managerInput)`
+- **Token Movement:** No additional token transfers occur at this step
+- **Vault State:** The vault calculates share prices using the accountant and determines how many shares each depositor will receive
+- **User State:** User's deposit allocation is calculated and committed, but shares are not yet minted
+
+#### 3. Executed State
+
+- **Who:** Users call `executeDeposit()` to claim their shares
+- **Token Movement:** Vault shares are minted and transferred to the user
+- **Vault State:** Shares are officially minted, increasing total supply
+- **User State:** User receives vault shares representing their proportional ownership
+
+### Withdrawal Flow States
+
+#### 1. Requested State
+
+- **Who:** Users call `requestWithdrawal(shares)` on the HypoVault
+- **Token Movement:** Users transfer their vault shares to the HypoVault (shares are burned)
+- **Vault State:** Shares are queued for the current `withdrawalEpoch` and removed from circulation
+- **User State:** User has a pending withdrawal request but hasn't received underlying assets yet
+
+#### 2. Fulfilled State
+
+- **Who:** Managers call `fulfillWithdrawals(sharesToFulfill, managerInput)`
+- **Token Movement:** No additional token transfers occur at this step
+- **Vault State:** The vault calculates asset prices using the accountant and determines how many underlying assets each withdrawer will receive
+- **User State:** User's withdrawal allocation is calculated and committed, but assets are not yet transferred
+
+#### 3. Executed State
+
+- **Who:** Users call `executeWithdrawal()` to claim their assets
+- **Token Movement:** Underlying assets are transferred from the vault to the user
+- **Vault State:** Assets leave the vault, reducing total assets under management
+- **User State:** User receives underlying assets (e.g., WETH, USDC) based on their proportional share
+
+### Key Points
+
+- **Asynchronous Design:** The three-state system allows managers time to rebalance portfolios and ensure adequate liquidity before fulfilling requests
+- **Manager Incentives:** Managers are incentivized to fulfill requests promptly as this is typically how they earn management fees
+- **NAV Calculations:** Share/asset prices are determined at fulfillment time using the vault's accountant contract (e.g., `PanopticVaultAccountant`)
+- **Epoch Management:** Each deposit and withdrawal operates on separate epoch counters that increment as batches are processed
+- **Partial Fulfillment:** Managers can choose to fulfill only a portion of requested deposits/withdrawals in each epoch
+
+This design ensures that:
+
+1. Users maintain control over their timing of entry/exit requests
+2. Managers have flexibility to manage liquidity and portfolio rebalancing
+3. All participants benefit from fair, accountant-calculated pricing at fulfillment time
+4. The vault maintains operational efficiency through batched processing
+
 ## Roles
 
 | Role                            | Account                    | Can Do                                                                                                               |
