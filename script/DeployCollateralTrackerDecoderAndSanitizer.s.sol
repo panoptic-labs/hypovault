@@ -14,8 +14,8 @@ contract DeployCollateralTrackerDecoderAndSanitizer is Script {
         address hypoVault = 0x265933ff1C1ebf01b7Ae66c2Ca68B9023f286849;
 
         CollateralTrackerDecoderAndSanitizer decoderAndSanitizer = new CollateralTrackerDecoderAndSanitizer(
-            hypoVault
-        );
+                hypoVault
+            );
 
         console.log(
             "CollateralTrackerDecoderAndSanitizer deployed at:",
