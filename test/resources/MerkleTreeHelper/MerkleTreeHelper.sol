@@ -4216,6 +4216,26 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
         leafs[leafIndex].argumentAddresses[1] = getAddress(sourceChain, "boringVault");
     }
 
+    function _addCollateralTrackerLeafs(
+        ManageLeaf[] memory leafs,
+        ERC4626 vault,
+        address panopticPool
+    ) internal {
+        _addCollateralTrackerLeafs(leafs, vault);
+
+        unchecked {
+            leafIndex++;
+        }
+        leafs[leafIndex] = ManageLeaf(
+            panopticPool,
+            false,
+            "dispatch(uint256[],uint256[],uint128[],int24[3][],bool,uint256)",
+            new address[](0),
+            "Dispatch mint/burn options on PanopticPool",
+            getAddress(sourceChain, "rawDataDecoderAndSanitizer")
+        );
+    }
+
     // ========================================= Vault Craft =========================================
 
     function _addVaultCraftLeafs(ManageLeaf[] memory leafs, ERC4626 vault, address gauge) internal {

@@ -44,6 +44,7 @@ contract DeployUSDCVault is Script, DeployHypoVault {
             VAULT_TURNKEY_ADDRESS,
             address(sepoliaUsdc),
             COLLATERAL_TRACKER_ADDRESS,
+            address(0x2aafC1D2Af4dEB9FD8b02cDE5a8C0922cA4D6c78),
             "gammaScalpingUSDC",
             "Panoptic Gamma Scalping Vault | USDC",
             salt

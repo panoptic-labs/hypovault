@@ -44,6 +44,7 @@ contract DeployUSDCVault is Script, DeployHypoVault {
             VAULT_TURNKEY_ADDRESS,
             address(sepoliaUsdc),
             COLLATERAL_TRACKER_ADDRESS,
+            address(0), // panopticPool not needed for this vault
             "povLendUSDC",
             "Panoptic Lend Vault | USDC",
             salt
