@@ -7,7 +7,7 @@ import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
 import {PanopticMath} from "lib/panoptic-v1.1/contracts/libraries/PanopticMath.sol";
 // Interfaces
 import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC20Partial.sol";
-import {PanopticPool} from "lib/panoptic-v1.1/contracts/PanopticPool.sol";
+import {IERC4626} from "lib/boring-vault/lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 // Types
 import {LeftRightUnsigned} from "lib/panoptic-v1.1/contracts/types/LeftRight.sol";
 import {LeftRightSigned} from "lib/panoptic-v1.1/contracts/types/LeftRight.sol";
@@ -17,6 +17,18 @@ import {TokenId} from "lib/panoptic-v1.1/contracts/types/TokenId.sol";
 
 interface IPanopticPoolV2 {
     function getTWAP() external view returns (int24 twapTick);
+
+    function getAccumulatedFeesAndPositionsData(
+        address user,
+        bool includePendingPremium,
+        TokenId[] calldata positionIdList
+    ) external view returns (LeftRightUnsigned, LeftRightUnsigned, PositionBalance[] memory);
+
+    function numberOfLegs(address user) external view returns (uint256);
+
+    function collateralToken0() external view returns (IERC4626);
+
+    function collateralToken1() external view returns (IERC4626);
 }
 
 /// @author Axicon Labs Limited
@@ -27,7 +39,7 @@ contract PanopticVaultAccountant is Ownable {
     /// @param token1 The token1 of the pool
     /// @param maxPriceDeviation The maximum price deviation allowed for the oracle prices
     struct PoolInfo {
-        PanopticPool pool;
+        IPanopticPoolV2 pool;
         IERC20Partial token0;
         IERC20Partial token1;
         int24 maxPriceDeviation;
@@ -103,12 +115,12 @@ contract PanopticVaultAccountant is Ownable {
         address _vault = vault;
 
         for (uint256 i = 0; i < pools.length; i++) {
-            int24 twapTick = IPanopticPoolV2(address(pools[i].pool)).getTWAP();
+            int24 twapTick = pools[i].pool.getTWAP();
 
             if (Math.abs(managerPrices[i].poolPrice - twapTick) > pools[i].maxPriceDeviation)
                 revert StaleOraclePrice();
 
-            uint256[2][] memory positionBalanceArray;
+            PositionBalance[] memory positionBalanceArray;
             int256 poolExposure0;
             int256 poolExposure1;
             {
@@ -129,16 +141,13 @@ contract PanopticVaultAccountant is Ownable {
 
             uint256 numLegs;
             for (uint256 j = 0; j < tokenIds[i].length; j++) {
-                if (positionBalanceArray[j][1] == 0) revert IncorrectPositionList();
+                uint128 positionSize = uint128(PositionBalance.unwrap(positionBalanceArray[j]));
+                if (positionSize == 0) revert IncorrectPositionList();
                 uint256 positionLegs = tokenIds[i][j].countLegs();
                 for (uint256 k = 0; k < positionLegs; k++) {
                     (uint256 amount0, uint256 amount1) = Math.getAmountsForLiquidity(
                         managerPrices[i].poolPrice,
-                        PanopticMath.getLiquidityChunk(
-                            tokenIds[i][j],
-                            k,
-                            uint128(positionBalanceArray[j][1])
-                        )
+                        PanopticMath.getLiquidityChunk(tokenIds[i][j], k, positionSize)
                     );
 
                     if (tokenIds[i][j].isLong(k) == 0) {
@@ -155,7 +164,7 @@ contract PanopticVaultAccountant is Ownable {
                 }
 
                 (LeftRightSigned longAmounts, LeftRightSigned shortAmounts) = PanopticMath
-                    .computeExercisedAmounts(tokenIds[i][j], uint128(positionBalanceArray[j][1]));
+                    .computeExercisedAmounts(tokenIds[i][j], positionSize);
 
                 poolExposure0 += int256(longAmounts.rightSlot()) - int256(shortAmounts.rightSlot());
                 poolExposure1 += int256(longAmounts.leftSlot()) - int256(shortAmounts.leftSlot());

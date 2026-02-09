@@ -6,7 +6,6 @@ import "forge-std/console2.sol";
 import "../src/accountants/PanopticVaultAccountant.sol";
 import "../src/interfaces/IVaultAccountant.sol";
 import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC20Partial.sol";
-import {PanopticPool} from "lib/panoptic-v1.1/contracts/PanopticPool.sol";
 import {TokenId} from "lib/panoptic-v1.1/contracts/types/TokenId.sol";
 import {LeftRightUnsigned} from "lib/panoptic-v1.1/contracts/types/LeftRight.sol";
 import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
@@ -81,7 +80,7 @@ contract MockPanopticPool {
     mapping(address => uint256) public numberOfLegsMapping;
     LeftRightUnsigned public mockShortPremium;
     LeftRightUnsigned public mockLongPremium;
-    uint256[2][] public mockPositionBalanceArray;
+    PositionBalance[] public mockPositionBalanceArray;
 
     // Additional state for more comprehensive testing
     mapping(address => mapping(uint256 => bool)) public positionExists;
@@ -120,7 +119,7 @@ contract MockPanopticPool {
         returns (
             LeftRightUnsigned shortPremium,
             LeftRightUnsigned longPremium,
-            uint256[2][] memory positionBalanceArray
+            PositionBalance[] memory positionBalanceArray
         )
     {
         return (mockShortPremium, mockLongPremium, mockPositionBalanceArray);
@@ -134,7 +133,7 @@ contract MockPanopticPool {
         mockLongPremium = _longPremium;
     }
 
-    function setMockPositionBalanceArray(uint256[2][] memory _array) external {
+    function setMockPositionBalanceArray(PositionBalance[] memory _array) external {
         delete mockPositionBalanceArray;
         for (uint i = 0; i < _array.length; i++) {
             mockPositionBalanceArray.push(_array[i]);
@@ -281,8 +280,8 @@ contract PanopticVaultAccountantTest is Test {
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
 
         // Setup position with zero balance (should revert)
-        uint256[2][] memory positionBalances = new uint256[2][](1);
-        positionBalances[0] = [uint256(1), uint256(0)]; // Zero balance
+        PositionBalance[] memory positionBalances = new PositionBalance[](1);
+        positionBalances[0] = PositionBalance.wrap(0); // Zero balance
         mockPool.setMockPositionBalanceArray(positionBalances);
 
         TokenId[][] memory tokenIds = new TokenId[][](1);
@@ -304,8 +303,8 @@ contract PanopticVaultAccountantTest is Test {
         accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
 
         // Setup position with correct balance but wrong legs count
-        uint256[2][] memory positionBalances = new uint256[2][](1);
-        positionBalances[0] = [uint256(1), uint256(100)];
+        PositionBalance[] memory positionBalances = new PositionBalance[](1);
+        positionBalances[0] = PositionBalance.wrap(100);
         mockPool.setMockPositionBalanceArray(positionBalances);
         mockPool.setNumberOfLegs(vault, 5); // Different from actual
 
@@ -367,7 +366,7 @@ contract PanopticVaultAccountantTest is Test {
         // Create pools where token0 IS the underlying token - no conversion needed
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: PanopticPool(address(mockPool)),
+            pool: IPanopticPoolV2(address(mockPool)),
             token0: underlyingToken, // Same as underlying - no conversion
             token1: token1,
             maxPriceDeviation: MAX_PRICE_DEVIATION
@@ -385,7 +384,7 @@ contract PanopticVaultAccountantTest is Test {
 
         // No positions, no premiums
         mockPool.setNumberOfLegs(vault, 0);
-        mockPool.setMockPositionBalanceArray(new uint256[2][](0));
+        mockPool.setMockPositionBalanceArray(new PositionBalance[](0));
         mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
@@ -412,7 +411,7 @@ contract PanopticVaultAccountantTest is Test {
         // Create pools where BOTH tokens are the underlying token - absolutely no conversion
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: PanopticPool(address(mockPool)),
+            pool: IPanopticPoolV2(address(mockPool)),
             token0: underlyingToken, // Same as underlying
             token1: underlyingToken, // Same as underlying
             maxPriceDeviation: MAX_PRICE_DEVIATION
@@ -429,7 +428,7 @@ contract PanopticVaultAccountantTest is Test {
 
         // No positions, no premiums
         mockPool.setNumberOfLegs(vault, 0);
-        mockPool.setMockPositionBalanceArray(new uint256[2][](0));
+        mockPool.setMockPositionBalanceArray(new PositionBalance[](0));
         mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
@@ -450,7 +449,7 @@ contract PanopticVaultAccountantTest is Test {
         // Create pools where token0 is underlying - only token1 needs conversion
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: PanopticPool(address(mockPool)),
+            pool: IPanopticPoolV2(address(mockPool)),
             token0: underlyingToken, // Same as underlying
             token1: token1,
             maxPriceDeviation: MAX_PRICE_DEVIATION
@@ -482,7 +481,7 @@ contract PanopticVaultAccountantTest is Test {
 
         // No positions
         mockPool.setNumberOfLegs(vault, 0);
-        mockPool.setMockPositionBalanceArray(new uint256[2][](0));
+        mockPool.setMockPositionBalanceArray(new PositionBalance[](0));
 
         PanopticVaultAccountant.ManagerPrices[]
             memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
@@ -513,7 +512,7 @@ contract PanopticVaultAccountantTest is Test {
         // Build pool with distinct tokens (not the underlying)
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: PanopticPool(address(mockPool)),
+            pool: IPanopticPoolV2(address(mockPool)),
             token0: token0,
             token1: token1,
             maxPriceDeviation: MAX_PRICE_DEVIATION
@@ -542,7 +541,7 @@ contract PanopticVaultAccountantTest is Test {
 
         // No positions
         mockPool.setNumberOfLegs(vault, 0);
-        mockPool.setMockPositionBalanceArray(new uint256[2][](0));
+        mockPool.setMockPositionBalanceArray(new PositionBalance[](0));
 
         // Manager prices must match the pool's TWAP tick
         PanopticVaultAccountant.ManagerPrices[]
@@ -805,7 +804,7 @@ contract PanopticVaultAccountantTest is Test {
     {
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: PanopticPool(address(mockPool)),
+            pool: IPanopticPoolV2(address(mockPool)),
             token0: token0,
             token1: token1,
             maxPriceDeviation: MAX_PRICE_DEVIATION
@@ -856,7 +855,7 @@ contract PanopticVaultAccountantTest is Test {
 
         // Setup empty position data
         mockPool.setNumberOfLegs(vault, 0);
-        uint256[2][] memory emptyPositions = new uint256[2][](0);
+        PositionBalance[] memory emptyPositions = new PositionBalance[](0);
         mockPool.setMockPositionBalanceArray(emptyPositions);
 
         // Setup premiums
@@ -868,8 +867,8 @@ contract PanopticVaultAccountantTest is Test {
 
         // Setup position data
         mockPool.setNumberOfLegs(vault, 1);
-        uint256[2][] memory positions = new uint256[2][](1);
-        positions[0] = [uint256(1), uint256(100)];
+        PositionBalance[] memory positions = new PositionBalance[](1);
+        positions[0] = PositionBalance.wrap(100);
         mockPool.setMockPositionBalanceArray(positions);
 
         // Setup premiums with some values
@@ -907,7 +906,7 @@ contract PanopticVaultAccountantTest is Test {
         );
 
         mockPool.setNumberOfLegs(vault, 0);
-        uint256[2][] memory emptyPositions = new uint256[2][](0);
+        PositionBalance[] memory emptyPositions = new PositionBalance[](0);
         mockPool.setMockPositionBalanceArray(emptyPositions);
     }
 
@@ -1007,7 +1006,7 @@ contract PanopticVaultAccountantTest is Test {
 
         mockPool.setMockPremiums(_shortPremium, _longPremium);
         mockPool.setNumberOfLegs(vault, 0);
-        mockPool.setMockPositionBalanceArray(new uint256[2][](0));
+        mockPool.setMockPositionBalanceArray(new PositionBalance[](0));
     }
 
     /// @notice Calculates expected NAV manually for comparison
@@ -1092,7 +1091,7 @@ contract PanopticVaultAccountantTest is Test {
 
         // Setup empty position data (no positions)
         mockPool.setNumberOfLegs(vault, 0);
-        uint256[2][] memory emptyPositions = new uint256[2][](0);
+        PositionBalance[] memory emptyPositions = new PositionBalance[](0);
         mockPool.setMockPositionBalanceArray(emptyPositions);
 
         // Setup zero premiums
@@ -1256,8 +1255,8 @@ contract PanopticVaultAccountantTest is Test {
 
         // Setup for 2-leg position
         mockPool.setNumberOfLegs(vault, 2);
-        uint256[2][] memory positions = new uint256[2][](1);
-        positions[0] = [uint256(1), uint256(100)];
+        PositionBalance[] memory positions = new PositionBalance[](1);
+        positions[0] = PositionBalance.wrap(100);
         mockPool.setMockPositionBalanceArray(positions);
 
         mockPool.setMockPremiums(
@@ -1354,7 +1353,7 @@ contract PanopticVaultAccountantTest is Test {
 
         // No positions
         mockPool.setNumberOfLegs(vault, 0);
-        uint256[2][] memory emptyPositions = new uint256[2][](0);
+        PositionBalance[] memory emptyPositions = new PositionBalance[](0);
         mockPool.setMockPositionBalanceArray(emptyPositions);
         mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
 
@@ -1401,7 +1400,7 @@ contract PanopticVaultAccountantTest is Test {
 
         // Setup empty position data
         mockPool.setNumberOfLegs(vault, 0);
-        uint256[2][] memory emptyPositions = new uint256[2][](0);
+        PositionBalance[] memory emptyPositions = new PositionBalance[](0);
         mockPool.setMockPositionBalanceArray(emptyPositions);
 
         // Setup premiums
@@ -1505,7 +1504,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.collateralToken0().setBalance(vault, 0);
         mockPool.collateralToken1().setBalance(vault, 0);
         mockPool.setNumberOfLegs(vault, 0);
-        mockPool.setMockPositionBalanceArray(new uint256[2][](0));
+        mockPool.setMockPositionBalanceArray(new PositionBalance[](0));
         mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
@@ -1538,7 +1537,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.collateralToken0().setBalance(vault, 0);
         mockPool.collateralToken1().setBalance(vault, 0);
         mockPool.setNumberOfLegs(vault, 0);
-        mockPool.setMockPositionBalanceArray(new uint256[2][](0));
+        mockPool.setMockPositionBalanceArray(new PositionBalance[](0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
@@ -1577,7 +1576,7 @@ contract PanopticVaultAccountantTest is Test {
         );
 
         mockPool.setNumberOfLegs(vault, 0);
-        mockPool.setMockPositionBalanceArray(new uint256[2][](0));
+        mockPool.setMockPositionBalanceArray(new PositionBalance[](0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
@@ -1647,7 +1646,7 @@ contract PanopticVaultAccountantTest is Test {
         );
 
         mockPool.setNumberOfLegs(vault, 0);
-        mockPool.setMockPositionBalanceArray(new uint256[2][](0));
+        mockPool.setMockPositionBalanceArray(new PositionBalance[](0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
@@ -1752,8 +1751,8 @@ contract PanopticVaultAccountantTest is Test {
 
         // Set position with zero balance
         mockPool.setNumberOfLegs(vault, 1);
-        uint256[2][] memory positions = new uint256[2][](1);
-        positions[0] = [uint256(1), uint256(0)]; // Zero balance
+        PositionBalance[] memory positions = new PositionBalance[](1);
+        positions[0] = PositionBalance.wrap(0); // Zero balance
         mockPool.setMockPositionBalanceArray(positions);
 
         TokenId[][] memory tokenIds = new TokenId[][](1);
@@ -1832,7 +1831,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.collateralToken1().setPreviewRedeemReturn(0);
 
         mockPool.setNumberOfLegs(vault, 0);
-        mockPool.setMockPositionBalanceArray(new uint256[2][](0));
+        mockPool.setMockPositionBalanceArray(new PositionBalance[](0));
         mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
@@ -1926,7 +1925,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.collateralToken1().setPreviewRedeemReturn(0);
 
         mockPool.setNumberOfLegs(vault, 0);
-        mockPool.setMockPositionBalanceArray(new uint256[2][](0));
+        mockPool.setMockPositionBalanceArray(new PositionBalance[](0));
         mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
@@ -1962,8 +1961,8 @@ contract PanopticVaultAccountantTest is Test {
 
         // Setup straddle position (2 legs)
         mockPool.setNumberOfLegs(vault, 2);
-        uint256[2][] memory positions = new uint256[2][](1);
-        positions[0] = [uint256(1), uint256(100)];
+        PositionBalance[] memory positions = new PositionBalance[](1);
+        positions[0] = PositionBalance.wrap(100);
         mockPool.setMockPositionBalanceArray(positions);
 
         TokenId[][] memory tokenIds = new TokenId[][](1);
@@ -2006,8 +2005,8 @@ contract PanopticVaultAccountantTest is Test {
 
         // Setup iron condor position (4 legs)
         mockPool.setNumberOfLegs(vault, 4);
-        uint256[2][] memory positions = new uint256[2][](1);
-        positions[0] = [uint256(1), uint256(50)];
+        PositionBalance[] memory positions = new PositionBalance[](1);
+        positions[0] = PositionBalance.wrap(50);
         mockPool.setMockPositionBalanceArray(positions);
 
         TokenId[][] memory tokenIds = new TokenId[][](1);
@@ -2046,9 +2045,9 @@ contract PanopticVaultAccountantTest is Test {
 
         // Setup multiple positions (3 total legs from 2 positions)
         mockPool.setNumberOfLegs(vault, 3);
-        uint256[2][] memory positions = new uint256[2][](2);
-        positions[0] = [uint256(1), uint256(100)]; // First position
-        positions[1] = [uint256(2), uint256(75)]; // Second position
+        PositionBalance[] memory positions = new PositionBalance[](2);
+        positions[0] = PositionBalance.wrap(100); // First position
+        positions[1] = PositionBalance.wrap(75); // Second position
         mockPool.setMockPositionBalanceArray(positions);
 
         TokenId[][] memory tokenIds = new TokenId[][](1);
@@ -2275,9 +2274,9 @@ contract PanopticVaultAccountantTest is Test {
 
         // Multiple positions representing a real strategy
         mockPool.setNumberOfLegs(vault, 3);
-        uint256[2][] memory positions = new uint256[2][](2);
-        positions[0] = [uint256(1), uint256(50)]; // Position 1
-        positions[1] = [uint256(2), uint256(25)]; // Position 2
+        PositionBalance[] memory positions = new PositionBalance[](2);
+        positions[0] = PositionBalance.wrap(50); // Position 1
+        positions[1] = PositionBalance.wrap(25); // Position 2
         mockPool.setMockPositionBalanceArray(positions);
 
         TokenId[][] memory tokenIds = new TokenId[][](1);
@@ -2335,7 +2334,7 @@ contract PanopticVaultAccountantTest is Test {
         );
 
         mockPool.setNumberOfLegs(vault, 0);
-        mockPool.setMockPositionBalanceArray(new uint256[2][](0));
+        mockPool.setMockPositionBalanceArray(new PositionBalance[](0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
         uint256 navNormal = accountant.computeNAV(vault, address(underlyingToken), managerInput);
@@ -2433,7 +2432,7 @@ contract PanopticVaultAccountantTest is Test {
         mockPool.collateralToken1().setPreviewRedeemReturn(0);
 
         mockPool.setNumberOfLegs(vault, 0);
-        mockPool.setMockPositionBalanceArray(new uint256[2][](0));
+        mockPool.setMockPositionBalanceArray(new PositionBalance[](0));
 
         // Test 1: No position exposure - tokens should be fully counted
         mockPool.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
