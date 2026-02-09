@@ -12,7 +12,7 @@ contract DeployUSDCVault is Script, DeployHypoVault {
     // Addresses from the initial deployment
     address constant FACTORY_ADDRESS = address(0x5d24AeA981D6e5F38A21Cfe5b81204D2F6225271);
     address constant ACCOUNTANT_ADDRESS = address(0x6100455aA6637093464E75a9Cb9785F7A8D51E80);
-    address constant DECODER_ADDRESS = address(0x606c4Aee942f2F0dCd0c0934E4266eb854EA0cBe);
+    address constant DECODER_ADDRESS = address(0x8Cf3d6d7C2E6718e36b9686385c384e5002Db7e1);
     address constant AUTHORITY_ADDRESS = address(0x9166293A301CcC805d5171A2D1e62050ba72795D);
     address constant COLLATERAL_TRACKER_ADDRESS =
         address(0x244Bf88435Be52e8dFb642a718ef4b6d0A1166BF);
@@ -44,6 +44,7 @@ contract DeployUSDCVault is Script, DeployHypoVault {
             VAULT_TURNKEY_ADDRESS,
             address(sepoliaUsdc),
             COLLATERAL_TRACKER_ADDRESS,
+            address(0x2aafC1D2Af4dEB9FD8b02cDE5a8C0922cA4D6c78),
             "gammaScalpingUSDC",
             "Panoptic Gamma Scalping Vault | USDC",
             salt

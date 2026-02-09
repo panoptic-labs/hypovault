@@ -9,11 +9,9 @@ import {CollateralTrackerDecoderAndSanitizer} from "../src/DecodersAndSanitizers
 /// @notice Script to deploy the CollateralTrackerDecoderAndSanitizer contract
 contract DeployCollateralTrackerDecoderAndSanitizer is Script {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        vm.startBroadcast();
 
-        vm.startBroadcast(deployerPrivateKey);
-
-        address hypoVault = 0x9f64DAB456351BF1488F7A02190BB532979721A7;
+        address hypoVault = 0x265933ff1C1ebf01b7Ae66c2Ca68B9023f286849;
 
         CollateralTrackerDecoderAndSanitizer decoderAndSanitizer = new CollateralTrackerDecoderAndSanitizer(
                 hypoVault

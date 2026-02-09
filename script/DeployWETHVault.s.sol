@@ -44,6 +44,7 @@ contract DeployWETHVault is Script, DeployHypoVault {
             VAULT_TURNKEY_ADDRESS,
             address(sepoliaWeth),
             COLLATERAL_TRACKER_ADDRESS,
+            address(0), // panopticPool not needed for this vault
             "povLendWETH",
             "Panoptic Lend Vault | WETH",
             salt

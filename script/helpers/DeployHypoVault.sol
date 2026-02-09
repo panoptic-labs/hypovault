@@ -32,6 +32,7 @@ contract DeployHypoVault is MerkleTreeHelper {
         address turnkeyAccount,
         address underlyingToken,
         address collateralTracker,
+        address panopticPool,
         string memory symbol,
         string memory name,
         bytes32 salt
@@ -86,7 +87,7 @@ contract DeployHypoVault is MerkleTreeHelper {
         );
 
         ManageLeaf[] memory leafs = new ManageLeaf[](8);
-        _addCollateralTrackerLeafs(leafs, ERC4626(collateralTracker));
+        _addCollateralTrackerLeafs(leafs, ERC4626(collateralTracker), panopticPool);
         bytes32[][] memory manageTree = _generateMerkleTree(leafs);
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
         string memory filePath = string.concat(

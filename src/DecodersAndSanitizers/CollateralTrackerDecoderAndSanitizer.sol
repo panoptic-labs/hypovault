@@ -48,4 +48,18 @@ contract CollateralTrackerDecoderAndSanitizer is BaseDecoderAndSanitizer {
     ) external pure virtual returns (bytes memory addressesFound) {
         addressesFound = abi.encodePacked(receiver, owner);
     }
+
+    //============================== PanopticPool ===============================
+
+    function dispatch(
+        uint256[] calldata,
+        uint256[] calldata,
+        uint128[] calldata,
+        int24[3][] calldata,
+        bool,
+        uint256
+    ) external pure virtual returns (bytes memory addressesFound) {
+        // No address arguments to extract
+        return addressesFound;
+    }
 }
