@@ -17,13 +17,17 @@ import {TokenId} from "lib/panoptic-v1.1/contracts/types/TokenId.sol";
 
 interface IPanopticPoolV2 {
     function getTWAP() external view returns (int24 twapTick);
+
     function getAccumulatedFeesAndPositionsData(
         address user,
         bool includePendingPremium,
         TokenId[] calldata positionIdList
     ) external view returns (LeftRightUnsigned, LeftRightUnsigned, PositionBalance[] memory);
+
     function numberOfLegs(address user) external view returns (uint256);
+
     function collateralToken0() external view returns (IERC4626);
+
     function collateralToken1() external view returns (IERC4626);
 }
 
@@ -123,7 +127,8 @@ contract PanopticVaultAccountant is Ownable {
                 LeftRightUnsigned shortPremium;
                 LeftRightUnsigned longPremium;
 
-                (shortPremium, longPremium, positionBalanceArray) = pools[i].pool
+                (shortPremium, longPremium, positionBalanceArray) = pools[i]
+                    .pool
                     .getAccumulatedFeesAndPositionsData(_vault, true, tokenIds[i]);
 
                 poolExposure0 =
@@ -142,11 +147,7 @@ contract PanopticVaultAccountant is Ownable {
                 for (uint256 k = 0; k < positionLegs; k++) {
                     (uint256 amount0, uint256 amount1) = Math.getAmountsForLiquidity(
                         managerPrices[i].poolPrice,
-                        PanopticMath.getLiquidityChunk(
-                            tokenIds[i][j],
-                            k,
-                            positionSize
-                        )
+                        PanopticMath.getLiquidityChunk(tokenIds[i][j], k, positionSize)
                     );
 
                     if (tokenIds[i][j].isLong(k) == 0) {
