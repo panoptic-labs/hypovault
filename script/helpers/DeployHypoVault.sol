@@ -33,6 +33,7 @@ contract DeployHypoVault is MerkleTreeHelper {
         address underlyingToken,
         address collateralTracker,
         address panopticPool,
+        address weth,
         string memory symbol,
         string memory name,
         bytes32 salt
@@ -86,8 +87,8 @@ contract DeployHypoVault is MerkleTreeHelper {
             collateralTrackerDecoderAndSanitizer
         );
 
-        ManageLeaf[] memory leafs = new ManageLeaf[](8);
-        _addCollateralTrackerLeafs(leafs, ERC4626(collateralTracker), panopticPool);
+        ManageLeaf[] memory leafs = new ManageLeaf[](16);
+        _addCollateralTrackerLeafs(leafs, ERC4626(collateralTracker), panopticPool, weth);
         bytes32[][] memory manageTree = _generateMerkleTree(leafs);
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
         string memory filePath = string.concat(
@@ -135,7 +136,7 @@ contract DeployHypoVault is MerkleTreeHelper {
         }
         console.log("STRATEGIST_ROLE capabilities set");
 
-        // 11. Update PanopticVaultAccountant pools hash for vault
+        // 10. Update PanopticVaultAccountant pools hash for vault
         PanopticVaultAccountant.PoolInfo[] memory poolInfos = createPanopticAccountantPoolInfos();
         _writePoolInfosToJson(address(vault), poolInfos, symbol);
         bytes32 poolInfosHash = keccak256(abi.encode(poolInfos));
@@ -157,13 +158,13 @@ contract DeployHypoVault is MerkleTreeHelper {
     {
         int24 MAX_PRICE_DEVIATION = 100;
 
-        address token0 = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14; // sepolia weth9
+        address token0 = 0x0000000000000000000000000000000000000000; // eth
         address token1 = 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A; // sepolia mock USDC
-        address wethUsdc500bpsV4PanopticPool = 0x2aafC1D2Af4dEB9FD8b02cDE5a8C0922cA4D6c78;
+        address ethUsdc500bpsV4PanopticPool = 0xA2dCe8f451e311BeFD427e3846BD117687af7B8E;
 
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: IPanopticPoolV2(wethUsdc500bpsV4PanopticPool),
+            pool: IPanopticPoolV2(ethUsdc500bpsV4PanopticPool),
             token0: IERC20Partial(token0),
             token1: IERC20Partial(token1),
             maxPriceDeviation: MAX_PRICE_DEVIATION
