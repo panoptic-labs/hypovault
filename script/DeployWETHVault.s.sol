@@ -16,7 +16,8 @@ contract DeployWETHVault is Script, DeployHypoVault {
     address constant AUTHORITY_ADDRESS = address(0x183b19b0c27f5124E077b10fa57f3B19e71958B2);
     address constant PANOPTIC_POOL_ADDRESS = address(0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E);
 
-    address constant COLLATERAL_TRACKER_ADDRESS = address(0x4d2579A5F9BC32641D6AdbFC47C6dAceF30027F1);
+    address constant COLLATERAL_TRACKER_ADDRESS =
+        address(0x4d2579A5F9BC32641D6AdbFC47C6dAceF30027F1);
     address constant VAULT_TURNKEY_ADDRESS = address(0x8FfA6DAB99f8afc64F61BeF83F0966eD6362f24F);
 
     bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v9-weth"));

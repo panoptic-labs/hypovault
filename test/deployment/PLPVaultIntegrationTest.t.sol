@@ -204,7 +204,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         address TurnkeyAccount0 = address(0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8);
         address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
         ERC20S sepoliaWeth = ERC20S(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
-        address ethUsdc500bpsV4Collateral0 = 0x4d2579A5F9BC32641D6AdbFC47C6dAceF30027F1; // Underlying: ETH 
+        address ethUsdc500bpsV4Collateral0 = 0x4d2579A5F9BC32641D6AdbFC47C6dAceF30027F1; // Underlying: ETH
         address ethUsdc500bpsV4PanopticPool = 0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E; // Underlying: ETH
 
         /*
@@ -398,8 +398,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         }
 
         uint256[] memory values = new uint256[](2);
-        values[0] = 0;  // WETH.withdraw doesn't need value
-        values[1] = 50 ether;  // CT.deposit needs ETH value
+        values[0] = 0; // WETH.withdraw doesn't need value
+        values[1] = 50 ether; // CT.deposit needs ETH value
 
         address[] memory decodersAndSanitizers = new address[](2);
         decodersAndSanitizers[0] = collateralTrackerDecoderAndSanitizer;
@@ -469,7 +469,12 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
 
         ManageLeaf[] memory leafs = new ManageLeaf[](16); // 9 leaves, next power of 2 is 16
 
-        _addCollateralTrackerLeafs(leafs, ERC4626(ethUsdc500bpsV4Collateral0), ethUsdc500bpsV4PanopticPool, address(sepoliaWeth));
+        _addCollateralTrackerLeafs(
+            leafs,
+            ERC4626(ethUsdc500bpsV4Collateral0),
+            ethUsdc500bpsV4PanopticPool,
+            address(sepoliaWeth)
+        );
 
         bytes32[][] memory manageTree = _generateMerkleTree(leafs);
 
@@ -588,8 +593,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         }
 
         uint256[] memory values = new uint256[](2);
-        values[0] = 0;  // WETH.withdraw doesn't need value
-        values[1] = 50 ether;  // CT.deposit needs ETH value
+        values[0] = 0; // WETH.withdraw doesn't need value
+        values[1] = 50 ether; // CT.deposit needs ETH value
 
         address[] memory decodersAndSanitizers = new address[](2);
         decodersAndSanitizers[0] = collateralTrackerDecoderAndSanitizer;

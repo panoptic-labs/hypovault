@@ -4126,7 +4126,12 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
 
     // ========================================= Collateral Tracker =========================================
 
-    function _addCollateralTrackerLeafs(ManageLeaf[] memory leafs, ERC4626 vault, address panopticPool, address weth) internal {
+    function _addCollateralTrackerLeafs(
+        ManageLeaf[] memory leafs,
+        ERC4626 vault,
+        address panopticPool,
+        address weth
+    ) internal {
         ERC20 asset = vault.asset();
         // Get asset symbol, handle native ETH (address(0))
         string memory assetSymbol = address(asset) == address(0) ? "ETH" : asset.symbol();
@@ -4254,10 +4259,8 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
             new address[](0),
             "Unwrap WETH to ETH",
             getAddress(sourceChain, "rawDataDecoderAndSanitizer")
-        ); 
-
+        );
     }
-
 
     // ========================================= Vault Craft =========================================
 

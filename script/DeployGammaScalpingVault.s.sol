@@ -16,7 +16,8 @@ contract DeployGammaScalpingVault is Script, DeployHypoVault {
     address constant AUTHORITY_ADDRESS = address(0x183b19b0c27f5124E077b10fa57f3B19e71958B2);
     address constant PANOPTIC_POOL_ADDRESS = address(0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E);
 
-    address constant COLLATERAL_TRACKER_ADDRESS = address(0xe2BD879109f84313AC986B2390110F5A240a9fa9);
+    address constant COLLATERAL_TRACKER_ADDRESS =
+        address(0xe2BD879109f84313AC986B2390110F5A240a9fa9);
     address constant VAULT_TURNKEY_ADDRESS = address(0x421297FB967aBb21fF6FCd7b66589De857a4F4cc);
 
     bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v9-gamma-scalping"));
