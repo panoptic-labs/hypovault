@@ -4150,7 +4150,21 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
         );
         leafs[leafIndex].argumentAddresses[0] = address(vault);
 
-        // Depositing
+        // Depositing (non-payable for ERC20 vaults)
+        unchecked {
+            leafIndex++;
+        }
+        leafs[leafIndex] = ManageLeaf(
+            address(vault),
+            false,
+            "deposit(uint256,address)",
+            new address[](1),
+            string.concat("Deposit ", assetSymbol, " for ", vault.symbol()),
+            getAddress(sourceChain, "rawDataDecoderAndSanitizer")
+        );
+        leafs[leafIndex].argumentAddresses[0] = getAddress(sourceChain, "boringVault");
+
+        // Depositing (payable for native ETH vaults)
         unchecked {
             leafIndex++;
         }
@@ -4159,7 +4173,7 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
             true,
             "deposit(uint256,address)",
             new address[](1),
-            string.concat("Deposit ", assetSymbol, " for ", vault.symbol()),
+            string.concat("Deposit ", assetSymbol, " for ", vault.symbol(), " (payable)"),
             getAddress(sourceChain, "rawDataDecoderAndSanitizer")
         );
         leafs[leafIndex].argumentAddresses[0] = getAddress(sourceChain, "boringVault");
@@ -4194,7 +4208,21 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
         leafs[leafIndex].argumentAddresses[0] = getAddress(sourceChain, "boringVault");
         leafs[leafIndex].argumentAddresses[1] = getAddress(sourceChain, "boringVault");
 
-        // Minting
+        // Minting (non-payable for ERC20 vaults)
+        unchecked {
+            leafIndex++;
+        }
+        leafs[leafIndex] = ManageLeaf(
+            address(vault),
+            false,
+            "mint(uint256,address)",
+            new address[](1),
+            string.concat("Mint ", vault.symbol(), " using ", assetSymbol),
+            getAddress(sourceChain, "rawDataDecoderAndSanitizer")
+        );
+        leafs[leafIndex].argumentAddresses[0] = getAddress(sourceChain, "boringVault");
+
+        // Minting (payable for native ETH vaults)
         unchecked {
             leafIndex++;
         }
@@ -4203,7 +4231,7 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
             true,
             "mint(uint256,address)",
             new address[](1),
-            string.concat("Mint ", vault.symbol(), " using ", assetSymbol),
+            string.concat("Mint ", vault.symbol(), " using ", assetSymbol, " (payable)"),
             getAddress(sourceChain, "rawDataDecoderAndSanitizer")
         );
         leafs[leafIndex].argumentAddresses[0] = getAddress(sourceChain, "boringVault");
