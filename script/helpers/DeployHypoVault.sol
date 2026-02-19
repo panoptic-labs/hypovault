@@ -160,7 +160,7 @@ contract DeployHypoVault is MerkleTreeHelper {
 
         address token0 = 0x0000000000000000000000000000000000000000; // eth
         address token1 = 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A; // sepolia mock USDC
-        address ethUsdc500bpsV4PanopticPool = 0xA2dCe8f451e311BeFD427e3846BD117687af7B8E;
+        address ethUsdc500bpsV4PanopticPool = 0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E;
 
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
