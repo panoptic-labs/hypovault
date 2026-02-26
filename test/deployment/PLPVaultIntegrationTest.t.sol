@@ -238,6 +238,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
                 TurnkeyAccount0,
                 address(sepoliaWeth),
                 wethUsdc500bpsV4Collateral0,
+                wethUsdc500bpsV4PanopticPool,
                 "povLendWETH",
                 "Panoptic Lend Vault | WETH",
                 salt
