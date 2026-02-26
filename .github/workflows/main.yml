@@ -1,0 +1,58 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  foundry:
+    strategy:
+      fail-fast: true
+    name: Foundry suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Build
+        run: |
+          forge --version
+          forge build
+
+      - name: Run Forge tests (unit)
+        run: |
+          forge test --no-match-path 'test/deployment/*' -vvv --fuzz-runs 1000
+
+  contract_sizes:
+    strategy:
+      fail-fast: true
+    name: Check contract size
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Build and check sizes
+        run: |
+          forge --version
+          forge build --sizes
