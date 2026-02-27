@@ -10,13 +10,14 @@ import {Script} from "forge-std/Script.sol";
 
 contract DeployWETHVault is Script, DeployHypoVault {
     // Addresses from the initial deployment
-    address constant FACTORY_ADDRESS = address(0x5d24AeA981D6e5F38A21Cfe5b81204D2F6225271);
-    address constant ACCOUNTANT_ADDRESS = address(0x6100455aA6637093464E75a9Cb9785F7A8D51E80);
-    address constant DECODER_ADDRESS = address(0x606c4Aee942f2F0dCd0c0934E4266eb854EA0cBe);
-    address constant AUTHORITY_ADDRESS = address(0x9166293A301CcC805d5171A2D1e62050ba72795D);
-    address constant COLLATERAL_TRACKER_ADDRESS =
-        address(0x4f29B472bebbFcEEc250a4A5BC33312F00025600);
+    address constant FACTORY_ADDRESS = address(0xC631ea9659A255641C0ee28C18f2F23970DD3DdD);
+    address constant ACCOUNTANT_ADDRESS = address(0x061AF4Fd2a015ed871e7EA406749cF268236C918);
+    address constant DECODER_ADDRESS = address(0x3c2D182DB402Fc649aea61731CE47Ea72Ab3a7f1);
+    address constant AUTHORITY_ADDRESS = address(0x183b19b0c27f5124E077b10fa57f3B19e71958B2);
+    address constant PANOPTIC_POOL_ADDRESS = address(0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E);
 
+    address constant COLLATERAL_TRACKER_ADDRESS =
+        address(0x4d2579A5F9BC32641D6AdbFC47C6dAceF30027F1);
     address constant VAULT_TURNKEY_ADDRESS = address(0x8FfA6DAB99f8afc64F61BeF83F0966eD6362f24F);
 
     bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v9-weth"));
@@ -44,7 +45,8 @@ contract DeployWETHVault is Script, DeployHypoVault {
             VAULT_TURNKEY_ADDRESS,
             address(sepoliaWeth),
             COLLATERAL_TRACKER_ADDRESS,
-            address(0), // panopticPool not needed for this vault
+            PANOPTIC_POOL_ADDRESS,
+            address(sepoliaWeth),
             "povLendWETH",
             "Panoptic Lend Vault | WETH",
             salt
