@@ -370,8 +370,9 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         ManageLeaf[] memory manageLeafs = new ManageLeaf[](2);
         // To determine which index of leaf to use, easiest to look at
         // JSON output from _generateLeafs, especially when multiple leafs adding helpers are used (like _addCollateralTrackerLeafs)
-        manageLeafs[0] = leafs[8];
-        manageLeafs[1] = leafs[1];
+        // _addCollateralTrackerLeafs order: [10] = WETH.withdraw(uint256), [2] = payable CT.deposit(uint256,address)
+        manageLeafs[0] = leafs[10];
+        manageLeafs[1] = leafs[2];
         bytes32[][] memory manageProofs = _getProofsUsingTree(manageLeafs, manageTree);
         console.log("got proofs");
 
@@ -565,8 +566,9 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         ManageLeaf[] memory manageLeafs = new ManageLeaf[](2);
         // To determine which index of leaf to use, easiest to look at
         // JSON output from _generateLeafs, especially when multiple leafs adding helpers are used (like _addCollateralTrackerLeafs)
-        manageLeafs[0] = leafs[0];
-        manageLeafs[1] = leafs[8];
+        // _addCollateralTrackerLeafs order: [10] = WETH.withdraw(uint256), [2] = payable CT.deposit(uint256,address)
+        manageLeafs[0] = leafs[10];
+        manageLeafs[1] = leafs[2];
         bytes32[][] memory manageProofs = _getProofsUsingTree(manageLeafs, manageTree);
         console.log("got proofs");
 
