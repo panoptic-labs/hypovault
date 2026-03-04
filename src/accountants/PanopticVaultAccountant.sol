@@ -68,7 +68,7 @@ contract PanopticVaultAccountant is Ownable {
     error VaultLocked();
 
     /// @notice Default WETH address for this contract
-    address public immutable wethAddress; 
+    address public immutable wethAddress;
 
     /// @notice The hash of pool structs to query for each vault
     mapping(address vault => bytes32 poolsHash) public vaultPools;
@@ -124,8 +124,8 @@ contract PanopticVaultAccountant is Ownable {
         for (uint256 i = 0; i < pools.length; i++) {
             int256 poolExposure0;
             int256 poolExposure1;
-           
-            // get exposure from options/tokenIds 
+
+            // get exposure from options/tokenIds
             {
                 PositionBalance[] memory positionBalanceArray;
                 {
@@ -152,7 +152,6 @@ contract PanopticVaultAccountant is Ownable {
                     uint256 positionLegs = _tokenId.countLegs();
                     int24 poolPrice = managerPrices[i].poolPrice;
                     for (uint256 k = 0; k < positionLegs; k++) {
-
                         // skip if leg is a credit/loan
                         if (_tokenId.width(k) != 0) {
                             (uint256 amount0, uint256 amount1) = Math.getAmountsForLiquidity(
@@ -178,32 +177,33 @@ contract PanopticVaultAccountant is Ownable {
                     (LeftRightSigned longAmounts, LeftRightSigned shortAmounts) = PanopticMath
                         .computeExercisedAmounts(_tokenId, positionSize);
 
-                    poolExposure0 += int256(longAmounts.rightSlot()) - int256(shortAmounts.rightSlot());
-                    poolExposure1 += int256(longAmounts.leftSlot()) - int256(shortAmounts.leftSlot());
+                    poolExposure0 +=
+                        int256(longAmounts.rightSlot()) -
+                        int256(shortAmounts.rightSlot());
+                    poolExposure1 +=
+                        int256(longAmounts.leftSlot()) -
+                        int256(shortAmounts.leftSlot());
 
                     numLegs += positionLegs;
                 }
                 if (numLegs != pools[i].pool.numberOfLegs(_vault)) revert IncorrectPositionList();
             }
 
-
             // set native tokens to 0xEeee... to avoid address(0) clashes
             if (address(pools[i].token0) == address(0))
                 pools[i].token0 = IERC20Partial(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
             uint256 token0Exposure;
             uint256 token1Exposure;
-            
+
             // get exposure from vault balance and collateral tracker/ERC4626
             // do not count the vault balance twice if the same token appears in multiple ERC4626 pools
             {
-
                 // do not skip by default
                 bool skipToken0 = false;
                 bool skipToken1 = false;
 
                 // optimized for small number of pools
                 for (uint256 j = 0; j < collateralTokens.length; j++) {
-                    
                     // if the token has already been seen, skip
                     if (collateralTokens[j] == address(pools[i].token0)) skipToken0 = true;
                     if (collateralTokens[j] == address(pools[i].token1)) skipToken1 = true;
@@ -251,9 +251,15 @@ contract PanopticVaultAccountant is Ownable {
             // HOWEVER, if the underlying token is WETH and token0 is native ETH (0xEeee), skip conversion (1 ETH == 1 WETH)
             // In that case, poolExposure0 and token0Exposure stay in ETH terms, which are equivalent to WETH
             if (address(pools[i].token0) != underlyingToken) {
-                if (!(address(pools[i].token0) == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE) && underlyingToken == wethAddress)) {
-                    if (Math.abs(twapTick - managerPrices[i].token0Price) > pools[i].maxPriceDeviation)
-                        revert StaleOraclePrice();
+                if (
+                    !(address(pools[i].token0) ==
+                        address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE) &&
+                        underlyingToken == wethAddress)
+                ) {
+                    if (
+                        Math.abs(twapTick - managerPrices[i].token0Price) >
+                        pools[i].maxPriceDeviation
+                    ) revert StaleOraclePrice();
 
                     uint160 conversionPrice = Math.getSqrtRatioAtTick(twapTick);
 
