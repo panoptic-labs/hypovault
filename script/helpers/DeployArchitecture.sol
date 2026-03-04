@@ -11,7 +11,8 @@ import {RolesAuthority, Authority} from "lib/boring-vault/lib/solmate/src/auth/a
 contract DeployArchitecture {
     function deployArchitecture(
         bytes32 salt,
-        address deployer
+        address deployer,
+        address wethAddress
     )
         internal
         returns (
@@ -38,7 +39,7 @@ contract DeployArchitecture {
         console.log("Factory Address:", vaultFactoryAddress);
 
         // 3. Deploy new Accountant with CREATE2
-        PanopticVaultAccountant accountant = new PanopticVaultAccountant{salt: salt}(deployer);
+        PanopticVaultAccountant accountant = new PanopticVaultAccountant{salt: salt}(deployer, wethAddress);
         address accountantAddress = address(accountant);
         console.log("=== CREATE2 Deployment Info ===");
         console.log("Accountant Address:", accountantAddress);

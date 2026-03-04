@@ -20,7 +20,7 @@ contract DeployHypoVaultArchitectureEoa is Script, DeployArchitecture {
             address accountantAddress,
             address collateralTrackerDecoderAndSanitizerAddress,
             address authorityAddress
-        ) = deployArchitecture(salt, deployer);
+        ) = deployArchitecture(salt, deployer, vm.envAddress("WETH_ADDRESS"));
 
         vm.stopBroadcast();
 

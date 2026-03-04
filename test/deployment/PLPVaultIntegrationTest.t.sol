@@ -221,7 +221,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             address accountant,
             address collateralTrackerDecoderAndSanitizer,
             address authorityAddress
-        ) = deployArchitecture(salt, owner);
+        ) = deployArchitecture(salt, owner, address(sepoliaWeth));
 
         // Deploy vault using the helper
         (
