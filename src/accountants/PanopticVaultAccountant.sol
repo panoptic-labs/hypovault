@@ -29,6 +29,8 @@ interface IPanopticPoolV2 {
     function collateralToken0() external view returns (IERC4626);
 
     function collateralToken1() external view returns (IERC4626);
+
+    function getCurrentTick() external view returns (int24);
 }
 
 /// @author Axicon Labs Limited
@@ -150,7 +152,7 @@ contract PanopticVaultAccountant is Ownable {
                     if (positionSize == 0) revert IncorrectPositionList();
                     TokenId _tokenId = tokenIds[i][j];
                     uint256 positionLegs = _tokenId.countLegs();
-                    int24 poolPrice = managerPrices[i].poolPrice;
+                    int24 poolPrice = pools[i].pool.getCurrentTick();
                     for (uint256 k = 0; k < positionLegs; k++) {
                         // skip if leg is a credit/loan
                         if (_tokenId.width(k) != 0) {
