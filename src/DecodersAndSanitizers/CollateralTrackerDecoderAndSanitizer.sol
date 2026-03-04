@@ -62,4 +62,16 @@ contract CollateralTrackerDecoderAndSanitizer is BaseDecoderAndSanitizer {
         // No address arguments to extract
         return addressesFound;
     }
+
+    //============================== WETH (NativeWrapper) ===============================
+
+    function deposit() external pure virtual returns (bytes memory addressesFound) {
+        // Nothing to sanitize or return
+        return addressesFound;
+    }
+
+    function withdraw(uint256) external pure virtual returns (bytes memory addressesFound) {
+        // Nothing to sanitize or return
+        return addressesFound;
+    }
 }

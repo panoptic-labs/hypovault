@@ -8,7 +8,7 @@ import {DeployArchitecture} from "./helpers/DeployArchitecture.sol";
 // Deploys core HypoVault infrastructure using --private-key or --turnkey --sender 0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8 (Turnkey0)
 contract DeployHypoVaultArchitectureEoa is Script, DeployArchitecture {
     // CREATE2 salt
-    bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v11"));
+    bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v12"));
 
     function run() public {
         vm.startBroadcast();

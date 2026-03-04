@@ -8,7 +8,7 @@ import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC2
 import {console} from "forge-std/console.sol";
 import {Script} from "forge-std/Script.sol";
 
-contract DeployUSDCVault is Script, DeployHypoVault {
+contract DeployCoveredCallVault is Script, DeployHypoVault {
     // Addresses from the initial deployment
     address constant FACTORY_ADDRESS = address(0xC631ea9659A255641C0ee28C18f2F23970DD3DdD);
     address constant ACCOUNTANT_ADDRESS = address(0x061AF4Fd2a015ed871e7EA406749cF268236C918);
@@ -18,9 +18,10 @@ contract DeployUSDCVault is Script, DeployHypoVault {
 
     address constant COLLATERAL_TRACKER_ADDRESS =
         address(0xe2BD879109f84313AC986B2390110F5A240a9fa9);
-    address constant VAULT_TURNKEY_ADDRESS = address(0x3c1c79d0cfc316Ba959194c89696a8382d7d283b);
 
-    bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v9-usdc"));
+    address constant VAULT_TURNKEY_ADDRESS = address(0xC3f99c43960dA8B20872078d57213E9C62E3926e);
+
+    bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v9-covered-call-usdc"));
 
     IERC20Partial sepoliaUsdc = IERC20Partial(0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A);
     IERC20Partial sepoliaWeth = IERC20Partial(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
@@ -29,7 +30,7 @@ contract DeployUSDCVault is Script, DeployHypoVault {
         vm.startBroadcast();
         address deployer = msg.sender;
 
-        console.log("=== Deploying USDC Vault ===");
+        console.log("=== Deploying Covered Call USDC Vault ===");
         console.log("Deployer:", deployer);
         console.log("Using Factory:", FACTORY_ADDRESS);
         console.log("Using Accountant:", ACCOUNTANT_ADDRESS);
@@ -47,8 +48,8 @@ contract DeployUSDCVault is Script, DeployHypoVault {
             COLLATERAL_TRACKER_ADDRESS,
             PANOPTIC_POOL_ADDRESS,
             address(sepoliaWeth),
-            "povLendUSDC",
-            "Panoptic Lend Vault | USDC",
+            "coveredCallUSDC",
+            "Panoptic Covered Call Vault | USDC",
             salt
         );
         vm.stopBroadcast();
