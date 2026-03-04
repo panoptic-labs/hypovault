@@ -71,7 +71,7 @@ contract PanopticVaultAccountant is Ownable {
 
     /// @notice Default WETH address for this contract
     /// @dev leave as address(0) if unused
-    address public immutable wethAddress; 
+    address public immutable wethAddress;
 
     /// @notice The hash of pool structs to query for each vault
     mapping(address vault => bytes32 poolsHash) public vaultPools;
