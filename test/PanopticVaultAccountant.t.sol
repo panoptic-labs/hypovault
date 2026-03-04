@@ -177,7 +177,7 @@ contract PanopticVaultAccountantTest is Test {
     int24 constant MAX_PRICE_DEVIATION = 50;
 
     function setUp() public {
-        accountant = new PanopticVaultAccountant(owner);
+        accountant = new PanopticVaultAccountant(owner, address(0));
         token0 = new MockERC20Partial("Token0", "T0");
         token1 = new MockERC20Partial("Token1", "T1");
         underlyingToken = new MockERC20Partial("Underlying", "UND");
