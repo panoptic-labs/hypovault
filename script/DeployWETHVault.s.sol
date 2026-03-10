@@ -36,21 +36,21 @@ contract DeployWETHVault is Script, DeployHypoVault {
         console.log("Using Decoder:", DECODER_ADDRESS);
         console.log("Using Authority:", AUTHORITY_ADDRESS);
 
-        deployVault(
-            deployer,
-            FACTORY_ADDRESS,
-            ACCOUNTANT_ADDRESS,
-            DECODER_ADDRESS,
-            AUTHORITY_ADDRESS,
-            VAULT_TURNKEY_ADDRESS,
-            address(sepoliaWeth),
-            COLLATERAL_TRACKER_ADDRESS,
-            PANOPTIC_POOL_ADDRESS,
-            address(sepoliaWeth),
-            "povLendWETH",
-            "Panoptic Lend Vault | WETH",
-            salt
-        );
+        deployVault(DeployStruct({
+            deployer: deployer,
+            vaultFactory: FACTORY_ADDRESS,
+            accountantAddress: ACCOUNTANT_ADDRESS,
+            collateralTrackerDecoderAndSanitizer: DECODER_ADDRESS,
+            authorityAddress: AUTHORITY_ADDRESS,
+            turnkeyAccount: VAULT_TURNKEY_ADDRESS,
+            underlyingToken: address(sepoliaWeth),
+            collateralTracker: COLLATERAL_TRACKER_ADDRESS,
+            panopticPool: PANOPTIC_POOL_ADDRESS,
+            weth: address(sepoliaWeth),
+            symbol: "povLendWETH",
+            name: "Panoptic Lend Vault | WETH",
+            salt: salt
+        }));
         vm.stopBroadcast();
     }
 }

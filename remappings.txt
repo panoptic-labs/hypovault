@@ -1,1 +1,4 @@
 forge-std/=lib/forge-std/src/
+src/base/=lib/boring-vault/src/base/
+src/interfaces/=lib/boring-vault/src/interfaces/
+src/helper/=lib/boring-vault/src/helper/
