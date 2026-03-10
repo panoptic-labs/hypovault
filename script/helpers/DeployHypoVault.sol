@@ -15,6 +15,22 @@ import {HypoVaultManagerWithMerkleVerification} from "../../src/managers/HypoVau
 import {RolesAuthority, Authority} from "lib/boring-vault/lib/solmate/src/auth/authorities/RolesAuthority.sol";
 
 contract DeployHypoVault is MerkleTreeHelper {
+    struct DeployStruct {
+        address deployer;
+        address vaultFactory;
+        address accountantAddress;
+        address collateralTrackerDecoderAndSanitizer;
+        address authorityAddress;
+        address turnkeyAccount;
+        address underlyingToken;
+        address collateralTracker;
+        address panopticPool;
+        address weth;
+        string symbol;
+        string name;
+        bytes32 salt;
+    }
+
     // Real Panoptic multisig
     // ISafe PanopticMultisig = ISafe(0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1);
     // @dev - test Safe on sepolia. NOT the real multisig.
@@ -24,19 +40,7 @@ contract DeployHypoVault is MerkleTreeHelper {
     address BalancerVaultAddr = address(0x7777); // Required by ManagerWithMerkleVerification
 
     function deployVault(
-        address deployer,
-        address vaultFactory,
-        address accountantAddress,
-        address collateralTrackerDecoderAndSanitizer,
-        address authorityAddress,
-        address turnkeyAccount,
-        address underlyingToken,
-        address collateralTracker,
-        address panopticPool,
-        address weth,
-        string memory symbol,
-        string memory name,
-        bytes32 salt
+        DeployStruct memory deployData
     )
         internal
         returns (
@@ -48,73 +52,113 @@ contract DeployHypoVault is MerkleTreeHelper {
     {
         // 1. Deploy HypoVault via Factory
         uint256 performanceFeeBps = 1000; // 10%
-        address vaultAddress = HypoVaultFactory(vaultFactory).createVault(
-            underlyingToken,
-            deployer,
-            IVaultAccountant(accountantAddress),
+        vault = HypoVaultFactory(deployData.vaultFactory).createVault(
+            deployData.underlyingToken,
+            deployData.deployer,
+            IVaultAccountant(deployData.accountantAddress),
             performanceFeeBps,
-            symbol,
-            name,
-            salt
+            deployData.symbol,
+            deployData.name,
+            deployData.salt
         );
-        HypoVault vault = HypoVault(payable(vaultAddress));
-        console.log("vaultAddress: ", vaultAddress);
+        HypoVault _vault = HypoVault(payable(vault));
+        console.log("vaultAddress: ", vault);
 
         // 2. Set Fee Wallet
-        vault.setFeeWallet(turnkeyAccount); // vault level
-        console.log("Set fee wallet to:", turnkeyAccount);
+        _vault.setFeeWallet(deployData.turnkeyAccount); // vault level
+        console.log("Set fee wallet to:", deployData.turnkeyAccount);
 
         // 3. Deploy HypoVaultManagerWithMerkleVerification with CREATE2
-        HypoVaultManagerWithMerkleVerification manager = new HypoVaultManagerWithMerkleVerification{
-            salt: salt
-        }(deployer, address(vault), BalancerVaultAddr);
-        address managerAddress = address(manager);
-        console.log("Manager Address:", managerAddress);
+        manager = address(
+            new HypoVaultManagerWithMerkleVerification{salt: deployData.salt}(
+                deployData.deployer,
+                vault,
+                BalancerVaultAddr
+            )
+        );
+        console.log("Manager Address:", manager);
 
         // 4. Set HypoVault manager
-        vault.setManager(managerAddress);
+        _vault.setManager(manager);
         console.log("Manager set on vault");
+
+        // 5-10: Configure manager, merkle tree, roles, and accountant
+        (leafs, manageTree) = _configureVault(deployData, vault, manager);
+    }
+
+    function _configureVault(
+        DeployStruct memory deployData,
+        address vaultAddress,
+        address managerAddress
+    ) internal returns (ManageLeaf[] memory leafs, bytes32[][] memory manageTree) {
+        HypoVaultManagerWithMerkleVerification manager = HypoVaultManagerWithMerkleVerification(
+            managerAddress
+        );
 
         // 5. Build merkle tree for manage operations
         setSourceChainName(sepolia);
-        setAddress(true, sepolia, "boringVault", address(vault));
+        setAddress(true, sepolia, "boringVault", vaultAddress);
         setAddress(true, sepolia, "managerAddress", managerAddress);
-        setAddress(true, sepolia, "accountantAddress", accountantAddress);
+        setAddress(true, sepolia, "accountantAddress", deployData.accountantAddress);
         setAddress(
             true,
             sepolia,
             "rawDataDecoderAndSanitizer",
-            collateralTrackerDecoderAndSanitizer
+            deployData.collateralTrackerDecoderAndSanitizer
         );
 
-        ManageLeaf[] memory leafs = new ManageLeaf[](16);
-        _addCollateralTrackerLeafs(leafs, ERC4626(collateralTracker), panopticPool, weth);
-        bytes32[][] memory manageTree = _generateMerkleTree(leafs);
+        leafs = new ManageLeaf[](16);
+        _addCollateralTrackerLeafs(
+            leafs,
+            ERC4626(deployData.collateralTracker),
+            deployData.panopticPool,
+            deployData.weth
+        );
+        manageTree = _generateMerkleTree(leafs);
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
         string memory filePath = string.concat(
             "./hypoVaultManagerArtifacts/Production",
-            symbol,
+            deployData.symbol,
             "StrategistLeaves.json"
         );
-        _generateLeafs(filePath, leafs, manageRoot, manageTree); // Dump tree and leaves to JSON. Useful for SDK later.
+        _generateLeafs(filePath, leafs, manageRoot, manageTree);
 
         console.log("Generated manageRoot:");
         console.logBytes32(manageRoot);
 
         // 6. Set manageRoot for both multisig and turnkey
         manager.setManageRoot(PanopticMultisig, manageRoot);
-        manager.setManageRoot(turnkeyAccount, manageRoot); // vault turnkey
+        manager.setManageRoot(deployData.turnkeyAccount, manageRoot);
         console.log("ManageRoot set for multisig and turnkey");
 
         // 7. Set RolesAuthority as authority on HypoVaultManagerWithMerkleVerification
-        manager.setAuthority(Authority(authorityAddress));
+        manager.setAuthority(Authority(deployData.authorityAddress));
         console.log("Authority set on manager");
 
         // 8. Grant STRATEGIST_ROLE to TurnkeyAccount0
+        _configureRoles(deployData, managerAddress);
+
+        // 10. Update PanopticVaultAccountant pools hash for vault
+        PanopticVaultAccountant.PoolInfo[] memory poolInfos = createPanopticAccountantPoolInfos();
+        _writePoolInfosToJson(vaultAddress, poolInfos, deployData.symbol);
+        bytes32 poolInfosHash = keccak256(abi.encode(poolInfos));
+        console.log("Generated poolInfosHash:");
+        console.logBytes32(poolInfosHash);
+
+        PanopticVaultAccountant(deployData.accountantAddress).updatePoolsHash(
+            vaultAddress,
+            poolInfosHash
+        );
+        console.log("Pools hash updated");
+
+        // TODO: Add transfer ownership calls to the multisig
+    }
+
+    function _configureRoles(DeployStruct memory deployData, address managerAddress) internal {
         uint8 STRATEGIST_ROLE = 7;
-        RolesAuthority authority = RolesAuthority(authorityAddress);
-        authority.setUserRole(turnkeyAccount, STRATEGIST_ROLE, true); // vault turnkey
-        console.log("STRATEGIST_ROLE granted to:", turnkeyAccount);
+        RolesAuthority authority = RolesAuthority(deployData.authorityAddress);
+        authority.setUserRole(deployData.turnkeyAccount, STRATEGIST_ROLE, true);
+        console.log("STRATEGIST_ROLE granted to:", deployData.turnkeyAccount);
 
         // 9. Set abilities/capabilities for STRATEGIST_ROLE
         bytes4[] memory strategistSelectors = new bytes4[](4);
@@ -135,20 +179,6 @@ contract DeployHypoVault is MerkleTreeHelper {
             );
         }
         console.log("STRATEGIST_ROLE capabilities set");
-
-        // 10. Update PanopticVaultAccountant pools hash for vault
-        PanopticVaultAccountant.PoolInfo[] memory poolInfos = createPanopticAccountantPoolInfos();
-        _writePoolInfosToJson(address(vault), poolInfos, symbol);
-        bytes32 poolInfosHash = keccak256(abi.encode(poolInfos));
-        console.log("Generated poolInfosHash:");
-        console.logBytes32(poolInfosHash);
-
-        PanopticVaultAccountant(accountantAddress).updatePoolsHash(address(vault), poolInfosHash);
-        console.log("Pools hash updated");
-
-        // TODO: Add transfer ownership calls to the multisig
-
-        return (address(vault), address(managerAddress), leafs, manageTree);
     }
 
     function createPanopticAccountantPoolInfos()

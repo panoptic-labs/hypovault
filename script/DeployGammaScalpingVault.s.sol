@@ -37,19 +37,21 @@ contract DeployGammaScalpingVault is Script, DeployHypoVault {
         console.log("Using Authority:", AUTHORITY_ADDRESS);
 
         deployVault(
-            deployer,
-            FACTORY_ADDRESS,
-            ACCOUNTANT_ADDRESS,
-            DECODER_ADDRESS,
-            AUTHORITY_ADDRESS,
-            VAULT_TURNKEY_ADDRESS,
-            address(sepoliaUsdc),
-            COLLATERAL_TRACKER_ADDRESS,
-            PANOPTIC_POOL_ADDRESS,
-            address(sepoliaWeth),
-            "gammaScalpingUSDC",
-            "Panoptic Gamma Scalping Vault | USDC",
-            salt
+            DeployStruct({
+                deployer: deployer,
+                vaultFactory: FACTORY_ADDRESS,
+                accountantAddress: ACCOUNTANT_ADDRESS,
+                collateralTrackerDecoderAndSanitizer: DECODER_ADDRESS,
+                authorityAddress: AUTHORITY_ADDRESS,
+                turnkeyAccount: VAULT_TURNKEY_ADDRESS,
+                underlyingToken: address(sepoliaUsdc),
+                collateralTracker: COLLATERAL_TRACKER_ADDRESS,
+                panopticPool: PANOPTIC_POOL_ADDRESS,
+                weth: address(sepoliaWeth),
+                symbol: "gammaScalpingUSDC",
+                name: "Panoptic Gamma Scalping Vault | USDC",
+                salt: salt
+            })
         );
         vm.stopBroadcast();
     }

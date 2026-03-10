@@ -27,49 +27,33 @@ contract DeployArchitecture {
         console.log("Deployer:", deployer);
 
         // 1. Deploy reference HypoVault implementation with CREATE2
-        HypoVault hypoVaultImpl = new HypoVault{salt: salt}();
-        address hypoVaultImplAddress = address(hypoVaultImpl);
+        hypoVaultImpl = address(new HypoVault{salt: salt}());
         console.log("=== CREATE2 Deployment Info ===");
-        console.log("HypoVault implementation Address:", hypoVaultImplAddress);
+        console.log("HypoVault implementation Address:", hypoVaultImpl);
 
         // 2. Deploy HypoVaultFactory with CREATE2
-        HypoVaultFactory vaultFactory = new HypoVaultFactory{salt: salt}(hypoVaultImplAddress);
-        address vaultFactoryAddress = address(vaultFactory);
+        vaultFactory = address(new HypoVaultFactory{salt: salt}(hypoVaultImpl));
         console.log("=== CREATE2 Deployment Info ===");
-        console.log("Factory Address:", vaultFactoryAddress);
+        console.log("Factory Address:", vaultFactory);
 
         // 3. Deploy new Accountant with CREATE2
-        PanopticVaultAccountant accountant = new PanopticVaultAccountant{salt: salt}(
-            deployer,
-            wethAddress
-        );
-        address accountantAddress = address(accountant);
+        accountant = address(new PanopticVaultAccountant{salt: salt}(deployer, wethAddress));
         console.log("=== CREATE2 Deployment Info ===");
-        console.log("Accountant Address:", accountantAddress);
+        console.log("Accountant Address:", accountant);
 
         // 4. Deploy CollateralTrackerDecoderAndSanitizer with CREATE2
-        CollateralTrackerDecoderAndSanitizer decoder = new CollateralTrackerDecoderAndSanitizer{
-            salt: salt
-        }(hypoVaultImplAddress);
-        address collateralTrackerDecoderAndSanitizerAddress = address(decoder);
+        collateralTrackerDecoderAndSanitizer = address(
+            new CollateralTrackerDecoderAndSanitizer{salt: salt}(hypoVaultImpl)
+        );
         console.log("=== CREATE2 Deployment Info ===");
         console.log(
             "CollateralTrackerDecoderAndSanitizer Address:",
-            collateralTrackerDecoderAndSanitizerAddress
+            collateralTrackerDecoderAndSanitizer
         );
 
         // 5. Deploy and configure RolesAuthority with CREATE2
-        RolesAuthority authority = new RolesAuthority{salt: salt}(deployer, Authority(address(0)));
-        address authorityAddress = address(authority);
+        rolesAuthority = address(new RolesAuthority{salt: salt}(deployer, Authority(address(0))));
         console.log("=== CREATE2 Deployment Info ===");
-        console.log("RolesAuthority Address:", authorityAddress);
-
-        return (
-            hypoVaultImplAddress,
-            vaultFactoryAddress,
-            accountantAddress,
-            collateralTrackerDecoderAndSanitizerAddress,
-            authorityAddress
-        );
+        console.log("RolesAuthority Address:", rolesAuthority);
     }
 }

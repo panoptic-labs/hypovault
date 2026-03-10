@@ -1,1 +1,16 @@
 forge-std/=lib/forge-std/src/
+src/base/=lib/boring-vault/src/base/
+src/helper/=lib/boring-vault/src/helper/
+src/interfaces/BalancerVault.sol=lib/boring-vault/src/interfaces/BalancerVault.sol
+src/interfaces/BeforeTransferHook.sol=lib/boring-vault/src/interfaces/BeforeTransferHook.sol
+src/interfaces/DecoderCustomTypes.sol=lib/boring-vault/src/interfaces/DecoderCustomTypes.sol
+src/interfaces/IPausable.sol=lib/boring-vault/src/interfaces/IPausable.sol
+src/interfaces/IRateProvider.sol=lib/boring-vault/src/interfaces/IRateProvider.sol
+src/interfaces/IStaking.sol=lib/boring-vault/src/interfaces/IStaking.sol
+src/interfaces/RawDataDecoderAndSanitizerInterfaces.sol=lib/boring-vault/src/interfaces/RawDataDecoderAndSanitizerInterfaces.sol
+src/interfaces/ShareLocker.sol=lib/boring-vault/src/interfaces/ShareLocker.sol
+src/interfaces/AggregationRouterV5.sol=lib/boring-vault/src/interfaces/AggregationRouterV5.sol
+src/interfaces/PriceRouter.sol=lib/boring-vault/src/interfaces/PriceRouter.sol
+src/interfaces/IUniswapV3Router.sol=lib/boring-vault/src/interfaces/IUniswapV3Router.sol
+src/interfaces/DefaultCollateral.sol=lib/boring-vault/src/interfaces/DefaultCollateral.sol
+src/interfaces/EtherFiLiquid1.sol=lib/boring-vault/src/interfaces/EtherFiLiquid1.sol
