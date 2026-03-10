@@ -243,28 +243,23 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         // Deploy vault using the helper
         MerkleTreeHelper.ManageLeaf[] memory leafs;
         bytes32[][] memory manageTree;
-        (
-            $vaultAddress,
-            $managerAddress,
-            leafs,
-            manageTree
-        ) = deployVault(
-                DeployStruct({
-                    deployer: $owner,
-                    vaultFactory: $vaultFactory,
-                    accountantAddress: $accountant,
-                    collateralTrackerDecoderAndSanitizer: $collateralTrackerDecoderAndSanitizer,
-                    authorityAddress: $authorityAddress,
-                    turnkeyAccount: $TurnkeyAccount0,
-                    underlyingToken: address($sepoliaWeth),
-                    collateralTracker: $ethUsdc500bpsV4Collateral0,
-                    panopticPool: $ethUsdc500bpsV4PanopticPool,
-                    weth: address($sepoliaWeth),
-                    symbol: "povLendWETH",
-                    name: "Panoptic Lend Vault | WETH",
-                    salt: salt
-                })
-            );
+        ($vaultAddress, $managerAddress, leafs, manageTree) = deployVault(
+            DeployStruct({
+                deployer: $owner,
+                vaultFactory: $vaultFactory,
+                accountantAddress: $accountant,
+                collateralTrackerDecoderAndSanitizer: $collateralTrackerDecoderAndSanitizer,
+                authorityAddress: $authorityAddress,
+                turnkeyAccount: $TurnkeyAccount0,
+                underlyingToken: address($sepoliaWeth),
+                collateralTracker: $ethUsdc500bpsV4Collateral0,
+                panopticPool: $ethUsdc500bpsV4PanopticPool,
+                weth: address($sepoliaWeth),
+                symbol: "povLendWETH",
+                name: "Panoptic Lend Vault | WETH",
+                salt: salt
+            })
+        );
 
         vm.stopPrank();
 
@@ -438,7 +433,9 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             values
         );
 
-        uint256 newCtShares = ERC4626($ethUsdc500bpsV4Collateral0).balanceOf(address($wethPlpVault));
+        uint256 newCtShares = ERC4626($ethUsdc500bpsV4Collateral0).balanceOf(
+            address($wethPlpVault)
+        );
         assertGt(newCtShares, initialCtShares);
 
         vm.stopPrank();
@@ -632,7 +629,9 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             values
         );
 
-        uint256 newCtShares = ERC4626($ethUsdc500bpsV4Collateral0).balanceOf(address($wethPlpVault));
+        uint256 newCtShares = ERC4626($ethUsdc500bpsV4Collateral0).balanceOf(
+            address($wethPlpVault)
+        );
         assertGt(newCtShares, initialCtShares);
 
         vm.stopPrank();
