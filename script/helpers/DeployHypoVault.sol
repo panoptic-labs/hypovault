@@ -39,7 +39,9 @@ contract DeployHypoVault is MerkleTreeHelper {
     // Deployment addresses
     address BalancerVaultAddr = address(0x7777); // Required by ManagerWithMerkleVerification
 
-    function deployVault(DeployStruct memory deployData)
+    function deployVault(
+        DeployStruct memory deployData
+    )
         internal
         returns (
             address vault,
@@ -67,9 +69,13 @@ contract DeployHypoVault is MerkleTreeHelper {
         console.log("Set fee wallet to:", deployData.turnkeyAccount);
 
         // 3. Deploy HypoVaultManagerWithMerkleVerification with CREATE2
-        manager = address(new HypoVaultManagerWithMerkleVerification{
-            salt: deployData.salt
-        }(deployData.deployer, vault, BalancerVaultAddr));
+        manager = address(
+            new HypoVaultManagerWithMerkleVerification{salt: deployData.salt}(
+                deployData.deployer,
+                vault,
+                BalancerVaultAddr
+            )
+        );
         console.log("Manager Address:", manager);
 
         // 4. Set HypoVault manager
@@ -85,7 +91,9 @@ contract DeployHypoVault is MerkleTreeHelper {
         address vaultAddress,
         address managerAddress
     ) internal returns (ManageLeaf[] memory leafs, bytes32[][] memory manageTree) {
-        HypoVaultManagerWithMerkleVerification manager = HypoVaultManagerWithMerkleVerification(managerAddress);
+        HypoVaultManagerWithMerkleVerification manager = HypoVaultManagerWithMerkleVerification(
+            managerAddress
+        );
 
         // 5. Build merkle tree for manage operations
         setSourceChainName(sepolia);
@@ -100,7 +108,12 @@ contract DeployHypoVault is MerkleTreeHelper {
         );
 
         leafs = new ManageLeaf[](16);
-        _addCollateralTrackerLeafs(leafs, ERC4626(deployData.collateralTracker), deployData.panopticPool, deployData.weth);
+        _addCollateralTrackerLeafs(
+            leafs,
+            ERC4626(deployData.collateralTracker),
+            deployData.panopticPool,
+            deployData.weth
+        );
         manageTree = _generateMerkleTree(leafs);
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
         string memory filePath = string.concat(
@@ -132,7 +145,10 @@ contract DeployHypoVault is MerkleTreeHelper {
         console.log("Generated poolInfosHash:");
         console.logBytes32(poolInfosHash);
 
-        PanopticVaultAccountant(deployData.accountantAddress).updatePoolsHash(vaultAddress, poolInfosHash);
+        PanopticVaultAccountant(deployData.accountantAddress).updatePoolsHash(
+            vaultAddress,
+            poolInfosHash
+        );
         console.log("Pools hash updated");
 
         // TODO: Add transfer ownership calls to the multisig

@@ -37,17 +37,14 @@ contract DeployArchitecture {
         console.log("Factory Address:", vaultFactory);
 
         // 3. Deploy new Accountant with CREATE2
-        accountant = address(new PanopticVaultAccountant{salt: salt}(
-            deployer,
-            wethAddress
-        ));
+        accountant = address(new PanopticVaultAccountant{salt: salt}(deployer, wethAddress));
         console.log("=== CREATE2 Deployment Info ===");
         console.log("Accountant Address:", accountant);
 
         // 4. Deploy CollateralTrackerDecoderAndSanitizer with CREATE2
-        collateralTrackerDecoderAndSanitizer = address(new CollateralTrackerDecoderAndSanitizer{
-            salt: salt
-        }(hypoVaultImpl));
+        collateralTrackerDecoderAndSanitizer = address(
+            new CollateralTrackerDecoderAndSanitizer{salt: salt}(hypoVaultImpl)
+        );
         console.log("=== CREATE2 Deployment Info ===");
         console.log(
             "CollateralTrackerDecoderAndSanitizer Address:",

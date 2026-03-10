@@ -37,21 +37,23 @@ contract DeployCoveredCallVault is Script, DeployHypoVault {
         console.log("Using Decoder:", DECODER_ADDRESS);
         console.log("Using Authority:", AUTHORITY_ADDRESS);
 
-        deployVault(DeployStruct({
-            deployer: deployer,
-            vaultFactory: FACTORY_ADDRESS,
-            accountantAddress: ACCOUNTANT_ADDRESS,
-            collateralTrackerDecoderAndSanitizer: DECODER_ADDRESS,
-            authorityAddress: AUTHORITY_ADDRESS,
-            turnkeyAccount: VAULT_TURNKEY_ADDRESS,
-            underlyingToken: address(sepoliaUsdc),
-            collateralTracker: COLLATERAL_TRACKER_ADDRESS,
-            panopticPool: PANOPTIC_POOL_ADDRESS,
-            weth: address(sepoliaWeth),
-            symbol: "coveredCallUSDC",
-            name: "Panoptic Covered Call Vault | USDC",
-            salt: salt
-        }));
+        deployVault(
+            DeployStruct({
+                deployer: deployer,
+                vaultFactory: FACTORY_ADDRESS,
+                accountantAddress: ACCOUNTANT_ADDRESS,
+                collateralTrackerDecoderAndSanitizer: DECODER_ADDRESS,
+                authorityAddress: AUTHORITY_ADDRESS,
+                turnkeyAccount: VAULT_TURNKEY_ADDRESS,
+                underlyingToken: address(sepoliaUsdc),
+                collateralTracker: COLLATERAL_TRACKER_ADDRESS,
+                panopticPool: PANOPTIC_POOL_ADDRESS,
+                weth: address(sepoliaWeth),
+                symbol: "coveredCallUSDC",
+                name: "Panoptic Covered Call Vault | USDC",
+                salt: salt
+            })
+        );
         vm.stopBroadcast();
     }
 }
