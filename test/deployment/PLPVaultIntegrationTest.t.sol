@@ -204,8 +204,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         address TurnkeyAccount0 = address(0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8);
         address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
         ERC20S sepoliaWeth = ERC20S(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
-        address ethUsdc500bpsV4Collateral0 = 0x4d2579A5F9BC32641D6AdbFC47C6dAceF30027F1; // Underlying: ETH
-        address ethUsdc500bpsV4PanopticPool = 0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E; // Underlying: ETH
+        address ethUsdc500bpsV4Collateral0 = 0x45f93888565bA53650Af5ceF6279776B0e6B8A92; // Underlying: ETH
+        address ethUsdc500bpsV4PanopticPool = 0x03AFf7Be6A5afB2bC6830BC54778AF674006850A; // Underlying: ETH
 
         /*
            STEP 1: Deployments
@@ -440,23 +440,23 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         address TurnkeyAccount0 = address(0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8);
         address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
         ERC20S sepoliaWeth = ERC20S(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
-        address ethUsdc500bpsV4Collateral0 = 0x4d2579A5F9BC32641D6AdbFC47C6dAceF30027F1; // Underlying: WETH9 | 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
-        address ethUsdc500bpsV4PanopticPool = 0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E;
+        address ethUsdc500bpsV4Collateral0 = 0x45f93888565bA53650Af5ceF6279776B0e6B8A92; // Underlying: WETH9 | 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
+        address ethUsdc500bpsV4PanopticPool = 0x03AFf7Be6A5afB2bC6830BC54778AF674006850A;
 
         // use contract suite deployed from EOA
-        HypoVault wethPlpVault = HypoVault(payable(0x225Bf020d280E98C3037fb3c5aa291De6F618834));
+        HypoVault wethPlpVault = HypoVault(payable(0x1b67b080e420F21396c4Bb98c3f59321B1e04D5A));
         HypoVaultManagerWithMerkleVerification wethPlpVaultManager = HypoVaultManagerWithMerkleVerification(
-                0xe675A002d7f8C9476Ebf3706550b80221BA2AE5E
+                0x6EBdE9BF487A3194878CFe27cbdA2008B3FAa31e
             );
         PanopticVaultAccountant panopticVaultAccountant = PanopticVaultAccountant(
-            0x061AF4Fd2a015ed871e7EA406749cF268236C918
+            0x0ba79E9964148DdBd185eCD13ee03E321d7b22D9
         );
-        RolesAuthority rolesAuthority = RolesAuthority(0x183b19b0c27f5124E077b10fa57f3B19e71958B2);
+        RolesAuthority rolesAuthority = RolesAuthority(0x34eC4c475A7fc3B864649007B3C9E6C392043D42);
 
         /////////////////////////////
         // rebuild merkle tree to show full manage flow
         ///////////////////////
-        address collateralTrackerDecoderAndSanitizer = 0x3c2D182DB402Fc649aea61731CE47Ea72Ab3a7f1;
+        address collateralTrackerDecoderAndSanitizer = 0x5388cE7E3d81e0BEe9372c429e4276c20699a1E7;
         setSourceChainName(sepolia);
         setAddress(false, sepolia, "boringVault", address(wethPlpVault));
         setAddress(false, sepolia, "managerAddress", address(wethPlpVaultManager));
@@ -632,7 +632,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
 
         address token0 = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14; // sepolia weth9
         address token1 = 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A; // sepolia mock USDC
-        address ethUsdc500bpsV4PanopticPool = 0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E;
+        address ethUsdc500bpsV4PanopticPool = 0x03AFf7Be6A5afB2bC6830BC54778AF674006850A;
 
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({

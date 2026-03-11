@@ -10,14 +10,14 @@ import {Script} from "forge-std/Script.sol";
 
 contract DeployWETHVault is Script, DeployHypoVault {
     // Addresses from the initial deployment
-    address constant FACTORY_ADDRESS = address(0xC631ea9659A255641C0ee28C18f2F23970DD3DdD);
-    address constant ACCOUNTANT_ADDRESS = address(0x061AF4Fd2a015ed871e7EA406749cF268236C918);
-    address constant DECODER_ADDRESS = address(0x3c2D182DB402Fc649aea61731CE47Ea72Ab3a7f1);
-    address constant AUTHORITY_ADDRESS = address(0x183b19b0c27f5124E077b10fa57f3B19e71958B2);
-    address constant PANOPTIC_POOL_ADDRESS = address(0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E);
+    address constant FACTORY_ADDRESS = address(0x3994a6236f6889054d7C11D6B9016C25D0bC18a2);
+    address constant ACCOUNTANT_ADDRESS = address(0x0ba79E9964148DdBd185eCD13ee03E321d7b22D9);
+    address constant DECODER_ADDRESS = address(0x5388cE7E3d81e0BEe9372c429e4276c20699a1E7);
+    address constant AUTHORITY_ADDRESS = address(0x34eC4c475A7fc3B864649007B3C9E6C392043D42);
+    address constant PANOPTIC_POOL_ADDRESS = address(0x03AFf7Be6A5afB2bC6830BC54778AF674006850A);
 
     address constant COLLATERAL_TRACKER_ADDRESS =
-        address(0x4d2579A5F9BC32641D6AdbFC47C6dAceF30027F1);
+        address(0x45f93888565bA53650Af5ceF6279776B0e6B8A92);
     address constant VAULT_TURNKEY_ADDRESS = address(0x8FfA6DAB99f8afc64F61BeF83F0966eD6362f24F);
 
     bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v9-weth"));
