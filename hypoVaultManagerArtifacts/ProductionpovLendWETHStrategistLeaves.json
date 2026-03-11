@@ -1,23 +1,9 @@
 {
-  "metadata": {
-    "AccountantAddress": "0x0ba79E9964148DdBd185eCD13ee03E321d7b22D9",
-    "BoringVaultAddress": "0x1b67b080e420F21396c4Bb98c3f59321B1e04D5A",
-    "DecoderAndSanitizerAddress": "0x5388cE7E3d81e0BEe9372c429e4276c20699a1E7",
-    "DigestComposition": [
-      "Bytes20(DECODER_AND_SANITIZER_ADDRESS)",
-      "Bytes20(TARGET_ADDRESS)",
-      "Bytes1(CAN_SEND_VALUE)",
-      "Bytes4(TARGET_FUNCTION_SELECTOR)",
-      "Bytes{N*20}(ADDRESS_ARGUMENT_0,...,ADDRESS_ARGUMENT_N)"
-    ],
-    "LeafCount": 10,
-    "ManageRoot": "0x366035a76500d8fc68e967dc4a6af32d167c84e40776b92710bc4f424a9728b3",
-    "ManagerAddress": "0x6EBdE9BF487A3194878CFe27cbdA2008B3FAa31e",
-    "TreeCapacity": 16
-  },
   "leafs": [
     {
-      "AddressArguments": ["0x45f93888565bA53650Af5ceF6279776B0e6B8A92"],
+      "AddressArguments": [
+        "0x45f93888565bA53650Af5ceF6279776B0e6B8A92"
+      ],
       "CanSendValue": false,
       "DecoderAndSanitizerAddress": "0x5388cE7E3d81e0BEe9372c429e4276c20699a1E7",
       "Description": "Approve poETH to spend ETH",
@@ -28,7 +14,9 @@
       "TargetAddress": "0x0000000000000000000000000000000000000000"
     },
     {
-      "AddressArguments": ["0x1b67b080e420F21396c4Bb98c3f59321B1e04D5A"],
+      "AddressArguments": [
+        "0x1b67b080e420F21396c4Bb98c3f59321B1e04D5A"
+      ],
       "CanSendValue": false,
       "DecoderAndSanitizerAddress": "0x5388cE7E3d81e0BEe9372c429e4276c20699a1E7",
       "Description": "Deposit ETH for poETH",
@@ -39,7 +27,9 @@
       "TargetAddress": "0x45f93888565bA53650Af5ceF6279776B0e6B8A92"
     },
     {
-      "AddressArguments": ["0x1b67b080e420F21396c4Bb98c3f59321B1e04D5A"],
+      "AddressArguments": [
+        "0x1b67b080e420F21396c4Bb98c3f59321B1e04D5A"
+      ],
       "CanSendValue": true,
       "DecoderAndSanitizerAddress": "0x5388cE7E3d81e0BEe9372c429e4276c20699a1E7",
       "Description": "Deposit ETH for poETH (payable)",
@@ -78,7 +68,9 @@
       "TargetAddress": "0x45f93888565bA53650Af5ceF6279776B0e6B8A92"
     },
     {
-      "AddressArguments": ["0x1b67b080e420F21396c4Bb98c3f59321B1e04D5A"],
+      "AddressArguments": [
+        "0x1b67b080e420F21396c4Bb98c3f59321B1e04D5A"
+      ],
       "CanSendValue": false,
       "DecoderAndSanitizerAddress": "0x5388cE7E3d81e0BEe9372c429e4276c20699a1E7",
       "Description": "Mint poETH using ETH",
@@ -89,7 +81,9 @@
       "TargetAddress": "0x45f93888565bA53650Af5ceF6279776B0e6B8A92"
     },
     {
-      "AddressArguments": ["0x1b67b080e420F21396c4Bb98c3f59321B1e04D5A"],
+      "AddressArguments": [
+        "0x1b67b080e420F21396c4Bb98c3f59321B1e04D5A"
+      ],
       "CanSendValue": true,
       "DecoderAndSanitizerAddress": "0x5388cE7E3d81e0BEe9372c429e4276c20699a1E7",
       "Description": "Mint poETH using ETH (payable)",
@@ -203,7 +197,9 @@
     }
   ],
   "MerkleTree": {
-    "0": ["0x366035a76500d8fc68e967dc4a6af32d167c84e40776b92710bc4f424a9728b3"],
+    "0": [
+      "0x366035a76500d8fc68e967dc4a6af32d167c84e40776b92710bc4f424a9728b3"
+    ],
     "1": [
       "0x004830070b20268bf430e1e4f9ff9d9a796e33bfc33191102def8825a4b27a5d",
       "0x752498cf68d516fadcc56d5c877d6aba6b18fcbb1e26d2036e4822ebfb16e8b5"
@@ -242,5 +238,21 @@
       "0xa7a0fd846665d92e66be6155c6221b3acd7145ca7c4e4b67a594e4c516969400",
       "0xa7a0fd846665d92e66be6155c6221b3acd7145ca7c4e4b67a594e4c516969400"
     ]
+  },
+  "metadata": {
+    "AccountantAddress": "0x0ba79E9964148DdBd185eCD13ee03E321d7b22D9",
+    "BoringVaultAddress": "0x1b67b080e420F21396c4Bb98c3f59321B1e04D5A",
+    "DecoderAndSanitizerAddress": "0x5388cE7E3d81e0BEe9372c429e4276c20699a1E7",
+    "DigestComposition": [
+      "Bytes20(DECODER_AND_SANITIZER_ADDRESS)",
+      "Bytes20(TARGET_ADDRESS)",
+      "Bytes1(CAN_SEND_VALUE)",
+      "Bytes4(TARGET_FUNCTION_SELECTOR)",
+      "Bytes{N*20}(ADDRESS_ARGUMENT_0,...,ADDRESS_ARGUMENT_N)"
+    ],
+    "LeafCount": 10,
+    "ManagerAddress": "0x6EBdE9BF487A3194878CFe27cbdA2008B3FAa31e",
+    "ManageRoot": "0x366035a76500d8fc68e967dc4a6af32d167c84e40776b92710bc4f424a9728b3",
+    "TreeCapacity": 16
   }
 }
