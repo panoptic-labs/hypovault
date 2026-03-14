@@ -10,73 +10,73 @@
 
 ### A.1 Unchecked Blocks
 
-| # | File:Line | Expression | Operand Provenance | Callers / External Entrypoints |
-|---|-----------|------------|--------------------|-------------------------------|
-| U1 | `PanopticVaultAccountant.sol:166-169` | `poolExposure0 += int256(amount0); poolExposure1 += int256(amount1);` | `amount0/1` from `Math.getAmountsForLiquidity` (derived from oracle tick + position size uint128). `poolExposure` is running int256 accumulator. | `computeNAV` <- `fulfillDeposits` / `fulfillWithdrawals` / `totalAssets` |
-| U2 | `PanopticVaultAccountant.sol:171-174` | `poolExposure0 -= int256(amount0); poolExposure1 -= int256(amount1);` | Same as U1 but for long legs. | Same as U1 |
-| U3 | `HypoVault.sol:726-728` | `balanceOf[to] += amount;` | `amount` from `sharesReceived` (mulDiv result) or `cancelWithdrawal` restore. | `_mintVirtual` <- `executeDeposit`, `cancelWithdrawal` |
+| #   | File:Line                             | Expression                                                            | Operand Provenance                                                                                                                               | Callers / External Entrypoints                                           |
+| --- | ------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| U1  | `PanopticVaultAccountant.sol:166-169` | `poolExposure0 += int256(amount0); poolExposure1 += int256(amount1);` | `amount0/1` from `Math.getAmountsForLiquidity` (derived from oracle tick + position size uint128). `poolExposure` is running int256 accumulator. | `computeNAV` <- `fulfillDeposits` / `fulfillWithdrawals` / `totalAssets` |
+| U2  | `PanopticVaultAccountant.sol:171-174` | `poolExposure0 -= int256(amount0); poolExposure1 -= int256(amount1);` | Same as U1 but for long legs.                                                                                                                    | Same as U1                                                               |
+| U3  | `HypoVault.sol:726-728`               | `balanceOf[to] += amount;`                                            | `amount` from `sharesReceived` (mulDiv result) or `cancelWithdrawal` restore.                                                                    | `_mintVirtual` <- `executeDeposit`, `cancelWithdrawal`                   |
 
 ### A.2 Narrowing Casts (uint256 -> uint128)
 
-| # | File:Line | Expression | Operand Provenance | Callers |
-|---|-----------|------------|--------------------|---------|
-| N1 | `HypoVault.sol:349` | `uint128(pendingWithdrawal.basis + withdrawalBasis)` | `withdrawalBasis = (previousBasis * shares) / userBalance`; previousBasis is uint256 from storage | `_requestWithdrawal` <- `requestWithdrawal`, `requestWithdrawalFrom` |
-| N2 | `HypoVault.sol:387` | `uint128(queuedDepositAmount)` | `queuedDepositAmount` is uint128 loaded into uint256 (safe - value fits) | `_cancelDeposit` |
-| N3 | `HypoVault.sol:454` | `uint128(assetsRemaining)` | `queuedDepositAmount (uint128) - mulDiv(uint128, uint128, uint128)` <= original uint128 | `executeDeposit` |
-| N4 | `HypoVault.sol:501` | `uint128(nextQueuedWithdrawal.amount + sharesRemaining)` | Both derived from uint128 sources; sum could exceed uint128 after multiple rollovers | `executeWithdrawal` |
-| N5 | `HypoVault.sol:502` | `uint128(nextQueuedWithdrawal.basis + basisRemaining)` | `basisRemaining` from uint256 computation; could exceed uint128 | `executeWithdrawal` |
-| N6 | `HypoVault.sol:515-516` | `uint128(assetsToWithdraw)` | mulDiv result, bounded by reservedWithdrawalAssets; fits if vault asset < 2^128 | `executeWithdrawal` (redeposit path) |
-| N7 | `HypoVault.sol:650-652` | `uint128(epochState.assetsDeposited)`, `uint128(sharesReceived)`, `uint128(assetsToFulfill)` | `sharesReceived = mulDiv(uint256, uint256, uint256)`; can exceed uint128 if totalSupply or assetsToFulfill is large | `fulfillDeposits` (manager) |
-| N8 | `HypoVault.sol:656` | `uint128(currentEpoch)` | Monotonic counter starting at 0; uint128 overflow after ~3.4e38 epochs (infeasible) | `fulfillDeposits` |
-| N9 | `HypoVault.sol:659` | `uint128(assetsRemaining)` | `assetsDeposited - assetsToFulfill`; both uint128-origin but computed as uint256 | `fulfillDeposits` |
-| N10 | `HypoVault.sol:698-700` | `uint128(assetsReceived)`, `uint128(epochState.sharesWithdrawn)`, `uint128(sharesToFulfill)` | `assetsReceived = mulDiv(uint256, uint256, uint256)`; can exceed uint128 | `fulfillWithdrawals` (manager) |
-| N11 | `HypoVault.sol:705, 709` | `uint128(currentEpoch)`, `uint128(sharesRemaining)` | Same as N8, N9 pattern | `fulfillWithdrawals` |
-| N12 | `PanopticVaultAccountant.sol:152` | `uint128(PositionBalance.unwrap(positionBalanceArray[j]))` | External return from PanopticPool; lower 128 bits is position size | `computeNAV` |
+| #   | File:Line                         | Expression                                                                                   | Operand Provenance                                                                                                  | Callers                                                              |
+| --- | --------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| N1  | `HypoVault.sol:349`               | `uint128(pendingWithdrawal.basis + withdrawalBasis)`                                         | `withdrawalBasis = (previousBasis * shares) / userBalance`; previousBasis is uint256 from storage                   | `_requestWithdrawal` <- `requestWithdrawal`, `requestWithdrawalFrom` |
+| N2  | `HypoVault.sol:387`               | `uint128(queuedDepositAmount)`                                                               | `queuedDepositAmount` is uint128 loaded into uint256 (safe - value fits)                                            | `_cancelDeposit`                                                     |
+| N3  | `HypoVault.sol:454`               | `uint128(assetsRemaining)`                                                                   | `queuedDepositAmount (uint128) - mulDiv(uint128, uint128, uint128)` <= original uint128                             | `executeDeposit`                                                     |
+| N4  | `HypoVault.sol:501`               | `uint128(nextQueuedWithdrawal.amount + sharesRemaining)`                                     | Both derived from uint128 sources; sum could exceed uint128 after multiple rollovers                                | `executeWithdrawal`                                                  |
+| N5  | `HypoVault.sol:502`               | `uint128(nextQueuedWithdrawal.basis + basisRemaining)`                                       | `basisRemaining` from uint256 computation; could exceed uint128                                                     | `executeWithdrawal`                                                  |
+| N6  | `HypoVault.sol:515-516`           | `uint128(assetsToWithdraw)`                                                                  | mulDiv result, bounded by reservedWithdrawalAssets; fits if vault asset < 2^128                                     | `executeWithdrawal` (redeposit path)                                 |
+| N7  | `HypoVault.sol:650-652`           | `uint128(epochState.assetsDeposited)`, `uint128(sharesReceived)`, `uint128(assetsToFulfill)` | `sharesReceived = mulDiv(uint256, uint256, uint256)`; can exceed uint128 if totalSupply or assetsToFulfill is large | `fulfillDeposits` (manager)                                          |
+| N8  | `HypoVault.sol:656`               | `uint128(currentEpoch)`                                                                      | Monotonic counter starting at 0; uint128 overflow after ~3.4e38 epochs (infeasible)                                 | `fulfillDeposits`                                                    |
+| N9  | `HypoVault.sol:659`               | `uint128(assetsRemaining)`                                                                   | `assetsDeposited - assetsToFulfill`; both uint128-origin but computed as uint256                                    | `fulfillDeposits`                                                    |
+| N10 | `HypoVault.sol:698-700`           | `uint128(assetsReceived)`, `uint128(epochState.sharesWithdrawn)`, `uint128(sharesToFulfill)` | `assetsReceived = mulDiv(uint256, uint256, uint256)`; can exceed uint128                                            | `fulfillWithdrawals` (manager)                                       |
+| N11 | `HypoVault.sol:705, 709`          | `uint128(currentEpoch)`, `uint128(sharesRemaining)`                                          | Same as N8, N9 pattern                                                                                              | `fulfillWithdrawals`                                                 |
+| N12 | `PanopticVaultAccountant.sol:152` | `uint128(PositionBalance.unwrap(positionBalanceArray[j]))`                                   | External return from PanopticPool; lower 128 bits is position size                                                  | `computeNAV`                                                         |
 
 ### A.3 Signed/Unsigned Transitions
 
-| # | File:Line | Expression | Risk |
-|---|-----------|------------|------|
-| S1 | `PanopticVaultAccountant.sol:142-147` | `int256(uint256(shortPremium.rightSlot())) - int256(uint256(longPremium.rightSlot()))` | Slots are uint128; fits in int256. **Safe.** |
-| S2 | `PanopticVaultAccountant.sol:167-168, 172-173` | `int256(amount0)` inside unchecked | `amount0` from `getAmountsForLiquidity` with uint128 liquidity; bounded by ~uint128. **Safe by practical bound.** |
-| S3 | `PanopticVaultAccountant.sol:237-243` | `int256(previewRedeem(collateralBalance))` | `previewRedeem` returns uint256; if > int256.max, reverts (checked context). DoS-only if collateral tracker returns extreme value. |
-| S4 | `PanopticVaultAccountant.sol:279-281` | `uint256(PanopticMath.convert0to1(int256(token0Exposure), conversionPrice))` | `token0Exposure` is uint256 (vault balance). If convert0to1 returns negative (impossible for positive input), would revert in checked context. **Safe.** |
-| S5 | `HypoVault.sol:484` | `int256(assetsToWithdraw) - int256(withdrawnBasis)` | Both bounded by vault assets (< 2^128 in practice). `Math.max(0, ...)` guards against negative. **Safe.** |
+| #   | File:Line                                      | Expression                                                                             | Risk                                                                                                                                                     |
+| --- | ---------------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S1  | `PanopticVaultAccountant.sol:142-147`          | `int256(uint256(shortPremium.rightSlot())) - int256(uint256(longPremium.rightSlot()))` | Slots are uint128; fits in int256. **Safe.**                                                                                                             |
+| S2  | `PanopticVaultAccountant.sol:167-168, 172-173` | `int256(amount0)` inside unchecked                                                     | `amount0` from `getAmountsForLiquidity` with uint128 liquidity; bounded by ~uint128. **Safe by practical bound.**                                        |
+| S3  | `PanopticVaultAccountant.sol:237-243`          | `int256(previewRedeem(collateralBalance))`                                             | `previewRedeem` returns uint256; if > int256.max, reverts (checked context). DoS-only if collateral tracker returns extreme value.                       |
+| S4  | `PanopticVaultAccountant.sol:279-281`          | `uint256(PanopticMath.convert0to1(int256(token0Exposure), conversionPrice))`           | `token0Exposure` is uint256 (vault balance). If convert0to1 returns negative (impossible for positive input), would revert in checked context. **Safe.** |
+| S5  | `HypoVault.sol:484`                            | `int256(assetsToWithdraw) - int256(withdrawnBasis)`                                    | Both bounded by vault assets (< 2^128 in practice). `Math.max(0, ...)` guards against negative. **Safe.**                                                |
 
 ### A.4 Mul/Div Chains and Rounding Helpers
 
-| # | File:Line | Expression | Rounding Direction | Who Benefits |
-|---|-----------|------------|--------------------|-------------|
-| R1 | `HypoVault.sol:343` | `(previousBasis * shares) / userBalance` | Down | Vault (lower basis transferred -> higher fee on withdrawal) |
-| R2 | `HypoVault.sol:434-437` | `mulDiv(queuedDepositAmount, assetsFulfilled, assetsDeposited)` | Down | Vault (user gets fewer fulfilled assets, more rolls over) |
-| R3 | `HypoVault.sol:440-443` | `mulDiv(userAssetsDeposited, sharesReceived, assetsFulfilled)` | Down | Vault (user gets fewer shares) |
-| R4 | `HypoVault.sol:470-471` | `(amount * sharesFulfilled) / sharesWithdrawn` | Down | Vault (user gets fewer shares fulfilled) |
-| R5 | `HypoVault.sol:473-476` | `mulDiv(sharesToFulfill, assetsReceived, sharesFulfilled)` | Down | Vault (user gets fewer assets) |
-| R6 | `HypoVault.sol:481-482` | `(basis * sharesFulfilled) / sharesWithdrawn` | Down | User (lower basis -> lower performance fee) |
-| R7 | `HypoVault.sol:483-485` | `Math.max(0, profit) * feeBps / 10_000` | Down | User (lower fee) |
-| R8 | `HypoVault.sol:584` | `(fromBasis * amount) / fromBalance` | Down | Vault (less basis transferred) |
-| R9 | `HypoVault.sol:594` | `Math.min(basisToTransfer, (userBasis[to] * amount) / toBalance)` | Down (min of two) | Vault (lower recipient basis -> higher fee) |
-| R10 | `HypoVault.sol:645` | `mulDiv(assetsToFulfill, totalSupply, totalAssets)` | Down | Vault (fewer shares minted to depositors) |
-| R11 | `HypoVault.sol:691` | `mulDiv(sharesToFulfill, totalAssets, totalSupply)` | Down | Users (fewer assets disbursed for withdrawals) |
+| #   | File:Line               | Expression                                                        | Rounding Direction | Who Benefits                                                |
+| --- | ----------------------- | ----------------------------------------------------------------- | ------------------ | ----------------------------------------------------------- |
+| R1  | `HypoVault.sol:343`     | `(previousBasis * shares) / userBalance`                          | Down               | Vault (lower basis transferred -> higher fee on withdrawal) |
+| R2  | `HypoVault.sol:434-437` | `mulDiv(queuedDepositAmount, assetsFulfilled, assetsDeposited)`   | Down               | Vault (user gets fewer fulfilled assets, more rolls over)   |
+| R3  | `HypoVault.sol:440-443` | `mulDiv(userAssetsDeposited, sharesReceived, assetsFulfilled)`    | Down               | Vault (user gets fewer shares)                              |
+| R4  | `HypoVault.sol:470-471` | `(amount * sharesFulfilled) / sharesWithdrawn`                    | Down               | Vault (user gets fewer shares fulfilled)                    |
+| R5  | `HypoVault.sol:473-476` | `mulDiv(sharesToFulfill, assetsReceived, sharesFulfilled)`        | Down               | Vault (user gets fewer assets)                              |
+| R6  | `HypoVault.sol:481-482` | `(basis * sharesFulfilled) / sharesWithdrawn`                     | Down               | User (lower basis -> lower performance fee)                 |
+| R7  | `HypoVault.sol:483-485` | `Math.max(0, profit) * feeBps / 10_000`                           | Down               | User (lower fee)                                            |
+| R8  | `HypoVault.sol:584`     | `(fromBasis * amount) / fromBalance`                              | Down               | Vault (less basis transferred)                              |
+| R9  | `HypoVault.sol:594`     | `Math.min(basisToTransfer, (userBasis[to] * amount) / toBalance)` | Down (min of two)  | Vault (lower recipient basis -> higher fee)                 |
+| R10 | `HypoVault.sol:645`     | `mulDiv(assetsToFulfill, totalSupply, totalAssets)`               | Down               | Vault (fewer shares minted to depositors)                   |
+| R11 | `HypoVault.sol:691`     | `mulDiv(sharesToFulfill, totalAssets, totalSupply)`               | Down               | Users (fewer assets disbursed for withdrawals)              |
 
 ### A.5 Subtraction Hotspots
 
-| # | File:Line | Expression | Guard | Status |
-|---|-----------|------------|-------|--------|
-| SUB1 | `HypoVault.sol:345` | `previousBasis - withdrawalBasis` | `withdrawalBasis = (previousBasis * shares) / userBalance <= previousBasis` when `shares <= userBalance` (enforced by burn on line 355) | Safe by invariant |
-| SUB2 | `HypoVault.sol:387` | `assetsDeposited -= uint128(queuedDepositAmount)` | **BARE SUBTRACTION.** See Finding F-01. | **DRIFT-EXPOSED** |
-| SUB3 | `HypoVault.sol:413-416` | `epochSharesWithdrawn - currentPendingWithdrawal.amount` | **Saturating subtraction** (ternary clamp to 0) | Drift-protected |
-| SUB4 | `HypoVault.sol:451` | `queuedDepositAmount - userAssetsDeposited` | `userAssetsDeposited = mulDiv(queued, fulfilled, deposited) <= queued` | Safe by mulDiv property |
-| SUB5 | `HypoVault.sol:479` | `reservedWithdrawalAssets -= assetsToWithdraw` | **BARE SUBTRACTION.** See Finding F-02. | **DRIFT-EXPOSED** |
-| SUB6 | `HypoVault.sol:493` | `pendingWithdrawal.amount - sharesToFulfill` | `sharesToFulfill = (amount * fulfilled) / withdrawn <= amount` | Safe by division property |
-| SUB7 | `HypoVault.sol:495` | `pendingWithdrawal.basis - withdrawnBasis` | `withdrawnBasis = (basis * fulfilled) / withdrawn <= basis` | Safe by division property |
-| SUB8 | `HypoVault.sol:508` | `assetsToWithdraw -= performanceFee` | `performanceFee = max(0, profit) * bps / 10000 <= assetsToWithdraw` (profit <= assetsToWithdraw, bps <= 10000) | Safe by invariant (requires `performanceFeeBps <= 10_000`) |
-| SUB9 | `HypoVault.sol:586` | `fromBasis - basisToTransfer` | Same logic as SUB1 | Safe by invariant |
-| SUB10 | `HypoVault.sol:638-641` | `computeNAV() + 1 - assetsDeposited - reservedWithdrawalAssets` | No guard; reverts if NAV < deposits + reserved - 1. Manager-controlled entry. | DoS if vault insolvent (by design) |
-| SUB11 | `HypoVault.sol:647` | `assetsDeposited - assetsToFulfill` | Manager must ensure `assetsToFulfill <= assetsDeposited` | Safe (manager trust) |
-| SUB12 | `HypoVault.sol:695` | `sharesWithdrawn - sharesToFulfill` | Manager must ensure `sharesToFulfill <= sharesWithdrawn` | Safe (manager trust) |
-| SUB13 | `HypoVault.sol:713` | `totalSupply - sharesToFulfill` | `sharesToFulfill <= totalSupply` ensured by manager | Safe (manager trust) |
-| SUB14 | `HypoVault.sol:737` | `balanceOf[from] -= amount` | Checked math; reverts if insufficient balance | Safe (revert is correct behavior) |
+| #     | File:Line               | Expression                                                      | Guard                                                                                                                                   | Status                                                     |
+| ----- | ----------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| SUB1  | `HypoVault.sol:345`     | `previousBasis - withdrawalBasis`                               | `withdrawalBasis = (previousBasis * shares) / userBalance <= previousBasis` when `shares <= userBalance` (enforced by burn on line 355) | Safe by invariant                                          |
+| SUB2  | `HypoVault.sol:387`     | `assetsDeposited -= uint128(queuedDepositAmount)`               | **BARE SUBTRACTION.** See Finding F-01.                                                                                                 | **DRIFT-EXPOSED**                                          |
+| SUB3  | `HypoVault.sol:413-416` | `epochSharesWithdrawn - currentPendingWithdrawal.amount`        | **Saturating subtraction** (ternary clamp to 0)                                                                                         | Drift-protected                                            |
+| SUB4  | `HypoVault.sol:451`     | `queuedDepositAmount - userAssetsDeposited`                     | `userAssetsDeposited = mulDiv(queued, fulfilled, deposited) <= queued`                                                                  | Safe by mulDiv property                                    |
+| SUB5  | `HypoVault.sol:479`     | `reservedWithdrawalAssets -= assetsToWithdraw`                  | **BARE SUBTRACTION.** See Finding F-02.                                                                                                 | **DRIFT-EXPOSED**                                          |
+| SUB6  | `HypoVault.sol:493`     | `pendingWithdrawal.amount - sharesToFulfill`                    | `sharesToFulfill = (amount * fulfilled) / withdrawn <= amount`                                                                          | Safe by division property                                  |
+| SUB7  | `HypoVault.sol:495`     | `pendingWithdrawal.basis - withdrawnBasis`                      | `withdrawnBasis = (basis * fulfilled) / withdrawn <= basis`                                                                             | Safe by division property                                  |
+| SUB8  | `HypoVault.sol:508`     | `assetsToWithdraw -= performanceFee`                            | `performanceFee = max(0, profit) * bps / 10000 <= assetsToWithdraw` (profit <= assetsToWithdraw, bps <= 10000)                          | Safe by invariant (requires `performanceFeeBps <= 10_000`) |
+| SUB9  | `HypoVault.sol:586`     | `fromBasis - basisToTransfer`                                   | Same logic as SUB1                                                                                                                      | Safe by invariant                                          |
+| SUB10 | `HypoVault.sol:638-641` | `computeNAV() + 1 - assetsDeposited - reservedWithdrawalAssets` | No guard; reverts if NAV < deposits + reserved - 1. Manager-controlled entry.                                                           | DoS if vault insolvent (by design)                         |
+| SUB11 | `HypoVault.sol:647`     | `assetsDeposited - assetsToFulfill`                             | Manager must ensure `assetsToFulfill <= assetsDeposited`                                                                                | Safe (manager trust)                                       |
+| SUB12 | `HypoVault.sol:695`     | `sharesWithdrawn - sharesToFulfill`                             | Manager must ensure `sharesToFulfill <= sharesWithdrawn`                                                                                | Safe (manager trust)                                       |
+| SUB13 | `HypoVault.sol:713`     | `totalSupply - sharesToFulfill`                                 | `sharesToFulfill <= totalSupply` ensured by manager                                                                                     | Safe (manager trust)                                       |
+| SUB14 | `HypoVault.sol:737`     | `balanceOf[from] -= amount`                                     | Checked math; reverts if insufficient balance                                                                                           | Safe (revert is correct behavior)                          |
 
 ---
 
@@ -85,17 +85,19 @@
 ### U1/U2: Unchecked poolExposure accumulation (`PanopticVaultAccountant.sol:166-174`)
 
 **Operand ranges:**
+
 - `amount0`, `amount1`: Output of `Math.getAmountsForLiquidity(tick, liquidityChunk)`. `liquidityChunk` encodes a `uint128` liquidity value. For a full-range position at max liquidity (2^128-1), max token amount is ~2^128. So `amount0, amount1 < 2^128`.
 - `int256(amount0)`: max 2^128 - 1, well within int256 range (max 2^255 - 1).
-- `poolExposure0/1`: Accumulated over all legs of all positions. With K positions, each having up to 4 legs, max accumulation is ~4K * 2^128.
+- `poolExposure0/1`: Accumulated over all legs of all positions. With K positions, each having up to 4 legs, max accumulation is ~4K \* 2^128.
 
-**Range proof:** For `poolExposure` to overflow int256, need ~4K * 2^128 > 2^255, i.e., K > 2^125. A vault with 2^125 positions is infeasible (gas limit prevents this).
+**Range proof:** For `poolExposure` to overflow int256, need ~4K \* 2^128 > 2^255, i.e., K > 2^125. A vault with 2^125 positions is infeasible (gas limit prevents this).
 
 **Status:** **Safe by practical bound.** Cannot overflow with any realistic number of positions (<< 2^125).
 
 ### U3: Unchecked balanceOf increment (`HypoVault.sol:726-728`)
 
 **Operand ranges:**
+
 - `amount`: Comes from `sharesReceived` (mulDiv result bounded by totalSupply) or `cancelWithdrawal` (restoring previously burned shares).
 - `balanceOf[to]`: Running sum of user's shares.
 
@@ -106,6 +108,7 @@
 ### N1: Basis narrowing cast (`HypoVault.sol:349`)
 
 **Operand ranges:**
+
 - `pendingWithdrawal.basis`: uint128 from storage.
 - `withdrawalBasis`: `(previousBasis * shares) / userBalance`. `previousBasis` is uint256, unbounded.
 
@@ -116,6 +119,7 @@
 ### N4/N5: Withdrawal rollover narrowing casts (`HypoVault.sol:501-502`)
 
 **Operand ranges:**
+
 - `nextQueuedWithdrawal.amount` (uint128) + `sharesRemaining` (uint256, but derived from uint128).
 - After multiple rollovers, `nextQueuedWithdrawal.amount` already includes prior rollover. Each rollover preserves the original amount (no amplification). Sum of two uint128 values fits in uint256 but the cast back to uint128 could truncate.
 
@@ -126,6 +130,7 @@
 ### N7/N10: Fulfillment narrowing casts (`HypoVault.sol:650-652, 698-700`)
 
 **Operand ranges:**
+
 - `sharesReceived = mulDiv(assetsToFulfill, totalSupply, totalAssets)`. If `totalSupply >> totalAssets` (share price << 1), this can exceed uint128.
 - `assetsReceived = mulDiv(sharesToFulfill, totalAssets, totalSupply)`. If `totalAssets >> totalSupply` (share price >> 1), can exceed uint128.
 
@@ -151,12 +156,12 @@ If `performanceFeeBps > 10_000`, fee can exceed profit and even exceed `assetsTo
 
 The following state variables satisfy BOTH conditions (written at aggregate level AND per-user level):
 
-| Variable | Aggregate Writer | Per-User Writer |
-|----------|-----------------|-----------------|
-| `depositEpochState[e].assetsDeposited` | `fulfillDeposits` (sets remainder for epoch+1) | `requestDeposit` (+=), `_cancelDeposit` (-=), `executeDeposit` (rollover to epoch+1 via `queuedDeposit` but NOT `assetsDeposited`) |
+| Variable                                  | Aggregate Writer                                  | Per-User Writer                                                                                                                                |
+| ----------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `depositEpochState[e].assetsDeposited`    | `fulfillDeposits` (sets remainder for epoch+1)    | `requestDeposit` (+=), `_cancelDeposit` (-=), `executeDeposit` (rollover to epoch+1 via `queuedDeposit` but NOT `assetsDeposited`)             |
 | `withdrawalEpochState[e].sharesWithdrawn` | `fulfillWithdrawals` (sets remainder for epoch+1) | `_requestWithdrawal` (+=), `cancelWithdrawal` (saturating -=), `executeWithdrawal` (rollover via `queuedWithdrawal` but NOT `sharesWithdrawn`) |
-| `reservedWithdrawalAssets` | `fulfillWithdrawals` (+=) | `executeWithdrawal` (-=) |
-| `totalSupply` | `fulfillDeposits` (+=), `fulfillWithdrawals` (-=) | Never directly (virtual mint/burn only touches `balanceOf`) |
+| `reservedWithdrawalAssets`                | `fulfillWithdrawals` (+=)                         | `executeWithdrawal` (-=)                                                                                                                       |
+| `totalSupply`                             | `fulfillDeposits` (+=), `fulfillWithdrawals` (-=) | Never directly (virtual mint/burn only touches `balanceOf`)                                                                                    |
 
 ### C.2 Drift Analysis: `depositEpochState[e].assetsDeposited`
 
@@ -188,47 +193,47 @@ This drift **accumulates across epochs**: each partial fulfillment that creates 
 
 #### Consumers of `depositEpochState[e].assetsDeposited`:
 
-| # | File:Line | Function | Operation | Subtracted Value Source | DRIFT-EXPOSED? |
-|---|-----------|----------|-----------|------------------------|----------------|
-| D1 | `HypoVault.sol:387` | `_cancelDeposit` | `assetsDeposited -= uint128(queuedDepositAmount)` | Per-user path (`queuedDeposit[depositor][currentEpoch]`) | **YES** |
-| D2 | `HypoVault.sol:638` | `fulfillDeposits` | `computeNAV + 1 - assetsDeposited - reserved` | Aggregate (reads assetsDeposited) | No (reads, does not subtract per-user) |
-| D3 | `HypoVault.sol:647` | `fulfillDeposits` | `assetsDeposited - assetsToFulfill` | Manager input | No |
-| D4 | `HypoVault.sol:747` | `totalAssets` | `computeNAV + 1 - assetsDeposited - reserved` | Aggregate | No |
-| D5 | `HypoVault.sol:682` | `fulfillWithdrawals` | `computeNAV + 1 - assetsDeposited - reserved` | Aggregate | No |
+| #   | File:Line           | Function             | Operation                                         | Subtracted Value Source                                  | DRIFT-EXPOSED?                         |
+| --- | ------------------- | -------------------- | ------------------------------------------------- | -------------------------------------------------------- | -------------------------------------- |
+| D1  | `HypoVault.sol:387` | `_cancelDeposit`     | `assetsDeposited -= uint128(queuedDepositAmount)` | Per-user path (`queuedDeposit[depositor][currentEpoch]`) | **YES**                                |
+| D2  | `HypoVault.sol:638` | `fulfillDeposits`    | `computeNAV + 1 - assetsDeposited - reserved`     | Aggregate (reads assetsDeposited)                        | No (reads, does not subtract per-user) |
+| D3  | `HypoVault.sol:647` | `fulfillDeposits`    | `assetsDeposited - assetsToFulfill`               | Manager input                                            | No                                     |
+| D4  | `HypoVault.sol:747` | `totalAssets`        | `computeNAV + 1 - assetsDeposited - reserved`     | Aggregate                                                | No                                     |
+| D5  | `HypoVault.sol:682` | `fulfillWithdrawals` | `computeNAV + 1 - assetsDeposited - reserved`     | Aggregate                                                | No                                     |
 
 **D1 is DRIFT-EXPOSED.** All others read the aggregate value, not subtract a per-user value from it.
 
 #### Consumers of `withdrawalEpochState[e].sharesWithdrawn`:
 
-| # | File:Line | Function | Operation | Subtracted Value Source | DRIFT-EXPOSED? |
-|---|-----------|----------|-----------|------------------------|----------------|
-| W1 | `HypoVault.sol:413-416` | `cancelWithdrawal` | Saturating: `sharesWithdrawn > amount ? sharesWithdrawn - amount : 0` | Per-user path (`queuedWithdrawal[user][epoch].amount`) | **YES, but GUARDED** |
-| W2 | `HypoVault.sol:471` | `executeWithdrawal` | `(amount * sharesFulfilled) / sharesWithdrawn` (denominator) | Aggregate (reads sharesWithdrawn) | **YES — inflated per-user numerator** |
-| W3 | `HypoVault.sol:482` | `executeWithdrawal` | `(basis * sharesFulfilled) / sharesWithdrawn` (denominator) | Aggregate | **YES — same drift pattern** |
-| W4 | `HypoVault.sol:695` | `fulfillWithdrawals` | `sharesWithdrawn - sharesToFulfill` | Manager input | No |
+| #   | File:Line               | Function             | Operation                                                             | Subtracted Value Source                                | DRIFT-EXPOSED?                        |
+| --- | ----------------------- | -------------------- | --------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------- |
+| W1  | `HypoVault.sol:413-416` | `cancelWithdrawal`   | Saturating: `sharesWithdrawn > amount ? sharesWithdrawn - amount : 0` | Per-user path (`queuedWithdrawal[user][epoch].amount`) | **YES, but GUARDED**                  |
+| W2  | `HypoVault.sol:471`     | `executeWithdrawal`  | `(amount * sharesFulfilled) / sharesWithdrawn` (denominator)          | Aggregate (reads sharesWithdrawn)                      | **YES — inflated per-user numerator** |
+| W3  | `HypoVault.sol:482`     | `executeWithdrawal`  | `(basis * sharesFulfilled) / sharesWithdrawn` (denominator)           | Aggregate                                              | **YES — same drift pattern**          |
+| W4  | `HypoVault.sol:695`     | `fulfillWithdrawals` | `sharesWithdrawn - sharesToFulfill`                                   | Manager input                                          | No                                    |
 
 **W1 is drift-protected** (saturating subtraction).
 **W2 and W3 are DRIFT-EXPOSED** — the per-user numerator (`pendingWithdrawal.amount`, `pendingWithdrawal.basis`) reflects inflated rollover values, while the denominator (`sharesWithdrawn`) reflects the aggregate. This makes each user's prorated fulfillment LARGER than their fair share.
 
 #### Consumers of `reservedWithdrawalAssets`:
 
-| # | File:Line | Function | Operation | Subtracted Value Source | DRIFT-EXPOSED? |
-|---|-----------|----------|-----------|------------------------|----------------|
-| R1 | `HypoVault.sol:479` | `executeWithdrawal` | `reservedWithdrawalAssets -= assetsToWithdraw` | Per-user (derived from inflated proration via W2) | **YES** |
-| R2 | `HypoVault.sol:638` | `fulfillDeposits` | `NAV + 1 - assetsDeposited - reservedWithdrawalAssets` | Aggregate | No |
-| R3 | `HypoVault.sol:682` | `fulfillWithdrawals` | Same as R2 | Aggregate | No |
-| R4 | `HypoVault.sol:747` | `totalAssets` | Same as R2 | Aggregate | No |
+| #   | File:Line           | Function             | Operation                                              | Subtracted Value Source                           | DRIFT-EXPOSED? |
+| --- | ------------------- | -------------------- | ------------------------------------------------------ | ------------------------------------------------- | -------------- |
+| R1  | `HypoVault.sol:479` | `executeWithdrawal`  | `reservedWithdrawalAssets -= assetsToWithdraw`         | Per-user (derived from inflated proration via W2) | **YES**        |
+| R2  | `HypoVault.sol:638` | `fulfillDeposits`    | `NAV + 1 - assetsDeposited - reservedWithdrawalAssets` | Aggregate                                         | No             |
+| R3  | `HypoVault.sol:682` | `fulfillWithdrawals` | Same as R2                                             | Aggregate                                         | No             |
+| R4  | `HypoVault.sol:747` | `totalAssets`        | Same as R2                                             | Aggregate                                         | No             |
 
 **R1 is DRIFT-EXPOSED** — downstream of the W2 inflation.
 
 ### C.5 Symmetry Check (MANDATORY)
 
-| Protection | Location | Analogous Operation | Has Same Protection? | Finding |
-|-----------|----------|---------------------|---------------------|---------|
-| Saturating subtraction on `sharesWithdrawn` in `cancelWithdrawal` | `HypoVault.sol:413-416` | `assetsDeposited -= queuedDepositAmount` in `_cancelDeposit` (`HypoVault.sol:387`) | **NO — bare subtraction** | **ASYMMETRY: F-01** |
-| Zero-division guard `assetsFulfilled == 0 ? 1 : assetsFulfilled` | `HypoVault.sol:443` | `sharesFulfilled == 0 ? 1 : sharesFulfilled` in `executeWithdrawal` (`HypoVault.sol:476`) | **YES** | Symmetric |
-| `Math.max(0, ...)` on performance fee profit | `HypoVault.sol:484` | N/A (one-directional) | N/A | N/A |
-| `fromBalance == 0` early return in `_transferBasis` | `HypoVault.sol:580` | `toBalance == 0` guard (`HypoVault.sol:590`) | **YES** | Symmetric |
+| Protection                                                        | Location                | Analogous Operation                                                                       | Has Same Protection?      | Finding             |
+| ----------------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------- | ------------------------- | ------------------- |
+| Saturating subtraction on `sharesWithdrawn` in `cancelWithdrawal` | `HypoVault.sol:413-416` | `assetsDeposited -= queuedDepositAmount` in `_cancelDeposit` (`HypoVault.sol:387`)        | **NO — bare subtraction** | **ASYMMETRY: F-01** |
+| Zero-division guard `assetsFulfilled == 0 ? 1 : assetsFulfilled`  | `HypoVault.sol:443`     | `sharesFulfilled == 0 ? 1 : sharesFulfilled` in `executeWithdrawal` (`HypoVault.sol:476`) | **YES**                   | Symmetric           |
+| `Math.max(0, ...)` on performance fee profit                      | `HypoVault.sol:484`     | N/A (one-directional)                                                                     | N/A                       | N/A                 |
+| `fromBalance == 0` early return in `_transferBasis`               | `HypoVault.sol:580`     | `toBalance == 0` guard (`HypoVault.sol:590`)                                              | **YES**                   | Symmetric           |
 
 **Critical asymmetry found:** The saturating subtraction in `cancelWithdrawal` (line 413-416) has NO equivalent in `_cancelDeposit` (line 387). The existence of the defense on the withdrawal side is strong evidence that the developers encountered or anticipated the drift bug class, but the deposit side was missed.
 
@@ -253,11 +258,11 @@ The over-distribution from epoch E+1 equals approximately `drift * (assetsReceiv
 
 ### C.7 Status Summary
 
-| State Variable | Drift Status |
-|---------------|-------------|
-| `depositEpochState[e].assetsDeposited` | **Drift-vulnerable** — bare subtraction in `_cancelDeposit` (`HypoVault.sol:387`) |
+| State Variable                            | Drift Status                                                                                                                                                                                       |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `depositEpochState[e].assetsDeposited`    | **Drift-vulnerable** — bare subtraction in `_cancelDeposit` (`HypoVault.sol:387`)                                                                                                                  |
 | `withdrawalEpochState[e].sharesWithdrawn` | **Drift-protected** for `cancelWithdrawal` (saturating, `HypoVault.sol:413-416`). **Drift-vulnerable** for `executeWithdrawal` proration path -> `reservedWithdrawalAssets` (`HypoVault.sol:479`). |
-| `reservedWithdrawalAssets` | **Drift-vulnerable** — downstream of withdrawal proration inflation (`HypoVault.sol:479`) |
+| `reservedWithdrawalAssets`                | **Drift-vulnerable** — downstream of withdrawal proration inflation (`HypoVault.sol:479`)                                                                                                          |
 
 ---
 
@@ -490,268 +495,279 @@ import "../src/HypoVault.sol";
 
 // Minimal mock accountant
 contract MockAccountant is IVaultAccountant {
-    uint256 public navValue;
-    function setNav(uint256 _nav) external { navValue = _nav; }
-    function computeNAV(address, address, bytes memory) external view returns (uint256) {
-        return navValue;
-    }
+  uint256 public navValue;
+
+  function setNav(uint256 _nav) external {
+    navValue = _nav;
+  }
+
+  function computeNAV(address, address, bytes memory) external view returns (uint256) {
+    return navValue;
+  }
 }
 
 // Minimal mock ERC20
 contract MockToken {
-    mapping(address => uint256) public balanceOf;
-    mapping(address => mapping(address => uint256)) public allowance;
-    function approve(address spender, uint256 amount) external returns (bool) {
-        allowance[msg.sender][spender] = amount;
-        return true;
-    }
-    function transfer(address to, uint256 amount) external returns (bool) {
-        balanceOf[msg.sender] -= amount;
-        balanceOf[to] += amount;
-        return true;
-    }
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
-        allowance[from][msg.sender] -= amount;
-        balanceOf[from] -= amount;
-        balanceOf[to] += amount;
-        return true;
-    }
-    function mint(address to, uint256 amount) external {
-        balanceOf[to] += amount;
-    }
-    function decimals() external pure returns (uint8) { return 18; }
+  mapping(address => uint256) public balanceOf;
+  mapping(address => mapping(address => uint256)) public allowance;
+
+  function approve(address spender, uint256 amount) external returns (bool) {
+    allowance[msg.sender][spender] = amount;
+    return true;
+  }
+
+  function transfer(address to, uint256 amount) external returns (bool) {
+    balanceOf[msg.sender] -= amount;
+    balanceOf[to] += amount;
+    return true;
+  }
+
+  function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+    allowance[from][msg.sender] -= amount;
+    balanceOf[from] -= amount;
+    balanceOf[to] += amount;
+    return true;
+  }
+
+  function mint(address to, uint256 amount) external {
+    balanceOf[to] += amount;
+  }
+
+  function decimals() external pure returns (uint8) {
+    return 18;
+  }
 }
 
 contract ArithmeticAuditTest is Test {
-    HypoVault vault;
-    MockToken token;
-    MockAccountant accountant;
-    address manager = address(0xBEEF);
-    address userA = address(0xA);
-    address userB = address(0xB);
-    address userC = address(0xC);
+  HypoVault vault;
+  MockToken token;
+  MockAccountant accountant;
+  address manager = address(0xBEEF);
+  address userA = address(0xA);
+  address userB = address(0xB);
+  address userC = address(0xC);
 
-    function setUp() public {
-        token = new MockToken();
-        accountant = new MockAccountant();
+  function setUp() public {
+    token = new MockToken();
+    accountant = new MockAccountant();
 
-        // Deploy implementation and initialize
-        vault = new HypoVault();
-        // Re-deploy as a fresh instance (not behind proxy for testing)
-        // We'll use a simple approach: deploy and initialize via proxy-like pattern
-        // For simplicity, use a new contract instance
-        vault = HypoVault(payable(address(new HypoVault())));
-        // Since constructor disables initializers, we need to work around this for testing
-        // In a real test, use the factory or a proxy. Here we'll test the logic directly.
+    // Deploy implementation and initialize
+    vault = new HypoVault();
+    // Re-deploy as a fresh instance (not behind proxy for testing)
+    // We'll use a simple approach: deploy and initialize via proxy-like pattern
+    // For simplicity, use a new contract instance
+    vault = HypoVault(payable(address(new HypoVault())));
+    // Since constructor disables initializers, we need to work around this for testing
+    // In a real test, use the factory or a proxy. Here we'll test the logic directly.
+  }
+
+  // ======== F-01 Tests: Deposit Cancel Underflow ========
+
+  /// @notice Test: 3 users deposit, partial fulfill, execute creates drift, cancel reverts for last user
+  // F-01 Test 1: Basic drift underflow
+  function test_F01_depositCancelUnderflowAfterPartialFulfillment() public {
+    // This test would require a full setup with proxy deployment.
+    // Pseudocode for the attack path:
+    //
+    // 1. userA.requestDeposit(1), userB.requestDeposit(1), userC.requestDeposit(1)
+    //    => assetsDeposited[0] = 3
+    // 2. manager.fulfillDeposits(2, ...) => assetsDeposited[1] = 1
+    // 3. executeDeposit(userA, 0): remainder = 1 - floor(1*2/3) = 1 - 0 = 1
+    //    executeDeposit(userB, 0): remainder = 1
+    //    executeDeposit(userC, 0): remainder = 1
+    //    => sum(queuedDeposit[*][1]) = 3, but assetsDeposited[1] = 1
+    // 4. userA.cancelDeposit() => assetsDeposited = 1 - 1 = 0. OK
+    // 5. userB.cancelDeposit() => assetsDeposited = 0 - 1. REVERT!
+    assertTrue(true); // placeholder
+  }
+
+  // F-01 Test 2: Boundary — single user, no drift
+  function test_F01_singleUserNoDrift() public {
+    // With 1 user, drift = N-1 = 0. Cancel should always work.
+    assertTrue(true);
+  }
+
+  // F-01 Test 3: Drift accumulation across multiple epochs
+  function test_F01_driftAccumulatesAcrossEpochs() public {
+    // 1. Epoch 0: 3 users deposit 1 each, partial fulfill 2/3
+    // 2. Execute all => drift = 2 at epoch 1
+    // 3. Epoch 1: partial fulfill again => more drift at epoch 2
+    // 4. Cancel at epoch 2 reverts even earlier
+    assertTrue(true);
+  }
+
+  // ======== F-02 Tests: Withdrawal Reserved Assets Underflow ========
+
+  // F-02 Test 1: Basic underflow with price increase
+  function test_F02_reservedAssetsUnderflowWithPriceIncrease() public {
+    // 1. 3 users withdraw 1 share each
+    // 2. Manager fulfills 2/3 shares at price 100
+    // 3. All execute => each gets 0 shares fulfilled, rolls over 1 share
+    // 4. Epoch 1: sharesWithdrawn = 1, user amounts sum to 3
+    // 5. Manager fulfills epoch 1 at price 200 (price doubled)
+    // 6. Users A, B execute OK. User C: reserved = 0 - 200. REVERT.
+    assertTrue(true);
+  }
+
+  // F-02 Test 2: No price change — leftover covers over-allocation
+  function test_F02_noPriceChangeLeftoverCovers() public {
+    // Same as Test 1 but price stays at 100.
+    // Leftover from epoch 0 (200) + epoch 1 reserve (100) = 300.
+    // 3 users * 100 = 300. Exact match, no revert.
+    assertTrue(true);
+  }
+
+  // F-02 Test 3: Boundary — 0 shares fulfilled (max rollover)
+  function test_F02_zeroFulfilledMaxRollover() public {
+    // Manager fulfills 0 shares. All roll over. No drift because
+    // sharesToFulfill = 0 for each user => sharesRemaining = full amount.
+    // sharesWithdrawn at next epoch = 0 (from aggregate) but per-user sum > 0.
+    // Actually: fulfillWithdrawals(0) => sharesRemaining = sharesWithdrawn - 0 = sharesWithdrawn
+    // so no drift in this case. Verify.
+    assertTrue(true);
+  }
+
+  // F-02 Test 4: Max users amplification
+  function test_F02_manyUsersAmplification() public {
+    // N=100 users, each 1 share. Fulfill 99/100.
+    // Each: sharesToFulfill = floor(1 * 99 / 100) = 0. Rollover = 1 each.
+    // Drift = 100 - 1 = 99.
+    // If price doubles, over-allocation = 99 * newPrice.
+    assertTrue(true);
+  }
+
+  // ======== F-01/F-02 Fuzz Tests ========
+
+  // Fuzz: deposit cancel with varying user counts and fulfillment ratios
+  function testFuzz_depositCancelDrift(
+    uint8 numUsers,
+    uint128 depositAmount,
+    uint128 fulfillRatio // out of 10000
+  ) public {
+    vm.assume(numUsers > 1 && numUsers <= 20);
+    vm.assume(depositAmount > 0 && depositAmount < type(uint128).max / numUsers);
+    vm.assume(fulfillRatio > 0 && fulfillRatio < 10000);
+
+    uint256 totalDeposited = uint256(depositAmount) * numUsers;
+    uint256 assetsToFulfill = (totalDeposited * fulfillRatio) / 10000;
+
+    // Calculate expected drift
+    uint256 aggregateRemainder = totalDeposited - assetsToFulfill;
+    uint256 perUserRemainderSum = 0;
+    for (uint256 i = 0; i < numUsers; i++) {
+      uint256 userFulfilled = (uint256(depositAmount) * assetsToFulfill) / totalDeposited;
+      perUserRemainderSum += depositAmount - userFulfilled;
     }
 
-    // ======== F-01 Tests: Deposit Cancel Underflow ========
+    uint256 drift = perUserRemainderSum - aggregateRemainder;
+    // drift should be <= numUsers - 1
+    assertLe(drift, numUsers - 1, "drift exceeds N-1 bound");
 
-    /// @notice Test: 3 users deposit, partial fulfill, execute creates drift, cancel reverts for last user
-    // F-01 Test 1: Basic drift underflow
-    function test_F01_depositCancelUnderflowAfterPartialFulfillment() public {
-        // This test would require a full setup with proxy deployment.
-        // Pseudocode for the attack path:
-        //
-        // 1. userA.requestDeposit(1), userB.requestDeposit(1), userC.requestDeposit(1)
-        //    => assetsDeposited[0] = 3
-        // 2. manager.fulfillDeposits(2, ...) => assetsDeposited[1] = 1
-        // 3. executeDeposit(userA, 0): remainder = 1 - floor(1*2/3) = 1 - 0 = 1
-        //    executeDeposit(userB, 0): remainder = 1
-        //    executeDeposit(userC, 0): remainder = 1
-        //    => sum(queuedDeposit[*][1]) = 3, but assetsDeposited[1] = 1
-        // 4. userA.cancelDeposit() => assetsDeposited = 1 - 1 = 0. OK
-        // 5. userB.cancelDeposit() => assetsDeposited = 0 - 1. REVERT!
-        assertTrue(true); // placeholder
+    // If drift > 0, the last `drift` cancel calls would underflow
+    if (drift > 0) {
+      // This confirms the bug exists for these parameters
+      assertGt(perUserRemainderSum, aggregateRemainder, "per-user sum should exceed aggregate");
+    }
+  }
+
+  // Fuzz: withdrawal execution with varying drift and price ratios
+  function testFuzz_withdrawalReservedDrift(
+    uint8 numUsers,
+    uint128 shareAmount,
+    uint128 fulfillRatio,
+    uint128 priceEp0,
+    uint128 priceEp1
+  ) public {
+    vm.assume(numUsers > 1 && numUsers <= 20);
+    vm.assume(shareAmount > 0 && shareAmount < type(uint128).max / numUsers);
+    vm.assume(fulfillRatio > 0 && fulfillRatio < 10000);
+    vm.assume(priceEp0 > 0 && priceEp1 > 0);
+
+    uint256 totalShares = uint256(shareAmount) * numUsers;
+    uint256 sharesToFulfill = (totalShares * fulfillRatio) / 10000;
+    if (sharesToFulfill == 0) return;
+
+    uint256 assetsEp0 = sharesToFulfill * priceEp0;
+
+    // Calculate per-user fulfillment and rollover
+    uint256 totalClaimedEp0 = 0;
+    uint256 perUserRemainderSum = 0;
+    for (uint256 i = 0; i < numUsers; i++) {
+      uint256 userSharesFulfilled = (uint256(shareAmount) * sharesToFulfill) / totalShares;
+      uint256 userAssets = (userSharesFulfilled * assetsEp0) / sharesToFulfill;
+      totalClaimedEp0 += userAssets;
+      perUserRemainderSum += shareAmount - userSharesFulfilled;
     }
 
-    // F-01 Test 2: Boundary — single user, no drift
-    function test_F01_singleUserNoDrift() public {
-        // With 1 user, drift = N-1 = 0. Cancel should always work.
-        assertTrue(true);
+    uint256 leftoverReserve = assetsEp0 - totalClaimedEp0;
+    uint256 aggregateRemainder = totalShares - sharesToFulfill;
+    uint256 drift = perUserRemainderSum - aggregateRemainder;
+
+    // Epoch 1: full fulfillment at priceEp1
+    if (aggregateRemainder == 0) return;
+    uint256 assetsEp1 = aggregateRemainder * priceEp1;
+
+    uint256 totalClaimedEp1 = 0;
+    for (uint256 i = 0; i < numUsers; i++) {
+      uint256 userSharesFulfilledEp0 = (uint256(shareAmount) * sharesToFulfill) / totalShares;
+      uint256 userRemainder = shareAmount - userSharesFulfilledEp0;
+      // Full fulfillment: sharesToFulfill_ep1 = userRemainder (since sharesFulfilled == sharesWithdrawn)
+      uint256 userAssetsEp1 = (userRemainder * assetsEp1) / aggregateRemainder;
+      totalClaimedEp1 += userAssetsEp1;
     }
 
-    // F-01 Test 3: Drift accumulation across multiple epochs
-    function test_F01_driftAccumulatesAcrossEpochs() public {
-        // 1. Epoch 0: 3 users deposit 1 each, partial fulfill 2/3
-        // 2. Execute all => drift = 2 at epoch 1
-        // 3. Epoch 1: partial fulfill again => more drift at epoch 2
-        // 4. Cancel at epoch 2 reverts even earlier
-        assertTrue(true);
+    uint256 totalReserved = assetsEp0 + assetsEp1;
+    uint256 totalClaimed = totalClaimedEp0 + totalClaimedEp1;
+
+    // Check if underflow would occur
+    if (totalClaimed > totalReserved) {
+      // Bug confirmed: over-allocation
+      emit log_named_uint("over-allocation", totalClaimed - totalReserved);
+      emit log_named_uint("drift", drift);
+      emit log_named_uint("priceEp0", priceEp0);
+      emit log_named_uint("priceEp1", priceEp1);
+    }
+  }
+
+  // Fuzz invariant: for a single epoch with no rollovers, sum(claimed) <= reserved
+  function testFuzz_singleEpochNoOverallocation(
+    uint8 numUsers,
+    uint128[] calldata amounts,
+    uint128 fulfillRatio
+  ) public {
+    vm.assume(numUsers > 0 && numUsers <= 20);
+    vm.assume(amounts.length >= numUsers);
+    vm.assume(fulfillRatio > 0 && fulfillRatio <= 10000);
+
+    uint256 totalShares = 0;
+    for (uint256 i = 0; i < numUsers; i++) {
+      vm.assume(amounts[i] > 0);
+      totalShares += amounts[i];
+    }
+    vm.assume(totalShares > 0 && totalShares < type(uint128).max);
+
+    uint256 sharesToFulfill = (totalShares * fulfillRatio) / 10000;
+    if (sharesToFulfill == 0) return;
+
+    uint256 assetsReceived = sharesToFulfill * 100; // price = 100
+
+    uint256 totalClaimed = 0;
+    for (uint256 i = 0; i < numUsers; i++) {
+      uint256 userSharesFulfilled = (uint256(amounts[i]) * sharesToFulfill) / totalShares;
+      uint256 userAssets = (userSharesFulfilled * assetsReceived) / sharesToFulfill;
+      totalClaimed += userAssets;
     }
 
-    // ======== F-02 Tests: Withdrawal Reserved Assets Underflow ========
-
-    // F-02 Test 1: Basic underflow with price increase
-    function test_F02_reservedAssetsUnderflowWithPriceIncrease() public {
-        // 1. 3 users withdraw 1 share each
-        // 2. Manager fulfills 2/3 shares at price 100
-        // 3. All execute => each gets 0 shares fulfilled, rolls over 1 share
-        // 4. Epoch 1: sharesWithdrawn = 1, user amounts sum to 3
-        // 5. Manager fulfills epoch 1 at price 200 (price doubled)
-        // 6. Users A, B execute OK. User C: reserved = 0 - 200. REVERT.
-        assertTrue(true);
-    }
-
-    // F-02 Test 2: No price change — leftover covers over-allocation
-    function test_F02_noPriceChangeLeftoverCovers() public {
-        // Same as Test 1 but price stays at 100.
-        // Leftover from epoch 0 (200) + epoch 1 reserve (100) = 300.
-        // 3 users * 100 = 300. Exact match, no revert.
-        assertTrue(true);
-    }
-
-    // F-02 Test 3: Boundary — 0 shares fulfilled (max rollover)
-    function test_F02_zeroFulfilledMaxRollover() public {
-        // Manager fulfills 0 shares. All roll over. No drift because
-        // sharesToFulfill = 0 for each user => sharesRemaining = full amount.
-        // sharesWithdrawn at next epoch = 0 (from aggregate) but per-user sum > 0.
-        // Actually: fulfillWithdrawals(0) => sharesRemaining = sharesWithdrawn - 0 = sharesWithdrawn
-        // so no drift in this case. Verify.
-        assertTrue(true);
-    }
-
-    // F-02 Test 4: Max users amplification
-    function test_F02_manyUsersAmplification() public {
-        // N=100 users, each 1 share. Fulfill 99/100.
-        // Each: sharesToFulfill = floor(1 * 99 / 100) = 0. Rollover = 1 each.
-        // Drift = 100 - 1 = 99.
-        // If price doubles, over-allocation = 99 * newPrice.
-        assertTrue(true);
-    }
-
-    // ======== F-01/F-02 Fuzz Tests ========
-
-    // Fuzz: deposit cancel with varying user counts and fulfillment ratios
-    function testFuzz_depositCancelDrift(
-        uint8 numUsers,
-        uint128 depositAmount,
-        uint128 fulfillRatio // out of 10000
-    ) public {
-        vm.assume(numUsers > 1 && numUsers <= 20);
-        vm.assume(depositAmount > 0 && depositAmount < type(uint128).max / numUsers);
-        vm.assume(fulfillRatio > 0 && fulfillRatio < 10000);
-
-        uint256 totalDeposited = uint256(depositAmount) * numUsers;
-        uint256 assetsToFulfill = (totalDeposited * fulfillRatio) / 10000;
-
-        // Calculate expected drift
-        uint256 aggregateRemainder = totalDeposited - assetsToFulfill;
-        uint256 perUserRemainderSum = 0;
-        for (uint256 i = 0; i < numUsers; i++) {
-            uint256 userFulfilled = (uint256(depositAmount) * assetsToFulfill) / totalDeposited;
-            perUserRemainderSum += depositAmount - userFulfilled;
-        }
-
-        uint256 drift = perUserRemainderSum - aggregateRemainder;
-        // drift should be <= numUsers - 1
-        assertLe(drift, numUsers - 1, "drift exceeds N-1 bound");
-
-        // If drift > 0, the last `drift` cancel calls would underflow
-        if (drift > 0) {
-            // This confirms the bug exists for these parameters
-            assertGt(perUserRemainderSum, aggregateRemainder, "per-user sum should exceed aggregate");
-        }
-    }
-
-    // Fuzz: withdrawal execution with varying drift and price ratios
-    function testFuzz_withdrawalReservedDrift(
-        uint8 numUsers,
-        uint128 shareAmount,
-        uint128 fulfillRatio,
-        uint128 priceEp0,
-        uint128 priceEp1
-    ) public {
-        vm.assume(numUsers > 1 && numUsers <= 20);
-        vm.assume(shareAmount > 0 && shareAmount < type(uint128).max / numUsers);
-        vm.assume(fulfillRatio > 0 && fulfillRatio < 10000);
-        vm.assume(priceEp0 > 0 && priceEp1 > 0);
-
-        uint256 totalShares = uint256(shareAmount) * numUsers;
-        uint256 sharesToFulfill = (totalShares * fulfillRatio) / 10000;
-        if (sharesToFulfill == 0) return;
-
-        uint256 assetsEp0 = sharesToFulfill * priceEp0;
-
-        // Calculate per-user fulfillment and rollover
-        uint256 totalClaimedEp0 = 0;
-        uint256 perUserRemainderSum = 0;
-        for (uint256 i = 0; i < numUsers; i++) {
-            uint256 userSharesFulfilled = (uint256(shareAmount) * sharesToFulfill) / totalShares;
-            uint256 userAssets = (userSharesFulfilled * assetsEp0) / sharesToFulfill;
-            totalClaimedEp0 += userAssets;
-            perUserRemainderSum += shareAmount - userSharesFulfilled;
-        }
-
-        uint256 leftoverReserve = assetsEp0 - totalClaimedEp0;
-        uint256 aggregateRemainder = totalShares - sharesToFulfill;
-        uint256 drift = perUserRemainderSum - aggregateRemainder;
-
-        // Epoch 1: full fulfillment at priceEp1
-        if (aggregateRemainder == 0) return;
-        uint256 assetsEp1 = aggregateRemainder * priceEp1;
-
-        uint256 totalClaimedEp1 = 0;
-        for (uint256 i = 0; i < numUsers; i++) {
-            uint256 userSharesFulfilledEp0 = (uint256(shareAmount) * sharesToFulfill) / totalShares;
-            uint256 userRemainder = shareAmount - userSharesFulfilledEp0;
-            // Full fulfillment: sharesToFulfill_ep1 = userRemainder (since sharesFulfilled == sharesWithdrawn)
-            uint256 userAssetsEp1 = (userRemainder * assetsEp1) / aggregateRemainder;
-            totalClaimedEp1 += userAssetsEp1;
-        }
-
-        uint256 totalReserved = assetsEp0 + assetsEp1;
-        uint256 totalClaimed = totalClaimedEp0 + totalClaimedEp1;
-
-        // Check if underflow would occur
-        if (totalClaimed > totalReserved) {
-            // Bug confirmed: over-allocation
-            emit log_named_uint("over-allocation", totalClaimed - totalReserved);
-            emit log_named_uint("drift", drift);
-            emit log_named_uint("priceEp0", priceEp0);
-            emit log_named_uint("priceEp1", priceEp1);
-        }
-    }
-
-    // Fuzz invariant: for a single epoch with no rollovers, sum(claimed) <= reserved
-    function testFuzz_singleEpochNoOverallocation(
-        uint8 numUsers,
-        uint128[] calldata amounts,
-        uint128 fulfillRatio
-    ) public {
-        vm.assume(numUsers > 0 && numUsers <= 20);
-        vm.assume(amounts.length >= numUsers);
-        vm.assume(fulfillRatio > 0 && fulfillRatio <= 10000);
-
-        uint256 totalShares = 0;
-        for (uint256 i = 0; i < numUsers; i++) {
-            vm.assume(amounts[i] > 0);
-            totalShares += amounts[i];
-        }
-        vm.assume(totalShares > 0 && totalShares < type(uint128).max);
-
-        uint256 sharesToFulfill = (totalShares * fulfillRatio) / 10000;
-        if (sharesToFulfill == 0) return;
-
-        uint256 assetsReceived = sharesToFulfill * 100; // price = 100
-
-        uint256 totalClaimed = 0;
-        for (uint256 i = 0; i < numUsers; i++) {
-            uint256 userSharesFulfilled = (uint256(amounts[i]) * sharesToFulfill) / totalShares;
-            uint256 userAssets = (userSharesFulfilled * assetsReceived) / sharesToFulfill;
-            totalClaimed += userAssets;
-        }
-
-        // Within a single epoch (no rollovers), total claimed should never exceed reserved
-        assertLe(totalClaimed, assetsReceived, "single-epoch over-allocation");
-    }
+    // Within a single epoch (no rollovers), total claimed should never exceed reserved
+    assertLe(totalClaimed, assetsReceived, "single-epoch over-allocation");
+  }
 }
 ```
 
 ### Fuzz Invariant Summary
 
-| Finding | Fuzz Invariant |
-|---------|----------------|
-| F-01 (Deposit cancel) | `sum(per-user rollover remainders) - aggregate remainder <= N - 1` |
-| F-02 (Withdrawal reserve) | `totalClaimed(epoch0) + totalClaimed(epoch1) <= totalReserved(epoch0) + totalReserved(epoch1)` — violated when `priceEp1 > priceEp0` with drift > 0 |
-| F-03/F-04 (Narrowing casts) | `uint128(x) == x` for all values stored via narrowing cast |
+| Finding                     | Fuzz Invariant                                                                                                                                      |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F-01 (Deposit cancel)       | `sum(per-user rollover remainders) - aggregate remainder <= N - 1`                                                                                  |
+| F-02 (Withdrawal reserve)   | `totalClaimed(epoch0) + totalClaimed(epoch1) <= totalReserved(epoch0) + totalReserved(epoch1)` — violated when `priceEp1 > priceEp0` with drift > 0 |
+| F-03/F-04 (Narrowing casts) | `uint128(x) == x` for all values stored via narrowing cast                                                                                          |
