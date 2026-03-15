@@ -220,6 +220,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
 
         $owner = 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1;
         $TurnkeyAccount0 = address(0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8);
+        address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
         $sepoliaWeth = ERC20S(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
         $ethUsdc500bpsV4Collateral0 = 0x4d2579A5F9BC32641D6AdbFC47C6dAceF30027F1; // Underlying: ETH
         $ethUsdc500bpsV4PanopticPool = 0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E; // Underlying: ETH
@@ -453,6 +454,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
 
         $owner = 0x7643c4F21661691fb851AfedaF627695672C9fac;
         $TurnkeyAccount0 = address(0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8);
+        address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
         $sepoliaWeth = ERC20S(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
         $ethUsdc500bpsV4Collateral0 = 0x4d2579A5F9BC32641D6AdbFC47C6dAceF30027F1; // Underlying: WETH9 | 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
         $ethUsdc500bpsV4PanopticPool = 0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E;
@@ -648,7 +650,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
 
         address token0 = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14; // sepolia weth9
         address token1 = 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A; // sepolia mock USDC
-        address ethUsdc500bpsV4PanopticPool = 0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E;
+        address ethUsdc500bpsV4PanopticPool = 0x03AFf7Be6A5afB2bC6830BC54778AF674006850A;
 
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
