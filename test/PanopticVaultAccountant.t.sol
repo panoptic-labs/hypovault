@@ -105,6 +105,10 @@ contract MockPanopticPool {
         return twapTick;
     }
 
+    function getCurrentTick() external view returns (int24) {
+        return twapTick;
+    }
+
     function setTwapTick(int24 _twapTick) external {
         twapTick = _twapTick;
     }
