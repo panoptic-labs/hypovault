@@ -64,18 +64,16 @@ TRIAGE RULE: When analyzing drift, always check the SIMPLEST impact path first. 
    (b) written or modified at a PER-USER level across multiple independent calls in another function (e.g. user-facing execute, claim, cancel, rollover)
 2. For each such pair, answer:
 
-
-    - Does the aggregate path compute a total T and store it?
-    - Does the per-user path compute individual values t_i (for N users) and modify the same variable?
-    - Is it mathematically guaranteed that sum(t_i) == T, or can rounding introduce drift?
+   - Does the aggregate path compute a total T and store it?
+   - Does the per-user path compute individual values t_i (for N users) and modify the same variable?
+   - Is it mathematically guaranteed that sum(t_i) == T, or can rounding introduce drift?
 
 3. Specifically examine every "remainder = total - floor(prorated)" pattern:
 
-
-    - floor(a) + floor(b) <= floor(a + b) — the sum of individually floored values can be LESS than the floor of the sum
-    - The complement of a floor is effectively a ceil: x - floor(x * r) = ceil(x * (1-r)) when x*r is not exact
-    - Therefore sum(user remainders) can EXCEED the aggregate remainder by up to (N-1) units
-    - Trace whether any downstream consumer (cancel, withdraw, next-epoch accounting) subtracts per-user values from the aggregate value, and whether that
+   - floor(a) + floor(b) <= floor(a + b) — the sum of individually floored values can be LESS than the floor of the sum
+   - The complement of a floor is effectively a ceil: x - floor(x _ r) = ceil(x _ (1-r)) when x\*r is not exact
+   - Therefore sum(user remainders) can EXCEED the aggregate remainder by up to (N-1) units
+   - Trace whether any downstream consumer (cancel, withdraw, next-epoch accounting) subtracts per-user values from the aggregate value, and whether that
 
 subtraction can underflow
 
@@ -94,18 +92,16 @@ subtraction can underflow
 
 6. For each identified inconsistency:
 
-
-    - Compute the maximum drift as a function of N (number of users/iterations)
-    - Identify every code path that consumes the drifted variable (using the list from step 4)
-    - Determine if the drift causes: underflow revert (DoS), overpayment, underpayment, or permanent accounting corruption
-    - For EACH consumer from step 4 that is marked DRIFT-EXPOSED: state whether it uses saturating arithmetic, a guard, or bare subtraction
+   - Compute the maximum drift as a function of N (number of users/iterations)
+   - Identify every code path that consumes the drifted variable (using the list from step 4)
+   - Determine if the drift causes: underflow revert (DoS), overpayment, underpayment, or permanent accounting corruption
+   - For EACH consumer from step 4 that is marked DRIFT-EXPOSED: state whether it uses saturating arithmetic, a guard, or bare subtraction
 
 7. Status for each finding:
 
-
-    - Drift-safe: proven that sum(t_i) == T exactly (cite proof)
-    - Drift-protected: drift exists but ALL downstream consumers use saturating arithmetic or other guards (cite file:line of EVERY guard)
-    - Drift-vulnerable: drift exists and at least one downstream consumer can underflow/overflow/misbehave (cite the unguarded file:line)
+   - Drift-safe: proven that sum(t_i) == T exactly (cite proof)
+   - Drift-protected: drift exists but ALL downstream consumers use saturating arithmetic or other guards (cite file:line of EVERY guard)
+   - Drift-vulnerable: drift exists and at least one downstream consumer can underflow/overflow/misbehave (cite the unguarded file:line)
 
 D) Findings (prioritized)
 For each exploitable or DoS issue (from sections B and C):
