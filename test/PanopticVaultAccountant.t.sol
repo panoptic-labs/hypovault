@@ -54,6 +54,33 @@ contract MockERC20Partial is IERC20Partial {
     }
 }
 
+contract MockERC4626Vault {
+    address public asset;
+    mapping(address => uint256) public balances;
+    uint256 public rate; // underlying per share, in 1e18
+
+    constructor(address _asset) {
+        asset = _asset;
+        rate = 1e18; // 1:1 by default
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        return balances[account];
+    }
+
+    function setBalance(address account, uint256 amount) external {
+        balances[account] = amount;
+    }
+
+    function setRate(uint256 _rate) external {
+        rate = _rate;
+    }
+
+    function previewRedeem(uint256 shares) external view returns (uint256) {
+        return (shares * rate) / 1e18;
+    }
+}
+
 contract MockCollateralToken {
     mapping(address => uint256) public balances;
     uint256 public previewRedeemReturn;
@@ -226,6 +253,139 @@ contract PanopticVaultAccountantTest is Test {
         accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         assertEq(accountant.vaultHashes(vault, 0), keccak256(abi.encode(pools)));
+    }
+
+    function test_updateHashes_withERC4626() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        MockERC4626Vault mockVault4626 = new MockERC4626Vault(address(underlyingToken));
+        IERC4626[] memory erc4626Vaults = new IERC4626[](1);
+        erc4626Vaults[0] = IERC4626(address(mockVault4626));
+
+        accountant.updateHashes(vault, pools, erc4626Vaults);
+
+        assertEq(accountant.vaultHashes(vault, 0), keccak256(abi.encode(pools)));
+        assertEq(accountant.vaultHashes(vault, 1), keccak256(abi.encode(erc4626Vaults)));
+    }
+
+    function test_updateHashes_revert_duplicatePool() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](2);
+        pools[0] = createDefaultPools()[0];
+        pools[1] = pools[0]; // duplicate
+
+        vm.expectRevert(PanopticVaultAccountant.DuplicatePool.selector);
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
+    }
+
+    function test_updateHashes_revert_duplicateERC4626() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        MockERC4626Vault mockVault4626 = new MockERC4626Vault(address(underlyingToken));
+        IERC4626[] memory erc4626Vaults = new IERC4626[](2);
+        erc4626Vaults[0] = IERC4626(address(mockVault4626));
+        erc4626Vaults[1] = IERC4626(address(mockVault4626)); // duplicate
+
+        vm.expectRevert(PanopticVaultAccountant.DuplicateERC4626.selector);
+        accountant.updateHashes(vault, pools, erc4626Vaults);
+    }
+
+    function test_updateHashes_revert_erc4626OverlapsCollateral() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        // Use the pool's own collateralToken0 as an ERC4626 vault — should revert
+        IERC4626[] memory erc4626Vaults = new IERC4626[](1);
+        erc4626Vaults[0] = IERC4626(address(mockPool.collateralToken0()));
+
+        vm.expectRevert(PanopticVaultAccountant.DuplicateERC4626.selector);
+        accountant.updateHashes(vault, pools, erc4626Vaults);
+    }
+
+    function test_computeNAV_withERC4626Vaults() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        MockERC4626Vault mockVault4626 = new MockERC4626Vault(address(underlyingToken));
+        IERC4626[] memory erc4626Vaults = new IERC4626[](1);
+        erc4626Vaults[0] = IERC4626(address(mockVault4626));
+
+        accountant.updateHashes(vault, pools, erc4626Vaults);
+
+        // Setup basic scenario
+        setupBasicScenario();
+        // Vault holds 500 shares at 1.2x rate = 600 underlying
+        mockVault4626.setBalance(vault, 500e18);
+        mockVault4626.setRate(1.2e18);
+
+        PanopticVaultAccountant.ManagerPrices[]
+            memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
+        managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
+            poolPrice: TWAP_TICK,
+            token0Price: TWAP_TICK,
+            token1Price: TWAP_TICK
+        });
+
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            erc4626Vaults
+        );
+        uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
+
+        // NAV should include the 600e18 from the ERC4626 vault
+        assertGe(nav, 600e18, "NAV should include ERC4626 vault value");
+    }
+
+    function test_computeNAV_revert_invalidERC4626Vaults() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
+
+        setupBasicScenario();
+
+        // Pass a non-empty ERC4626 array when empty was registered
+        MockERC4626Vault mockVault4626 = new MockERC4626Vault(address(underlyingToken));
+        IERC4626[] memory erc4626Vaults = new IERC4626[](1);
+        erc4626Vaults[0] = IERC4626(address(mockVault4626));
+
+        PanopticVaultAccountant.ManagerPrices[]
+            memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
+        managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
+            poolPrice: TWAP_TICK,
+            token0Price: TWAP_TICK,
+            token1Price: TWAP_TICK
+        });
+
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            erc4626Vaults
+        );
+        vm.expectRevert(PanopticVaultAccountant.InvalidERC4626Vaults.selector);
+        accountant.computeNAV(vault, address(underlyingToken), managerInput);
+    }
+
+    function test_computeNAV_revert_erc4626UnderlyingMismatch() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        // ERC4626 vault with wrong underlying
+        MockERC4626Vault mockVault4626 = new MockERC4626Vault(address(token0));
+        IERC4626[] memory erc4626Vaults = new IERC4626[](1);
+        erc4626Vaults[0] = IERC4626(address(mockVault4626));
+
+        accountant.updateHashes(vault, pools, erc4626Vaults);
+        setupBasicScenario();
+
+        PanopticVaultAccountant.ManagerPrices[]
+            memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
+        managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
+            poolPrice: TWAP_TICK,
+            token0Price: TWAP_TICK,
+            token1Price: TWAP_TICK
+        });
+
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            erc4626Vaults
+        );
+        vm.expectRevert(PanopticVaultAccountant.ERC4626UnderlyingMismatch.selector);
+        accountant.computeNAV(vault, address(underlyingToken), managerInput);
     }
 
     function test_lockVault_success() public {
