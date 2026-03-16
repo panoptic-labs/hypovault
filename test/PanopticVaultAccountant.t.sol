@@ -11,6 +11,7 @@ import {LeftRightUnsigned} from "lib/panoptic-v2-core/contracts/types/LeftRight.
 import {Math} from "lib/panoptic-v2-core/contracts/libraries/Math.sol";
 import {Strings} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 import {PanopticMath} from "lib/panoptic-v2-core/contracts/libraries/PanopticMath.sol";
+import {IERC4626} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 
 /*//////////////////////////////////////////////////////////////
                             MOCKS
@@ -50,6 +51,33 @@ contract MockERC20Partial is IERC20Partial {
 
     function totalSupply() external view override returns (uint256) {
         return _totalSupply;
+    }
+}
+
+contract MockERC4626Vault {
+    address public asset;
+    mapping(address => uint256) public balances;
+    uint256 public rate; // underlying per share, in 1e18
+
+    constructor(address _asset) {
+        asset = _asset;
+        rate = 1e18; // 1:1 by default
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        return balances[account];
+    }
+
+    function setBalance(address account, uint256 amount) external {
+        balances[account] = amount;
+    }
+
+    function setRate(uint256 _rate) external {
+        rate = _rate;
+    }
+
+    function previewRedeem(uint256 shares) external view returns (uint256) {
+        return (shares * rate) / 1e18;
     }
 }
 
@@ -171,6 +199,7 @@ contract PanopticVaultAccountantTest is Test {
     MockERC20Partial public token1;
     MockERC20Partial public underlyingToken;
     MockPanopticPool public mockPool;
+    MockPanopticPool public mockPool2;
 
     address public vault = address(0x1234);
     address public owner = address(this);
@@ -186,41 +215,177 @@ contract PanopticVaultAccountantTest is Test {
         token1 = new MockERC20Partial("Token1", "T1");
         underlyingToken = new MockERC20Partial("Underlying", "UND");
         mockPool = new MockPanopticPool();
+        mockPool2 = new MockPanopticPool();
 
         mockPool.setTwapTick(TWAP_TICK);
+        mockPool2.setTwapTick(TWAP_TICK);
     }
 
     /*//////////////////////////////////////////////////////////////
                         OWNER FUNCTION TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_updatePoolsHash_success() public {
-        bytes32 newHash = keccak256("test hash");
+    function test_updateHashes_success() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        IERC4626[] memory erc4626Vaults = new IERC4626[](0);
 
-        accountant.updatePoolsHash(vault, newHash);
+        accountant.updateHashes(vault, pools, erc4626Vaults);
 
-        assertEq(accountant.vaultPools(vault), newHash);
+        assertEq(accountant.vaultHashes(vault, 0), keccak256(abi.encode(pools)));
+        assertEq(accountant.vaultHashes(vault, 1), keccak256(abi.encode(erc4626Vaults)));
     }
 
-    function test_updatePoolsHash_onlyOwner() public {
-        bytes32 newHash = keccak256("test hash");
+    function test_updateHashes_onlyOwner() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
 
         vm.prank(nonOwner);
         vm.expectRevert();
-        accountant.updatePoolsHash(vault, newHash);
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
     }
 
-    function test_updatePoolsHash_vaultLocked() public {
-        bytes32 originalHash = keccak256("original");
-        bytes32 newHash = keccak256("new");
+    function test_updateHashes_vaultLocked() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
 
-        accountant.updatePoolsHash(vault, originalHash);
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
         accountant.lockVault(vault);
 
         vm.expectRevert(PanopticVaultAccountant.VaultLocked.selector);
-        accountant.updatePoolsHash(vault, newHash);
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
-        assertEq(accountant.vaultPools(vault), originalHash);
+        assertEq(accountant.vaultHashes(vault, 0), keccak256(abi.encode(pools)));
+    }
+
+    function test_updateHashes_withERC4626() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        MockERC4626Vault mockVault4626 = new MockERC4626Vault(address(underlyingToken));
+        IERC4626[] memory erc4626Vaults = new IERC4626[](1);
+        erc4626Vaults[0] = IERC4626(address(mockVault4626));
+
+        accountant.updateHashes(vault, pools, erc4626Vaults);
+
+        assertEq(accountant.vaultHashes(vault, 0), keccak256(abi.encode(pools)));
+        assertEq(accountant.vaultHashes(vault, 1), keccak256(abi.encode(erc4626Vaults)));
+    }
+
+    function test_updateHashes_revert_duplicatePool() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](2);
+        pools[0] = createDefaultPools()[0];
+        pools[1] = pools[0]; // duplicate
+
+        vm.expectRevert(PanopticVaultAccountant.DuplicatePool.selector);
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
+    }
+
+    function test_updateHashes_revert_duplicateERC4626() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        MockERC4626Vault mockVault4626 = new MockERC4626Vault(address(underlyingToken));
+        IERC4626[] memory erc4626Vaults = new IERC4626[](2);
+        erc4626Vaults[0] = IERC4626(address(mockVault4626));
+        erc4626Vaults[1] = IERC4626(address(mockVault4626)); // duplicate
+
+        vm.expectRevert(PanopticVaultAccountant.DuplicateERC4626.selector);
+        accountant.updateHashes(vault, pools, erc4626Vaults);
+    }
+
+    function test_updateHashes_revert_erc4626OverlapsCollateral() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        // Use the pool's own collateralToken0 as an ERC4626 vault — should revert
+        IERC4626[] memory erc4626Vaults = new IERC4626[](1);
+        erc4626Vaults[0] = IERC4626(address(mockPool.collateralToken0()));
+
+        vm.expectRevert(PanopticVaultAccountant.DuplicateERC4626.selector);
+        accountant.updateHashes(vault, pools, erc4626Vaults);
+    }
+
+    function test_computeNAV_withERC4626Vaults() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        MockERC4626Vault mockVault4626 = new MockERC4626Vault(address(underlyingToken));
+        IERC4626[] memory erc4626Vaults = new IERC4626[](1);
+        erc4626Vaults[0] = IERC4626(address(mockVault4626));
+
+        accountant.updateHashes(vault, pools, erc4626Vaults);
+
+        // Setup basic scenario
+        setupBasicScenario();
+        // Vault holds 500 shares at 1.2x rate = 600 underlying
+        mockVault4626.setBalance(vault, 500e18);
+        mockVault4626.setRate(1.2e18);
+
+        PanopticVaultAccountant.ManagerPrices[]
+            memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
+        managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
+            poolPrice: TWAP_TICK,
+            token0Price: TWAP_TICK,
+            token1Price: TWAP_TICK
+        });
+
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            erc4626Vaults
+        );
+        uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
+
+        // NAV should include the 600e18 from the ERC4626 vault
+        assertGe(nav, 600e18, "NAV should include ERC4626 vault value");
+    }
+
+    function test_computeNAV_revert_invalidERC4626Vaults() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
+
+        setupBasicScenario();
+
+        // Pass a non-empty ERC4626 array when empty was registered
+        MockERC4626Vault mockVault4626 = new MockERC4626Vault(address(underlyingToken));
+        IERC4626[] memory erc4626Vaults = new IERC4626[](1);
+        erc4626Vaults[0] = IERC4626(address(mockVault4626));
+
+        PanopticVaultAccountant.ManagerPrices[]
+            memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
+        managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
+            poolPrice: TWAP_TICK,
+            token0Price: TWAP_TICK,
+            token1Price: TWAP_TICK
+        });
+
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            erc4626Vaults
+        );
+        vm.expectRevert(PanopticVaultAccountant.InvalidERC4626Vaults.selector);
+        accountant.computeNAV(vault, address(underlyingToken), managerInput);
+    }
+
+    function test_computeNAV_revert_erc4626UnderlyingMismatch() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        // ERC4626 vault with wrong underlying
+        MockERC4626Vault mockVault4626 = new MockERC4626Vault(address(token0));
+        IERC4626[] memory erc4626Vaults = new IERC4626[](1);
+        erc4626Vaults[0] = IERC4626(address(mockVault4626));
+
+        accountant.updateHashes(vault, pools, erc4626Vaults);
+        setupBasicScenario();
+
+        PanopticVaultAccountant.ManagerPrices[]
+            memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
+        managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
+            poolPrice: TWAP_TICK,
+            token0Price: TWAP_TICK,
+            token1Price: TWAP_TICK
+        });
+
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            erc4626Vaults
+        );
+        vm.expectRevert(PanopticVaultAccountant.ERC4626UnderlyingMismatch.selector);
+        accountant.computeNAV(vault, address(underlyingToken), managerInput);
     }
 
     function test_lockVault_success() public {
@@ -249,11 +414,12 @@ contract PanopticVaultAccountantTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_computeNAV_invalidPools() public {
+        // Set hashes with empty pools, then pass non-empty pools in computeNAV
+        PanopticVaultAccountant.PoolInfo[]
+            memory emptyPools = new PanopticVaultAccountant.PoolInfo[](0);
+        accountant.updateHashes(vault, emptyPools, new IERC4626[](0));
+
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        bytes32 wrongHash = keccak256("wrong hash");
-
-        accountant.updatePoolsHash(vault, wrongHash);
-
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
 
         vm.expectRevert(PanopticVaultAccountant.InvalidPools.selector);
@@ -262,7 +428,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_staleOraclePrice_pool() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Create manager prices with large deviation from oracle
         PanopticVaultAccountant.ManagerPrices[]
@@ -273,7 +439,12 @@ contract PanopticVaultAccountantTest is Test {
             token1Price: TWAP_TICK
         });
 
-        bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            new IERC4626[](0)
+        );
 
         vm.expectRevert(PanopticVaultAccountant.StaleOraclePrice.selector);
         accountant.computeNAV(vault, address(underlyingToken), managerInput);
@@ -281,7 +452,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_incorrectPositionList_zeroBalance() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Setup position with zero balance (should revert)
         PositionBalance[] memory positionBalances = new PositionBalance[](1);
@@ -304,7 +475,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_incorrectPositionList_wrongLegsCount() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Setup position with correct balance but wrong legs count
         PositionBalance[] memory positionBalances = new PositionBalance[](1);
@@ -325,7 +496,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_basicScenario() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Setup basic scenario with no positions
         setupBasicScenario();
@@ -376,7 +547,7 @@ contract PanopticVaultAccountantTest is Test {
             maxPriceDeviation: MAX_PRICE_DEVIATION
         });
 
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Setup exact scenario
         underlyingToken.setBalance(vault, 1000e18); // underlying = token0
@@ -421,7 +592,7 @@ contract PanopticVaultAccountantTest is Test {
             maxPriceDeviation: MAX_PRICE_DEVIATION
         });
 
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Setup exact scenario - all balances in underlying token
         underlyingToken.setBalance(vault, 1000e18); // Direct underlying balance
@@ -459,7 +630,7 @@ contract PanopticVaultAccountantTest is Test {
             maxPriceDeviation: MAX_PRICE_DEVIATION
         });
 
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Setup scenario with no token balances, only collateral and premiums
         underlyingToken.setBalance(vault, 1000e18);
@@ -494,7 +665,12 @@ contract PanopticVaultAccountantTest is Test {
             token0Price: 0, // token0 == underlyingToken
             token1Price: TWAP_TICK // token1 to token0 (aka underlyingToken)
         });
-        bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            new IERC4626[](0)
+        );
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
         // Expected NAV: underlyingToken balance, plus 150e18 of underlyingToken in net premium, plus convert1To0(50e18 token1s) in net premia
@@ -522,7 +698,7 @@ contract PanopticVaultAccountantTest is Test {
             maxPriceDeviation: MAX_PRICE_DEVIATION
         });
 
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Underlying balance stays as-is in NAV
         underlyingToken.setBalance(vault, 500e18);
@@ -556,7 +732,12 @@ contract PanopticVaultAccountantTest is Test {
             token1Price: TWAP_TICK
         });
 
-        bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            new IERC4626[](0)
+        );
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
         // NAV = underlying(500) + max(-100, 0) = 500
@@ -571,7 +752,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_withPositions() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupScenarioWithPositions();
 
@@ -600,7 +781,7 @@ contract PanopticVaultAccountantTest is Test {
     function test_computeNAV_multiplePoolsScenario() public {
         // Create scenario with multiple pools
         PanopticVaultAccountant.PoolInfo[] memory pools = createMultiplePools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupMultiplePoolsScenario();
 
@@ -617,7 +798,7 @@ contract PanopticVaultAccountantTest is Test {
         });
         managerPrices[1] = managerPrices[0];
 
-        bytes memory managerInput = abi.encode(managerPrices, pools, tokenIds);
+        bytes memory managerInput = abi.encode(managerPrices, pools, tokenIds, new IERC4626[](0));
 
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
@@ -637,7 +818,7 @@ contract PanopticVaultAccountantTest is Test {
         // Test ETH handling (address(0) converted to 0xEeeeeE...)
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
         pools[0].token0 = IERC20Partial(address(0)); // ETH
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupBasicScenario();
         vm.deal(vault, 1 ether); // Give vault some ETH
@@ -654,7 +835,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_tokenConversion() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Setup scenario where tokens need conversion to underlying
         setupTokenConversionScenario();
@@ -677,7 +858,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_negativePnL() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Setup scenario with negative PnL that should result in 0
         setupNegativePnLScenario();
@@ -823,7 +1004,12 @@ contract PanopticVaultAccountantTest is Test {
     {
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](2);
         pools[0] = createDefaultPools()[0];
-        pools[1] = createDefaultPools()[0]; // Duplicate for simplicity
+        pools[1] = PanopticVaultAccountant.PoolInfo({
+            pool: IPanopticPoolV2(address(mockPool2)),
+            token0: token0,
+            token1: token1,
+            maxPriceDeviation: MAX_PRICE_DEVIATION
+        });
         return pools;
     }
 
@@ -842,7 +1028,7 @@ contract PanopticVaultAccountantTest is Test {
             });
         }
 
-        return abi.encode(managerPrices, pools, tokenIds);
+        return abi.encode(managerPrices, pools, tokenIds, new IERC4626[](0));
     }
 
     function setupBasicScenario() internal {
@@ -887,6 +1073,15 @@ contract PanopticVaultAccountantTest is Test {
         // Multiply balances for multiple pools
         token0.setBalance(vault, 200 ether);
         token1.setBalance(vault, 400 ether);
+
+        // Setup mockPool2 collateral and position data
+        mockPool2.collateralToken0().setBalance(vault, 0);
+        mockPool2.collateralToken0().setPreviewRedeemReturn(0);
+        mockPool2.collateralToken1().setBalance(vault, 0);
+        mockPool2.collateralToken1().setPreviewRedeemReturn(0);
+        mockPool2.setNumberOfLegs(vault, 0);
+        mockPool2.setMockPositionBalanceArray(new PositionBalance[](0));
+        mockPool2.setMockPremiums(LeftRightUnsigned.wrap(0), LeftRightUnsigned.wrap(0));
     }
 
     function setupTokenConversionScenario() internal {
@@ -1065,14 +1260,15 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_emptyPools() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](0);
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         underlyingToken.setBalance(vault, 500 ether);
 
         bytes memory managerInput = abi.encode(
             new PanopticVaultAccountant.ManagerPrices[](0),
             pools,
-            new TokenId[][](0)
+            new TokenId[][](0),
+            new IERC4626[](0)
         );
 
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
@@ -1082,7 +1278,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_zeroBalances() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // All balances are zero and no positions
         token0.setBalance(vault, 0);
@@ -1111,7 +1307,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_maxPriceDeviationBoundary() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupBasicScenario();
 
@@ -1124,7 +1320,12 @@ contract PanopticVaultAccountantTest is Test {
             token1Price: TWAP_TICK
         });
 
-        bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            new IERC4626[](0)
+        );
 
         // Should not revert at exact boundary
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
@@ -1137,7 +1338,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_outOfRangeCall_short() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupScenarioWithPositions();
 
@@ -1164,7 +1365,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_outOfRangePut_short() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupScenarioWithPositions();
 
@@ -1191,7 +1392,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_inRangeCall_long() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupScenarioWithPositions();
 
@@ -1218,7 +1419,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_inRangePut_long() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupScenarioWithPositions();
 
@@ -1245,7 +1446,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_multiLegPosition() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Setup for multi-leg position
         token0.setBalance(vault, 100 ether);
@@ -1291,7 +1492,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_staleOraclePrice_token0() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupBasicScenario();
 
@@ -1304,7 +1505,12 @@ contract PanopticVaultAccountantTest is Test {
             token1Price: TWAP_TICK
         });
 
-        bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            new IERC4626[](0)
+        );
 
         vm.expectRevert(PanopticVaultAccountant.StaleOraclePrice.selector);
         accountant.computeNAV(vault, address(underlyingToken), managerInput);
@@ -1312,7 +1518,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_staleOraclePrice_token1() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupBasicScenario();
 
@@ -1325,7 +1531,12 @@ contract PanopticVaultAccountantTest is Test {
             token1Price: TWAP_TICK + MAX_PRICE_DEVIATION + 1 // Exceeds max deviation
         });
 
-        bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            new IERC4626[](0)
+        );
 
         vm.expectRevert(PanopticVaultAccountant.StaleOraclePrice.selector);
         accountant.computeNAV(vault, address(underlyingToken), managerInput);
@@ -1337,7 +1548,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_exactCalculation_noPositions() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Set exact balances for precise calculation
         uint256 token0Balance = 100e18;
@@ -1382,7 +1593,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_exactCalculation_withPremiums() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Set specific premium values
         uint256 shortPremium0 = 10e18;
@@ -1465,7 +1676,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_exactCalculation_singleLegPosition() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupScenarioWithPositions();
 
@@ -1496,7 +1707,7 @@ contract PanopticVaultAccountantTest is Test {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
         // Set different underlying token to force conversion
         MockERC20Partial differentUnderlying = new MockERC20Partial("Different", "DIFF");
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         uint256 token0Amount = 100e18;
         uint256 token1Amount = 200e18;
@@ -1525,7 +1736,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_negativeExposure_handledCorrectly() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Create scenario with large negative exposure
         token0.setBalance(vault, 0);
@@ -1552,7 +1763,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_tokenBalances_not_netted_against_negative_collateral() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Setup scenario: positive token balances but negative position exposure
         uint256 token0Balance = 500e18;
@@ -1625,7 +1836,7 @@ contract PanopticVaultAccountantTest is Test {
     function test_computeNAV_separate_token_and_position_exposures() public {
         // This test documents the current problematic netting behavior
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Setup: significant token balances and moderate negative position exposure
         uint256 token0Balance = 500e18;
@@ -1681,7 +1892,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_multiPool_exactAggregation() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createMultiplePools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupMultiplePoolsScenario();
 
@@ -1698,7 +1909,7 @@ contract PanopticVaultAccountantTest is Test {
         });
         managerPrices[1] = managerPrices[0];
 
-        bytes memory managerInput = abi.encode(managerPrices, pools, tokenIds);
+        bytes memory managerInput = abi.encode(managerPrices, pools, tokenIds, new IERC4626[](0));
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
         // Should aggregate from both pools without double counting underlying
@@ -1718,8 +1929,10 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_revert_invalidPoolsHash() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        // Set wrong hash
-        accountant.updatePoolsHash(vault, keccak256("wrong_hash"));
+        // Set hashes with empty pools, then pass non-empty pools
+        PanopticVaultAccountant.PoolInfo[]
+            memory emptyPools = new PanopticVaultAccountant.PoolInfo[](0);
+        accountant.updateHashes(vault, emptyPools, new IERC4626[](0));
 
         bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
 
@@ -1729,7 +1942,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_revert_stalePoolPrice() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupBasicScenario();
 
@@ -1741,7 +1954,12 @@ contract PanopticVaultAccountantTest is Test {
             token1Price: TWAP_TICK
         });
 
-        bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            new IERC4626[](0)
+        );
 
         vm.expectRevert(PanopticVaultAccountant.StaleOraclePrice.selector);
         accountant.computeNAV(vault, address(underlyingToken), managerInput);
@@ -1749,7 +1967,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_revert_zeroPositionBalance() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupBasicScenario();
 
@@ -1771,7 +1989,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_revert_incorrectLegsCount() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupScenarioWithPositions();
         mockPool.setNumberOfLegs(vault, 5); // Wrong count
@@ -1792,7 +2010,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_maxPriceDeviationBoundary_exact() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupBasicScenario();
 
@@ -1805,7 +2023,12 @@ contract PanopticVaultAccountantTest is Test {
             token1Price: TWAP_TICK - MAX_PRICE_DEVIATION // Negative boundary
         });
 
-        bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            new IERC4626[](0)
+        );
 
         // Should not revert at exact boundary
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
@@ -1823,7 +2046,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_zeroAmounts_edgeCase() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Set all balances to zero
         token0.setBalance(vault, 0);
@@ -1848,25 +2071,30 @@ contract PanopticVaultAccountantTest is Test {
                         FUZZ TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testFuzz_updatePoolsHash(address _vault, bytes32 _hash) public {
+    function testFuzz_updateHashes(address _vault) public {
         vm.assume(_vault != address(0));
 
-        accountant.updatePoolsHash(_vault, _hash);
-        assertEq(accountant.vaultPools(_vault), _hash);
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        IERC4626[] memory erc4626Vaults = new IERC4626[](0);
+
+        accountant.updateHashes(_vault, pools, erc4626Vaults);
+        assertEq(accountant.vaultHashes(_vault, 0), keccak256(abi.encode(pools)));
+        assertEq(accountant.vaultHashes(_vault, 1), keccak256(abi.encode(erc4626Vaults)));
     }
 
     function testFuzz_computeNAV_underlyingBalance(uint256 balance) public {
         vm.assume(balance < type(uint128).max); // Reasonable bound
 
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](0);
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         underlyingToken.setBalance(vault, balance);
 
         bytes memory managerInput = abi.encode(
             new PanopticVaultAccountant.ManagerPrices[](0),
             pools,
-            new TokenId[][](0)
+            new TokenId[][](0),
+            new IERC4626[](0)
         );
 
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
@@ -1877,7 +2105,7 @@ contract PanopticVaultAccountantTest is Test {
         vm.assume(deviation >= -MAX_PRICE_DEVIATION && deviation <= MAX_PRICE_DEVIATION);
 
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupBasicScenario();
 
@@ -1889,7 +2117,12 @@ contract PanopticVaultAccountantTest is Test {
             token1Price: TWAP_TICK
         });
 
-        bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            new IERC4626[](0)
+        );
 
         // Should not revert within bounds
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
@@ -1917,7 +2150,7 @@ contract PanopticVaultAccountantTest is Test {
         );
 
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         token0.setBalance(vault, balance0);
         token1.setBalance(vault, balance1);
@@ -1950,7 +2183,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_straddlePosition_exactCalculation() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Setup precise scenario for straddle
         setupPrecisionTestScenario(
@@ -1995,7 +2228,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_ironCondor_fourLegPosition() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupPrecisionTestScenario(
             100e18, // token0
@@ -2035,7 +2268,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_multiplePositions_aggregation() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupPrecisionTestScenario(
             200e18, // token0
@@ -2077,7 +2310,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_largeNumbers_noOverflow() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Test with large but realistic numbers
         uint256 largeBalance = 1000000e18; // 1M tokens
@@ -2143,7 +2376,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_precisionTest_smallAmounts() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Test with very small amounts to check precision
         uint256 smallAmount = 1e6; // 0.000001 tokens (1 microtoken)
@@ -2179,7 +2412,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_twapCalculation_verification() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Set specific TWAP tick via mock pool
         int24 expectedTwap = 150; // Target TWAP
@@ -2196,7 +2429,12 @@ contract PanopticVaultAccountantTest is Test {
             token1Price: expectedTwap
         });
 
-        bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            pools,
+            new TokenId[][](1),
+            new IERC4626[](0)
+        );
         uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
 
         // Expected: token0(100) + token1(200) + collateral0(50) + collateral1(75) + underlying(1000) = 1425
@@ -2212,7 +2450,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_priceDeviation_exactBoundary() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         setupBasicScenario();
 
@@ -2234,7 +2472,12 @@ contract PanopticVaultAccountantTest is Test {
                 token1Price: i == 2 ? TWAP_TICK + deviations[i * 2] : TWAP_TICK
             });
 
-            bytes memory managerInput = abi.encode(managerPrices, pools, new TokenId[][](1));
+            bytes memory managerInput = abi.encode(
+                managerPrices,
+                pools,
+                new TokenId[][](1),
+                new IERC4626[](0)
+            );
 
             // Should succeed at exact boundary
             uint256 nav = accountant.computeNAV(vault, address(underlyingToken), managerInput);
@@ -2263,7 +2506,7 @@ contract PanopticVaultAccountantTest is Test {
 
     function test_computeNAV_fullIntegration_realScenario() public {
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Simulate a realistic vault scenario
         setupPrecisionTestScenario(
@@ -2315,7 +2558,7 @@ contract PanopticVaultAccountantTest is Test {
         // The difference shows how token balances are incorrectly zeroed out
 
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         uint256 token0Balance = 500e18;
         uint256 token1Balance = 300e18;
@@ -2418,7 +2661,7 @@ contract PanopticVaultAccountantTest is Test {
         // even when position exposure becomes negative. This is fundamental to proper accounting.
 
         PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
-        accountant.updatePoolsHash(vault, keccak256(abi.encode(pools)));
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
 
         // Set up a clean scenario: only token balances, no collateral, minimal underlying
         uint256 token0Balance = 1000e18;

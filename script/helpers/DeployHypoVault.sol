@@ -138,18 +138,18 @@ contract DeployHypoVault is MerkleTreeHelper {
         // 8. Grant STRATEGIST_ROLE to TurnkeyAccount0
         _configureRoles(deployData, managerAddress);
 
-        // 10. Update PanopticVaultAccountant pools hash for vault
+        // 10. Update PanopticVaultAccountant hashes for vault
         PanopticVaultAccountant.PoolInfo[] memory poolInfos = createPanopticAccountantPoolInfos();
         _writePoolInfosToJson(vaultAddress, poolInfos, deployData.symbol);
-        bytes32 poolInfosHash = keccak256(abi.encode(poolInfos));
         console.log("Generated poolInfosHash:");
-        console.logBytes32(poolInfosHash);
+        console.logBytes32(keccak256(abi.encode(poolInfos)));
 
-        PanopticVaultAccountant(deployData.accountantAddress).updatePoolsHash(
+        PanopticVaultAccountant(deployData.accountantAddress).updateHashes(
             vaultAddress,
-            poolInfosHash
+            poolInfos,
+            new IERC4626[](0)
         );
-        console.log("Pools hash updated");
+        console.log("Vault hashes updated");
 
         // TODO: Add transfer ownership calls to the multisig
     }

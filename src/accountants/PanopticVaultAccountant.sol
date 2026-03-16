@@ -69,12 +69,24 @@ contract PanopticVaultAccountant is Ownable {
     /// @notice The pools hash for this vault has been locked and cannot be updated
     error VaultLocked();
 
+    /// @notice An invalid list of ERC4626 vaults was provided for the given vault
+    error InvalidERC4626Vaults();
+
+    /// @notice An ERC4626 vault's underlying asset does not match the vault's underlying token
+    error ERC4626UnderlyingMismatch();
+
+    /// @notice A pool appears more than once in the pools array
+    error DuplicatePool();
+
+    /// @notice An ERC4626 vault duplicates a pool collateral token or appears twice in the array
+    error DuplicateERC4626();
+
     /// @notice Default WETH address for this contract
     /// @dev leave as address(0) if unused
     address public immutable wethAddress;
 
-    /// @notice The hash of pool structs to query for each vault
-    mapping(address vault => bytes32 poolsHash) public vaultPools;
+    /// @notice The hashes for each vault: [0] = poolsHash, [1] = erc4626Hash
+    mapping(address vault => bytes32[2] hashes) public vaultHashes;
 
     /// @notice Whether the list of pools for the vault is locked
     mapping(address vault => bool isLocked) public vaultLocked;
@@ -83,16 +95,44 @@ contract PanopticVaultAccountant is Ownable {
         wethAddress = _wethAddress;
     }
 
-    /// @notice Updates the pools hash for a vault.
+    /// @notice Updates the pools and ERC4626 hashes for a vault, with duplicate detection.
     /// @dev This function can only be called by the owner of the contract.
-    /// @param vault The address of the vault to update the pools hash for
-    /// @param poolsHash The new pools hash to set for the vault
-    function updatePoolsHash(address vault, bytes32 poolsHash) external onlyOwner {
+    /// @dev Reverts if any ERC4626 vault duplicates a pool's collateral token or appears twice in the array.
+    /// @param vault The address of the vault to update the hashes for
+    /// @param pools The pool info structs for the vault
+    /// @param erc4626Vaults The ERC4626 vaults for the vault
+    function updateHashes(
+        address vault,
+        PoolInfo[] calldata pools,
+        IERC4626[] calldata erc4626Vaults
+    ) external onlyOwner {
         if (vaultLocked[vault]) revert VaultLocked();
-        vaultPools[vault] = poolsHash;
+
+        // check for duplicate pools
+        for (uint256 i = 0; i < pools.length; i++) {
+            for (uint256 j = 0; j < i; j++) {
+                if (pools[i].pool == pools[j].pool) revert DuplicatePool();
+            }
+        }
+
+        // check for duplicates: no ERC4626 vault can appear twice or match a pool collateral token
+        for (uint256 i = 0; i < erc4626Vaults.length; i++) {
+            for (uint256 j = 0; j < i; j++) {
+                if (erc4626Vaults[i] == erc4626Vaults[j]) revert DuplicateERC4626();
+            }
+            for (uint256 j = 0; j < pools.length; j++) {
+                if (
+                    erc4626Vaults[i] == pools[j].pool.collateralToken0() ||
+                    erc4626Vaults[i] == pools[j].pool.collateralToken1()
+                ) revert DuplicateERC4626();
+            }
+        }
+
+        vaultHashes[vault][0] = keccak256(abi.encode(pools));
+        vaultHashes[vault][1] = keccak256(abi.encode(erc4626Vaults));
     }
 
-    /// @notice Locks the vault from updating its pools hash.
+    /// @notice Locks the vault from updating its hashes.
     /// @dev This function can only be called by the owner of the contract.
     /// @param vault The address of the vault to lock
     function lockVault(address vault) external onlyOwner {
@@ -109,13 +149,15 @@ contract PanopticVaultAccountant is Ownable {
         address underlyingToken,
         bytes calldata managerInput
     ) external view returns (uint256 nav) {
+        // loop through Panoptic pools
         (
             ManagerPrices[] memory managerPrices,
             PoolInfo[] memory pools,
-            TokenId[][] memory tokenIds
-        ) = abi.decode(managerInput, (ManagerPrices[], PoolInfo[], TokenId[][]));
+            TokenId[][] memory tokenIds,
 
-        if (keccak256(abi.encode(pools)) != vaultPools[vault]) revert InvalidPools();
+        ) = abi.decode(managerInput, (ManagerPrices[], PoolInfo[], TokenId[][], IERC4626[]));
+
+        if (keccak256(abi.encode(pools)) != vaultHashes[vault][0]) revert InvalidPools();
 
         // tracks unique tokens across pools to avoid double-counting balances
         address[] memory collateralTokens = new address[](pools.length * 2);
@@ -306,6 +348,25 @@ contract PanopticVaultAccountant is Ownable {
                 token1Exposure +
                 // debt in pools with negative exposure does not need to be paid back
                 uint256(Math.max(poolExposure0 + poolExposure1, 0));
+        }
+
+        // loop through every 4626 pools
+        {
+            (, , , IERC4626[] memory erc4626Vaults) = abi.decode(
+                managerInput,
+                (ManagerPrices[], PoolInfo[], TokenId[][], IERC4626[])
+            );
+
+            // validate ERC4626 vault list
+            if (keccak256(abi.encode(erc4626Vaults)) != vaultHashes[_vault][1])
+                revert InvalidERC4626Vaults();
+
+            // add ERC4626 vault share values to NAV
+            for (uint256 i = 0; i < erc4626Vaults.length; i++) {
+                if (erc4626Vaults[i].asset() != underlyingToken) revert ERC4626UnderlyingMismatch();
+                uint256 shares = erc4626Vaults[i].balanceOf(_vault);
+                nav += erc4626Vaults[i].previewRedeem(shares);
+            }
         }
 
         // underlying cannot be native (0x000/0xeee)
