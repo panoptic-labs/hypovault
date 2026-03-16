@@ -9,14 +9,14 @@ import "../src/HypoVaultFactory.sol";
 import "../src/HypoVault.sol";
 import "../src/accountants/PanopticVaultAccountant.sol";
 import {CollateralTrackerDecoderAndSanitizer} from "../src/DecodersAndSanitizers/CollateralTrackerDecoderAndSanitizer.sol";
-import {ERC20S} from "lib/panoptic-v1.1/test/foundry/testUtils/ERC20S.sol";
+import {ERC20S} from "lib/panoptic-v2-core/test/foundry/testUtils/ERC20S.sol";
 import {ERC4626} from "lib/boring-vault/lib/solmate/src/tokens/ERC4626.sol";
-import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC20Partial.sol";
-import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
+import {IERC20Partial} from "lib/panoptic-v2-core/contracts/tokens/interfaces/IERC20Partial.sol";
+import {Math} from "lib/panoptic-v2-core/contracts/libraries/Math.sol";
 
 import {HypoVaultManagerWithMerkleVerification} from "../src/managers/HypoVaultManagerWithMerkleVerification.sol";
 import {ManagerWithMerkleVerification} from "lib/boring-vault/src/base/Roles/ManagerWithMerkleVerification.sol";
-import {AccessManager} from "lib/boring-vault/lib/openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
+import {AccessManager} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
 import {Authority} from "lib/boring-vault/lib/solmate/src/auth/Auth.sol";
 import {MerkleTreeHelper} from "lib/boring-vault/test/resources/MerkleTreeHelper/MerkleTreeHelper.sol";
 

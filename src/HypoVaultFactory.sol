@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {HypoVault} from "./HypoVault.sol";
 import {IVaultAccountant} from "./interfaces/IVaultAccountant.sol";
-import "lib/boring-vault/lib/openzeppelin-contracts/contracts/proxy/Clones.sol";
+import "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/Clones.sol";
 
 /// @title HypoVault Factory
 /// @author Axicon Labs Limited

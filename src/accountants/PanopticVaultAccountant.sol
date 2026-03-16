@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 // Base
-import {Ownable} from "lib/boring-vault/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 // Libraries
-import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
-import {PanopticMath} from "lib/panoptic-v1.1/contracts/libraries/PanopticMath.sol";
+import {Math} from "lib/panoptic-v2-core/contracts/libraries/Math.sol";
+import {PanopticMath} from "lib/panoptic-v2-core/contracts/libraries/PanopticMath.sol";
 // Interfaces
-import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC20Partial.sol";
-import {IERC4626} from "lib/boring-vault/lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import {IERC20Partial} from "lib/panoptic-v2-core/contracts/tokens/interfaces/IERC20Partial.sol";
+import {IERC4626} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 // Types
-import {LeftRightUnsigned} from "lib/panoptic-v1.1/contracts/types/LeftRight.sol";
-import {LeftRightSigned} from "lib/panoptic-v1.1/contracts/types/LeftRight.sol";
-import {LiquidityChunk} from "lib/panoptic-v1.1/contracts/types/LiquidityChunk.sol";
-import {PositionBalance} from "lib/panoptic-v1.1/contracts/types/PositionBalance.sol";
-import {TokenId} from "lib/panoptic-v1.1/contracts/types/TokenId.sol";
+import {LeftRightUnsigned} from "lib/panoptic-v2-core/contracts/types/LeftRight.sol";
+import {LeftRightSigned} from "lib/panoptic-v2-core/contracts/types/LeftRight.sol";
+import {LiquidityChunk} from "lib/panoptic-v2-core/contracts/types/LiquidityChunk.sol";
+import {PositionBalance} from "lib/panoptic-v2-core/contracts/types/PositionBalance.sol";
+import {TokenId} from "lib/panoptic-v2-core/contracts/types/TokenId.sol";
 
 interface IPanopticPoolV2 {
     function getTWAP() external view returns (int24 twapTick);
@@ -176,9 +176,9 @@ contract PanopticVaultAccountant is Ownable {
                         }
                     }
 
-                    // get raw exercised amounts, handles credits/loans gracefully
+                    // get raw exercised amounts, handles credits/loans gracefully. Compute as opening (rounds down) = true
                     (LeftRightSigned longAmounts, LeftRightSigned shortAmounts) = PanopticMath
-                        .computeExercisedAmounts(_tokenId, positionSize);
+                        .computeExercisedAmounts(_tokenId, positionSize, true);
 
                     poolExposure0 +=
                         int256(longAmounts.rightSlot()) -
