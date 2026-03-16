@@ -5,12 +5,12 @@ import "forge-std/Test.sol";
 import "forge-std/console2.sol";
 import "../src/accountants/PanopticVaultAccountant.sol";
 import "../src/interfaces/IVaultAccountant.sol";
-import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC20Partial.sol";
-import {TokenId} from "lib/panoptic-v1.1/contracts/types/TokenId.sol";
-import {LeftRightUnsigned} from "lib/panoptic-v1.1/contracts/types/LeftRight.sol";
-import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
-import {Strings} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/utils/Strings.sol";
-import {PanopticMath} from "lib/panoptic-v1.1/contracts/libraries/PanopticMath.sol";
+import {IERC20Partial} from "lib/panoptic-v2-core/contracts/tokens/interfaces/IERC20Partial.sol";
+import {TokenId} from "lib/panoptic-v2-core/contracts/types/TokenId.sol";
+import {LeftRightUnsigned} from "lib/panoptic-v2-core/contracts/types/LeftRight.sol";
+import {Math} from "lib/panoptic-v2-core/contracts/libraries/Math.sol";
+import {Strings} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/utils/Strings.sol";
+import {PanopticMath} from "lib/panoptic-v2-core/contracts/libraries/PanopticMath.sol";
 
 /*//////////////////////////////////////////////////////////////
                             MOCKS

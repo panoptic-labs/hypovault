@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {DeployHypoVault} from "./helpers/DeployHypoVault.sol";
 import {HypoVaultFactory} from "../src/HypoVaultFactory.sol";
 import {PanopticVaultAccountant} from "../src/accountants/PanopticVaultAccountant.sol";
-import {IERC20Partial} from "lib/panoptic-v1.1/contracts/tokens/interfaces/IERC20Partial.sol";
+import {IERC20Partial} from "lib/panoptic-v2-core/contracts/tokens/interfaces/IERC20Partial.sol";
 import {console} from "forge-std/console.sol";
 import {Script} from "forge-std/Script.sol";
 

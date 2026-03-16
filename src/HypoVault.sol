@@ -2,21 +2,21 @@
 pragma solidity ^0.8.28;
 
 // Interfaces
-import {ERC20Minimal} from "lib/panoptic-v1.1/contracts/tokens/ERC20Minimal.sol";
-import {IERC20} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {ERC20Minimal} from "lib/panoptic-v2-core/contracts/tokens/ERC20Minimal.sol";
+import {IERC20} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IVaultAccountant} from "./interfaces/IVaultAccountant.sol";
 // Base
-import {ERC721Holder} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC721/utils/ERC721Holder.sol";
-import {ERC1155Holder} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/token/ERC1155/utils/ERC1155Holder.sol";
-import {Multicall} from "lib/panoptic-v1.1/contracts/base/Multicall.sol";
+import {ERC721Holder} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC721/utils/ERC721Holder.sol";
+import {ERC1155Holder} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC1155/utils/ERC1155Holder.sol";
+import {Multicall} from "lib/panoptic-v2-core/contracts/base/Multicall.sol";
 import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
-import {Initializable} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
+import {Initializable} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 
 // Libraries
-import {Address} from "lib/panoptic-v1.1/lib/openzeppelin-contracts/contracts/utils/Address.sol";
-import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
-import {SafeTransferLib} from "lib/panoptic-v1.1/contracts/libraries/SafeTransferLib.sol";
+import {Address} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/utils/Address.sol";
+import {Math} from "lib/panoptic-v2-core/contracts/libraries/Math.sol";
+import {SafeTransferLib} from "lib/panoptic-v2-core/contracts/libraries/SafeTransferLib.sol";
 
 /// @author Axicon Labs Limited
 /// @notice A vault in which a manager allocates assets deposited by users and distributes profits asynchronously.
@@ -234,7 +234,7 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
         manager = _manager;
         accountant = _accountant;
         performanceFeeBps = _performanceFeeBps;
-        totalSupply = 1_000_000;
+        _internalSupply = 1_000_000;
         symbol = _symbol;
         name = _name;
     }
@@ -252,6 +252,10 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
         } catch {
             return 0;
         }
+    }
+
+    function totalSupply() public view returns (uint256) {
+        return _internalSupply;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -640,7 +644,7 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
             epochState.assetsDeposited -
             reservedWithdrawalAssets;
 
-        uint256 _totalSupply = totalSupply;
+        uint256 _totalSupply = _internalSupply;
 
         uint256 sharesReceived = Math.mulDiv(assetsToFulfill, _totalSupply, _totalAssets);
 
@@ -661,7 +665,7 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
             assetsFulfilled: 0
         });
 
-        totalSupply = _totalSupply + sharesReceived;
+        _internalSupply = _totalSupply + sharesReceived;
 
         emit DepositsFulfilled(currentEpoch - 1, assetsToFulfill, sharesReceived);
     }
@@ -686,7 +690,7 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
 
         WithdrawalEpochState memory epochState = withdrawalEpochState[currentEpoch];
 
-        uint256 _totalSupply = totalSupply;
+        uint256 _totalSupply = _internalSupply;
 
         uint256 assetsReceived = Math.mulDiv(sharesToFulfill, _totalAssets, _totalSupply);
 
@@ -710,7 +714,7 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
             sharesFulfilled: 0
         });
 
-        totalSupply = _totalSupply - sharesToFulfill;
+        _internalSupply = _totalSupply - sharesToFulfill;
 
         reservedWithdrawalAssets = _reservedWithdrawalAssets + assetsReceived;
 
@@ -752,7 +756,7 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
         uint256 shares,
         bytes memory managerInput
     ) external view returns (uint256) {
-        return Math.mulDiv(shares, totalAssets(managerInput), totalSupply);
+        return Math.mulDiv(shares, totalAssets(managerInput), _internalSupply);
     }
 
     receive() external payable {}
