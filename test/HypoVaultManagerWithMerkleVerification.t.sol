@@ -5,8 +5,8 @@ import "forge-std/console2.sol";
 import "../src/HypoVaultFactory.sol";
 import "../src/HypoVault.sol";
 import {HypoVaultManagerWithMerkleVerification} from "../src/managers/HypoVaultManagerWithMerkleVerification.sol";
-import {ERC20S} from "lib/panoptic-v1.1/test/foundry/testUtils/ERC20S.sol";
-import {Math} from "lib/panoptic-v1.1/contracts/libraries/Math.sol";
+import {ERC20S} from "lib/panoptic-v2-core/test/foundry/testUtils/ERC20S.sol";
+import {Math} from "lib/panoptic-v2-core/contracts/libraries/Math.sol";
 
 // Mock VaultAccountant for testing
 contract MockVaultAccountant {
