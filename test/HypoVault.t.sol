@@ -4510,6 +4510,362 @@ interface IERC721Receiver {
     ) external returns (bytes4);
 }
 
+/*//////////////////////////////////////////////////////////////
+                    ROUNDING DRIFT TESTS (F-01, F-02)
+//////////////////////////////////////////////////////////////*/
+
+contract RoundingDriftTest is Test {
+    VaultAccountantMock public accountant;
+    HypoVaultFactory public vaultFactory;
+    HypoVault public vault;
+    ERC20S public token;
+
+    address Manager = address(0x1234);
+    address FeeWallet = address(0x5678);
+
+    uint256 constant INITIAL_BALANCE = 1000000 ether;
+
+    function setUp() public {
+        accountant = new VaultAccountantMock();
+        token = new ERC20S("Test Token", "TEST", 18);
+
+        address implementation = address(new HypoVault());
+        vaultFactory = new HypoVaultFactory(implementation);
+
+        vault = HypoVault(
+            payable(
+                vaultFactory.createVault(
+                    address(token),
+                    Manager,
+                    IVaultAccountant(address(accountant)),
+                    100,
+                    "TEST",
+                    "Test Token",
+                    keccak256("drift-test-salt")
+                )
+            )
+        );
+        accountant.setExpectedVault(address(vault));
+
+        vm.prank(Manager);
+        vault.setFeeWallet(FeeWallet);
+    }
+
+    function _fundUser(address user, uint256 amount) internal {
+        token.mint(user, amount);
+        vm.prank(user);
+        token.approve(address(vault), type(uint256).max);
+    }
+
+    /// @notice F-01: 3 users deposit 1 wei each, partial fulfill 2/3, all execute.
+    ///         Drift = 2 wei. Without saturating sub, 2nd cancel reverts.
+    function test_F01_cancelDeposit_survives_rounding_drift() public {
+        address userA = address(0xA);
+        address userB = address(0xB);
+        address userC = address(0xC);
+
+        _fundUser(userA, 1);
+        _fundUser(userB, 1);
+        _fundUser(userC, 1);
+
+        vm.prank(userA);
+        vault.requestDeposit(1);
+        vm.prank(userB);
+        vault.requestDeposit(1);
+        vm.prank(userC);
+        vault.requestDeposit(1);
+
+        // assetsDeposited[0] = 3, fulfill 2
+        vm.startPrank(Manager);
+        accountant.setNav(3);
+        vault.fulfillDeposits(2, "");
+
+        // Execute all — each gets floor(1*2/3) = 0 fulfilled, rolls over 1
+        vault.executeDeposit(userA, 0);
+        vault.executeDeposit(userB, 0);
+        vault.executeDeposit(userC, 0);
+        vm.stopPrank();
+
+        // Verify drift: aggregate = 1, per-user sum = 3
+        (uint128 assetsDeposited, , ) = vault.depositEpochState(1);
+        assertEq(assetsDeposited, 1, "aggregate remainder should be 1");
+        assertEq(vault.queuedDeposit(userA, 1), 1);
+        assertEq(vault.queuedDeposit(userB, 1), 1);
+        assertEq(vault.queuedDeposit(userC, 1), 1);
+
+        // All 3 cancels should succeed (saturating sub clamps to 0)
+        vm.startPrank(Manager);
+        vault.cancelDeposit(userA);
+        vault.cancelDeposit(userB);
+        vault.cancelDeposit(userC); // would revert without fix
+        vm.stopPrank();
+
+        (assetsDeposited, , ) = vault.depositEpochState(1);
+        assertEq(assetsDeposited, 0, "should clamp to 0");
+    }
+
+    /// @notice F-01 boundary: single user, no drift (N-1 = 0)
+    function test_F01_single_user_no_drift() public {
+        _fundUser(Alice, 10);
+
+        vm.prank(Alice);
+        vault.requestDeposit(10);
+
+        vm.startPrank(Manager);
+        accountant.setNav(10);
+        vault.fulfillDeposits(7, "");
+        vault.executeDeposit(Alice, 0);
+        vm.stopPrank();
+
+        // remainder = 10 - floor(10*7/10) = 10 - 7 = 3
+        assertEq(vault.queuedDeposit(Alice, 1), 3);
+        (uint128 assetsDeposited, , ) = vault.depositEpochState(1);
+        assertEq(assetsDeposited, 3, "no drift with single user");
+
+        // Cancel should work exactly
+        vm.prank(Manager);
+        vault.cancelDeposit(Alice);
+
+        (assetsDeposited, , ) = vault.depositEpochState(1);
+        assertEq(assetsDeposited, 0);
+    }
+
+    /// @notice F-01: drift accumulates across multiple partial fulfillment epochs
+    function test_F01_drift_accumulates_across_epochs() public {
+        address[3] memory users = [address(0xA), address(0xB), address(0xC)];
+        for (uint i = 0; i < 3; i++) {
+            _fundUser(users[i], 100);
+        }
+
+        // Epoch 0: 3 users deposit 1 each, partial fulfill 2/3
+        for (uint i = 0; i < 3; i++) {
+            vm.prank(users[i]);
+            vault.requestDeposit(1);
+        }
+
+        vm.startPrank(Manager);
+        accountant.setNav(3);
+        vault.fulfillDeposits(2, "");
+
+        for (uint i = 0; i < 3; i++) {
+            vault.executeDeposit(users[i], 0);
+        }
+
+        // Epoch 1: each user has 1 queued from rollover. Add fresh deposits too.
+        vm.stopPrank();
+        for (uint i = 0; i < 3; i++) {
+            vm.prank(users[i]);
+            vault.requestDeposit(1);
+        }
+
+        // Now each user has 2 queued in epoch 1 (1 rollover + 1 fresh)
+        // assetsDeposited[1] = 1 (aggregate rollover) + 3 (fresh) = 4
+        // per-user sum = 6
+
+        vm.startPrank(Manager);
+        accountant.setNav(6);
+        vault.fulfillDeposits(3, "");
+
+        for (uint i = 0; i < 3; i++) {
+            vault.executeDeposit(users[i], 1);
+        }
+        vm.stopPrank();
+
+        // All cancels in epoch 2 should succeed
+        vm.startPrank(Manager);
+        for (uint i = 0; i < 3; i++) {
+            vault.cancelDeposit(users[i]);
+        }
+        vm.stopPrank();
+
+        (uint128 assetsDeposited, , ) = vault.depositEpochState(2);
+        assertEq(assetsDeposited, 0);
+    }
+
+    /// @notice F-02: withdrawal reserved assets underflow with price increase.
+    ///         3 users withdraw 1 share each, partial fulfill, price doubles, last user blocked.
+    function test_F02_reservedAssets_survives_withdrawal_drift() public {
+        // Setup: 3 users deposit and get shares
+        address userA = address(0xA);
+        address userB = address(0xB);
+        address userC = address(0xC);
+
+        uint256 depositEach = 100 ether;
+        _fundUser(userA, depositEach);
+        _fundUser(userB, depositEach);
+        _fundUser(userC, depositEach);
+
+        vm.prank(userA);
+        vault.requestDeposit(uint128(depositEach));
+        vm.prank(userB);
+        vault.requestDeposit(uint128(depositEach));
+        vm.prank(userC);
+        vault.requestDeposit(uint128(depositEach));
+
+        vm.startPrank(Manager);
+        accountant.setNav(300 ether);
+        vault.fulfillDeposits(300 ether, "");
+        vault.executeDeposit(userA, 0);
+        vault.executeDeposit(userB, 0);
+        vault.executeDeposit(userC, 0);
+        vm.stopPrank();
+
+        uint256 sharesA = vault.balanceOf(userA);
+        uint256 sharesB = vault.balanceOf(userB);
+        uint256 sharesC = vault.balanceOf(userC);
+
+        // Each user withdraws 1 share
+        vm.prank(userA);
+        vault.requestWithdrawal(1);
+        vm.prank(userB);
+        vault.requestWithdrawal(1);
+        vm.prank(userC);
+        vault.requestWithdrawal(1);
+
+        // Partial fulfill: 2 of 3 shares at price ~100 per share
+        vm.startPrank(Manager);
+        uint256 totalAssetsBefore = vault.totalSupply(); // approximate
+        accountant.setNav(300 ether);
+        vault.fulfillWithdrawals(2, 300 ether, "");
+
+        // Execute all — each gets floor(1*2/3) = 0 shares fulfilled, rolls over 1
+        vault.executeWithdrawal(userA, 0);
+        vault.executeWithdrawal(userB, 0);
+        vault.executeWithdrawal(userC, 0);
+
+        // Epoch 1: aggregate sharesWithdrawn = 1, per-user sum = 3 (drift = 2)
+        // Fulfill at doubled price
+        accountant.setNav(600 ether);
+        vault.fulfillWithdrawals(1, 600 ether, "");
+
+        // All 3 execute on epoch 1 — each claims full share (1*1/1 = 1)
+        // Last user would underflow reservedWithdrawalAssets without fix
+        vault.executeWithdrawal(userA, 1);
+        vault.executeWithdrawal(userB, 1);
+        vault.executeWithdrawal(userC, 1); // would revert without fix
+        vm.stopPrank();
+
+        // reserved should be clamped to 0
+        assertEq(vault.reservedWithdrawalAssets(), 0);
+    }
+
+    /// @notice F-02 boundary: no price change — dust buffer covers over-allocation
+    function test_F02_no_price_change_dust_covers() public {
+        address userA = address(0xA);
+        address userB = address(0xB);
+        address userC = address(0xC);
+
+        uint256 depositEach = 100 ether;
+        _fundUser(userA, depositEach);
+        _fundUser(userB, depositEach);
+        _fundUser(userC, depositEach);
+
+        vm.prank(userA);
+        vault.requestDeposit(uint128(depositEach));
+        vm.prank(userB);
+        vault.requestDeposit(uint128(depositEach));
+        vm.prank(userC);
+        vault.requestDeposit(uint128(depositEach));
+
+        vm.startPrank(Manager);
+        accountant.setNav(300 ether);
+        vault.fulfillDeposits(300 ether, "");
+        vault.executeDeposit(userA, 0);
+        vault.executeDeposit(userB, 0);
+        vault.executeDeposit(userC, 0);
+        vm.stopPrank();
+
+        vm.prank(userA);
+        vault.requestWithdrawal(1);
+        vm.prank(userB);
+        vault.requestWithdrawal(1);
+        vm.prank(userC);
+        vault.requestWithdrawal(1);
+
+        vm.startPrank(Manager);
+        accountant.setNav(300 ether);
+        vault.fulfillWithdrawals(2, 300 ether, "");
+
+        vault.executeWithdrawal(userA, 0);
+        vault.executeWithdrawal(userB, 0);
+        vault.executeWithdrawal(userC, 0);
+
+        // Same price for epoch 1
+        accountant.setNav(300 ether);
+        vault.fulfillWithdrawals(1, 300 ether, "");
+
+        vault.executeWithdrawal(userA, 1);
+        vault.executeWithdrawal(userB, 1);
+        vault.executeWithdrawal(userC, 1);
+        vm.stopPrank();
+
+        // Should succeed — dust from epoch 0 covers the slight over-allocation
+        assertLe(vault.reservedWithdrawalAssets(), 2, "at most dust remains");
+    }
+
+    /// @notice F-01 fuzz: drift bounded by N-1 for any deposit amounts and fulfillment ratio
+    function testFuzz_F01_drift_bounded(
+        uint8 numUsers,
+        uint128 depositAmount,
+        uint16 fulfillBps
+    ) public {
+        numUsers = uint8(bound(numUsers, 2, 10));
+        depositAmount = uint128(bound(depositAmount, 1, 1e30));
+        fulfillBps = uint16(bound(fulfillBps, 1, 9999));
+
+        uint256 totalDeposited = uint256(depositAmount) * numUsers;
+        uint256 assetsToFulfill = (totalDeposited * fulfillBps) / 10000;
+        if (assetsToFulfill == 0 || assetsToFulfill >= totalDeposited) return;
+
+        // Simulate the rounding math
+        uint256 aggregateRemainder = totalDeposited - assetsToFulfill;
+        uint256 perUserRemainderSum = 0;
+        for (uint256 i = 0; i < numUsers; i++) {
+            uint256 userFulfilled = Math.mulDiv(depositAmount, assetsToFulfill, totalDeposited);
+            perUserRemainderSum += depositAmount - userFulfilled;
+        }
+
+        uint256 drift = perUserRemainderSum - aggregateRemainder;
+        assertLe(drift, uint256(numUsers) - 1, "drift exceeds N-1 bound");
+    }
+
+    /// @notice Validate performanceFeeBps > 10_000 reverts on initialize
+    function test_performanceFeeTooHigh_reverts() public {
+        address implementation = address(new HypoVault());
+        HypoVaultFactory factory2 = new HypoVaultFactory(implementation);
+
+        vm.expectRevert(HypoVault.PerformanceFeeTooHigh.selector);
+        factory2.createVault(
+            address(token),
+            Manager,
+            IVaultAccountant(address(accountant)),
+            10_001,
+            "TEST",
+            "Test Token",
+            keccak256("fee-test-salt")
+        );
+    }
+
+    /// @notice Validate performanceFeeBps = 10_000 (100%) is allowed
+    function test_performanceFee_max_allowed() public {
+        address implementation = address(new HypoVault());
+        HypoVaultFactory factory2 = new HypoVaultFactory(implementation);
+
+        address v = factory2.createVault(
+            address(token),
+            Manager,
+            IVaultAccountant(address(accountant)),
+            10_000,
+            "TEST",
+            "Test Token",
+            keccak256("fee-max-salt")
+        );
+        assertEq(HypoVault(payable(v)).performanceFeeBps(), 10_000);
+    }
+
+    address constant Alice = address(0x123456);
+}
+
 // Mock token that doesn't implement decimals() properly
 contract MockTokenWithoutDecimals {
     string public name = "Bad Token";

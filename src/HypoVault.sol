@@ -158,6 +158,9 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
     /// @notice The withdrawal fulfillment exceeds the maximum amount of assets that can be received
     error WithdrawalNotFulfillable();
 
+    /// @notice The performance fee exceeds the maximum allowed (100%)
+    error PerformanceFeeTooHigh();
+
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
     //////////////////////////////////////////////////////////////*/
@@ -229,6 +232,8 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
         string memory _name
     ) external initializer {
         __Ownable_init(_manager);
+
+        if (_performanceFeeBps > 10_000) revert PerformanceFeeTooHigh();
 
         underlyingToken = _underlyingToken;
         manager = _manager;
@@ -388,7 +393,11 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
         uint256 queuedDepositAmount = queuedDeposit[depositor][currentEpoch];
         queuedDeposit[depositor][currentEpoch] = 0;
 
-        depositEpochState[currentEpoch].assetsDeposited -= uint128(queuedDepositAmount);
+        uint128 currentDeposited = depositEpochState[currentEpoch].assetsDeposited;
+        depositEpochState[currentEpoch].assetsDeposited = currentDeposited >
+            uint128(queuedDepositAmount)
+            ? currentDeposited - uint128(queuedDepositAmount)
+            : 0;
 
         SafeTransferLib.safeTransfer(underlyingToken, depositor, queuedDepositAmount);
 
@@ -480,7 +489,9 @@ contract HypoVault is ERC20Minimal, Multicall, OwnableUpgradeable, ERC721Holder,
             _withdrawalEpochState.sharesFulfilled == 0 ? 1 : _withdrawalEpochState.sharesFulfilled
         );
 
-        reservedWithdrawalAssets -= assetsToWithdraw;
+        reservedWithdrawalAssets = reservedWithdrawalAssets > assetsToWithdraw
+            ? reservedWithdrawalAssets - assetsToWithdraw
+            : 0;
 
         uint256 withdrawnBasis = (uint256(pendingWithdrawal.basis) *
             _withdrawalEpochState.sharesFulfilled) / _withdrawalEpochState.sharesWithdrawn;
