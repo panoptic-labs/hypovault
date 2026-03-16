@@ -326,9 +326,11 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         // Initialize pools in Accountant that Vault is allowed interact with
         PanopticVaultAccountant.PoolInfo[] memory poolInfos = createDefaultPools();
         vm.prank($owner);
-        bytes32 poolInfosHash = keccak256(abi.encode(poolInfos));
-        $panopticVaultAccountant.updatePoolsHash(address($wethPlpVault), poolInfosHash);
-        assertEq($panopticVaultAccountant.vaultPools(address($wethPlpVault)), poolInfosHash);
+        $panopticVaultAccountant.updateHashes(address($wethPlpVault), poolInfos, new IERC4626[](0));
+        assertEq(
+            $panopticVaultAccountant.vaultHashes(address($wethPlpVault), 0),
+            keccak256(abi.encode(poolInfos))
+        );
 
         int24 TWAP_TICK = 100;
         PanopticVaultAccountant.ManagerPrices[]
@@ -339,7 +341,12 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             token1Price: TWAP_TICK // token1 to token0 (aka underlyingToken)
         });
 
-        bytes memory managerInput = abi.encode(managerPrices, poolInfos, new TokenId[][](1));
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            poolInfos,
+            new TokenId[][](1),
+            new IERC4626[](0)
+        );
         vm.prank($TurnkeyAccount0);
         $wethPlpVaultManager.fulfillDeposits(100 ether, managerInput);
 
@@ -523,9 +530,11 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         // Initialize pools in Accountant that Vault is allowed interact with
         PanopticVaultAccountant.PoolInfo[] memory poolInfos = createDefaultPools();
         vm.prank($owner);
-        bytes32 poolInfosHash = keccak256(abi.encode(poolInfos));
-        $panopticVaultAccountant.updatePoolsHash(address($wethPlpVault), poolInfosHash);
-        assertEq($panopticVaultAccountant.vaultPools(address($wethPlpVault)), poolInfosHash);
+        $panopticVaultAccountant.updateHashes(address($wethPlpVault), poolInfos, new IERC4626[](0));
+        assertEq(
+            $panopticVaultAccountant.vaultHashes(address($wethPlpVault), 0),
+            keccak256(abi.encode(poolInfos))
+        );
 
         int24 twapTick = IPanopticPoolV2($ethUsdc500bpsV4PanopticPool).getTWAP();
         PanopticVaultAccountant.ManagerPrices[]
@@ -536,7 +545,12 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             token1Price: twapTick // token1 to token0 (aka underlyingToken)
         });
 
-        bytes memory managerInput = abi.encode(managerPrices, poolInfos, new TokenId[][](1));
+        bytes memory managerInput = abi.encode(
+            managerPrices,
+            poolInfos,
+            new TokenId[][](1),
+            new IERC4626[](0)
+        );
         vm.prank($TurnkeyAccount0);
         $wethPlpVaultManager.fulfillDeposits(100 ether, managerInput);
 
