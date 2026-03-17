@@ -10,10 +10,10 @@ import {Script} from "forge-std/Script.sol";
 
 contract DeployWETHVault is Script, DeployHypoVault {
     // Addresses from the initial deployment
-    address constant FACTORY_ADDRESS = address(0x3994a6236f6889054d7C11D6B9016C25D0bC18a2);
-    address constant ACCOUNTANT_ADDRESS = address(0x0ba79E9964148DdBd185eCD13ee03E321d7b22D9);
-    address constant DECODER_ADDRESS = address(0x5388cE7E3d81e0BEe9372c429e4276c20699a1E7);
-    address constant AUTHORITY_ADDRESS = address(0x34eC4c475A7fc3B864649007B3C9E6C392043D42);
+    address constant FACTORY_ADDRESS = address(0xA2924c8Bd74Ae84077D082aDeDA2ee78268F7acf);
+    address constant ACCOUNTANT_ADDRESS = address(0xF5fE85B6d639FA56E55A8CA5358A1D0384A0A64B);
+    address constant DECODER_ADDRESS = address(0xFb32d9323cF3cC2b01218CADa5AbbC6DE93d197b);
+    address constant AUTHORITY_ADDRESS = address(0x72E6334d230fDa6A727B619b632e1921F4780d5A);
     address constant PANOPTIC_POOL_ADDRESS = address(0x03AFf7Be6A5afB2bC6830BC54778AF674006850A);
 
     address constant COLLATERAL_TRACKER_ADDRESS =
@@ -48,6 +48,7 @@ contract DeployWETHVault is Script, DeployHypoVault {
                 collateralTracker: COLLATERAL_TRACKER_ADDRESS,
                 panopticPool: PANOPTIC_POOL_ADDRESS,
                 weth: address(sepoliaWeth),
+                canDispatch: false,
                 symbol: "povLendWETH",
                 name: "Panoptic Lend Vault | WETH",
                 salt: salt

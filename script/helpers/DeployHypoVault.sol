@@ -26,6 +26,7 @@ contract DeployHypoVault is MerkleTreeHelper {
         address collateralTracker;
         address panopticPool;
         address weth;
+        bool canDispatch;
         string symbol;
         string name;
         bytes32 salt;
@@ -107,12 +108,16 @@ contract DeployHypoVault is MerkleTreeHelper {
             deployData.collateralTrackerDecoderAndSanitizer
         );
 
-        leafs = new ManageLeaf[](16);
+        bool isNativeETH = deployData.underlyingToken == deployData.weth;
+        // USDC: up to 7 leaves (6 base + dispatch), WETH: up to 8 leaves (5 base + 2 payable + WETH wrap/unwrap + dispatch)
+        leafs = new ManageLeaf[](8);
         _addCollateralTrackerLeafs(
             leafs,
             ERC4626(deployData.collateralTracker),
             deployData.panopticPool,
-            deployData.weth
+            deployData.weth,
+            isNativeETH,
+            deployData.canDispatch
         );
         manageTree = _generateMerkleTree(leafs);
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
