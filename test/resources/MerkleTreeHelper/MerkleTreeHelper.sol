@@ -4162,7 +4162,13 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
             isPayable,
             "deposit(uint256,address)",
             new address[](1),
-            string.concat("Deposit ", assetSymbol, " for ", vault.symbol(), isPayable ? " (payable)" : ""),
+            string.concat(
+                "Deposit ",
+                assetSymbol,
+                " for ",
+                vault.symbol(),
+                isPayable ? " (payable)" : ""
+            ),
             getAddress(sourceChain, "rawDataDecoderAndSanitizer")
         );
         leafs[leafIndex].argumentAddresses[0] = getAddress(sourceChain, "boringVault");
@@ -4191,7 +4197,13 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
             false,
             "withdraw(uint256,address,address,uint256[])",
             new address[](2),
-            string.concat("Withdraw ", assetSymbol, " from ", vault.symbol(), " (with open positions)"),
+            string.concat(
+                "Withdraw ",
+                assetSymbol,
+                " from ",
+                vault.symbol(),
+                " (with open positions)"
+            ),
             getAddress(sourceChain, "rawDataDecoderAndSanitizer")
         );
         leafs[leafIndex].argumentAddresses[0] = getAddress(sourceChain, "boringVault");
@@ -4206,7 +4218,13 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
             isPayable,
             "mint(uint256,address)",
             new address[](1),
-            string.concat("Mint ", vault.symbol(), " using ", assetSymbol, isPayable ? " (payable)" : ""),
+            string.concat(
+                "Mint ",
+                vault.symbol(),
+                " using ",
+                assetSymbol,
+                isPayable ? " (payable)" : ""
+            ),
             getAddress(sourceChain, "rawDataDecoderAndSanitizer")
         );
         leafs[leafIndex].argumentAddresses[0] = getAddress(sourceChain, "boringVault");

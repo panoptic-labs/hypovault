@@ -141,7 +141,9 @@ contract DeployHypoVault is MerkleTreeHelper {
         _configureRoles(deployData, managerAddress);
 
         // 10. Update PanopticVaultAccountant hashes for vault
-        PanopticVaultAccountant.PoolInfo[] memory poolInfos = createPanopticAccountantPoolInfos(deployData.panopticPool);
+        PanopticVaultAccountant.PoolInfo[] memory poolInfos = createPanopticAccountantPoolInfos(
+            deployData.panopticPool
+        );
         _writePoolInfosToJson(vaultAddress, poolInfos, deployData.symbol);
         console.log("Generated poolInfosHash:");
         console.logBytes32(keccak256(abi.encode(poolInfos)));
@@ -185,11 +187,7 @@ contract DeployHypoVault is MerkleTreeHelper {
 
     function createPanopticAccountantPoolInfos(
         address panopticPool
-    )
-        internal
-        pure
-        returns (PanopticVaultAccountant.PoolInfo[] memory)
-    {
+    ) internal pure returns (PanopticVaultAccountant.PoolInfo[] memory) {
         int24 MAX_PRICE_DEVIATION = 100;
 
         address token0 = 0x0000000000000000000000000000000000000000; // eth
