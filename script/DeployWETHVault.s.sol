@@ -10,10 +10,10 @@ import {Script} from "forge-std/Script.sol";
 
 contract DeployWETHVault is Script, DeployHypoVault {
     // Addresses from the initial deployment
-    address constant FACTORY_ADDRESS = address(0x3994a6236f6889054d7C11D6B9016C25D0bC18a2);
-    address constant ACCOUNTANT_ADDRESS = address(0x0ba79E9964148DdBd185eCD13ee03E321d7b22D9);
-    address constant DECODER_ADDRESS = address(0x5388cE7E3d81e0BEe9372c429e4276c20699a1E7);
-    address constant AUTHORITY_ADDRESS = address(0x34eC4c475A7fc3B864649007B3C9E6C392043D42);
+    address constant FACTORY_ADDRESS = address(0x363a9d605ca45cBfF3b597350DeADb53cdC292c7);
+    address constant ACCOUNTANT_ADDRESS = address(0x25BBef1DF262c24aa1AACD1F7eCeEcc1a7AD08ab);
+    address constant DECODER_ADDRESS = address(0x38c833793ec6375e3e0232c73444a267daD2317A);
+    address constant AUTHORITY_ADDRESS = address(0x673BfafB4e2712215B422347c1571421B83E8A3d);
     address constant PANOPTIC_POOL_ADDRESS = address(0x03AFf7Be6A5afB2bC6830BC54778AF674006850A);
 
     address constant COLLATERAL_TRACKER_ADDRESS =
@@ -29,7 +29,7 @@ contract DeployWETHVault is Script, DeployHypoVault {
         vm.startBroadcast();
         address deployer = msg.sender;
 
-        console.log("=== Deploying WETH Vault ===");
+        console.log("=== Deploying WETH PLP Vault ===");
         console.log("Deployer:", deployer);
         console.log("Using Factory:", FACTORY_ADDRESS);
         console.log("Using Accountant:", ACCOUNTANT_ADDRESS);
@@ -48,8 +48,8 @@ contract DeployWETHVault is Script, DeployHypoVault {
                 collateralTracker: COLLATERAL_TRACKER_ADDRESS,
                 panopticPool: PANOPTIC_POOL_ADDRESS,
                 weth: address(sepoliaWeth),
-                symbol: "povLendWETH",
-                name: "Panoptic Lend Vault | WETH",
+                symbol: "plpWETH",
+                name: "Panoptic WETH PLP Vault",
                 salt: salt
             })
         );
