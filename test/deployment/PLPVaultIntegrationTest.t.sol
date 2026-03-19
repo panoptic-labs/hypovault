@@ -222,8 +222,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         $TurnkeyAccount0 = address(0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8);
         address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
         $sepoliaWeth = ERC20S(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
-        $ethUsdc500bpsV4Collateral0 = 0x4d2579A5F9BC32641D6AdbFC47C6dAceF30027F1; // Underlying: ETH
-        $ethUsdc500bpsV4PanopticPool = 0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E; // Underlying: ETH
+        $ethUsdc500bpsV4Collateral0 = 0x45f93888565bA53650Af5ceF6279776B0e6B8A92; // Underlying: ETH
+        $ethUsdc500bpsV4PanopticPool = 0x03AFf7Be6A5afB2bC6830BC54778AF674006850A; // Underlying: ETH
 
         /*
            STEP 1: Deployments
@@ -463,23 +463,23 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         $TurnkeyAccount0 = address(0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8);
         address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
         $sepoliaWeth = ERC20S(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
-        $ethUsdc500bpsV4Collateral0 = 0x4d2579A5F9BC32641D6AdbFC47C6dAceF30027F1; // Underlying: WETH9 | 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
-        $ethUsdc500bpsV4PanopticPool = 0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E;
+        $ethUsdc500bpsV4Collateral0 = 0x45f93888565bA53650Af5ceF6279776B0e6B8A92; // Underlying: WETH9 | 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
+        $ethUsdc500bpsV4PanopticPool = 0x03AFf7Be6A5afB2bC6830BC54778AF674006850A;
 
         // use contract suite deployed from EOA
-        $wethPlpVault = HypoVault(payable(0x225Bf020d280E98C3037fb3c5aa291De6F618834));
+        $wethPlpVault = HypoVault(payable(0xD58C4F9AEe5bBfcf28dC9a8d3D57b323fA6521b1));
         $wethPlpVaultManager = HypoVaultManagerWithMerkleVerification(
-            0xe675A002d7f8C9476Ebf3706550b80221BA2AE5E
+            0x95eC124FAAB70D7aE147c3BE0336E01a828AE2d5
         );
         $panopticVaultAccountant = PanopticVaultAccountant(
-            0x061AF4Fd2a015ed871e7EA406749cF268236C918
+            0x25BBef1DF262c24aa1AACD1F7eCeEcc1a7AD08ab
         );
-        $rolesAuthority = RolesAuthority(0x183b19b0c27f5124E077b10fa57f3B19e71958B2);
+        $rolesAuthority = RolesAuthority(0x673BfafB4e2712215B422347c1571421B83E8A3d);
 
         /////////////////////////////
         // rebuild merkle tree to show full manage flow
         ///////////////////////
-        $collateralTrackerDecoderAndSanitizer = 0x3c2D182DB402Fc649aea61731CE47Ea72Ab3a7f1;
+        $collateralTrackerDecoderAndSanitizer = 0x38c833793ec6375e3e0232c73444a267daD2317A;
         setSourceChainName(sepolia);
         setAddress(false, sepolia, "boringVault", address($wethPlpVault));
         setAddress(false, sepolia, "managerAddress", address($wethPlpVaultManager));
