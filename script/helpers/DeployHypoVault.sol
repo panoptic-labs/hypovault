@@ -107,17 +107,19 @@ contract DeployHypoVault is MerkleTreeHelper {
             deployData.collateralTrackerDecoderAndSanitizer
         );
 
-        leafs = new ManageLeaf[](16);
+        bool isPayable = deployData.underlyingToken == deployData.weth;
+        leafs = new ManageLeaf[](8);
         _addCollateralTrackerLeafs(
             leafs,
             ERC4626(deployData.collateralTracker),
             deployData.panopticPool,
-            deployData.weth
+            deployData.weth,
+            isPayable
         );
         manageTree = _generateMerkleTree(leafs);
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
         string memory filePath = string.concat(
-            "./hypoVaultManagerArtifacts/Production",
+            "./hypoVaultManagerArtifacts/",
             deployData.symbol,
             "StrategistLeaves.json"
         );
@@ -139,7 +141,9 @@ contract DeployHypoVault is MerkleTreeHelper {
         _configureRoles(deployData, managerAddress);
 
         // 10. Update PanopticVaultAccountant hashes for vault
-        PanopticVaultAccountant.PoolInfo[] memory poolInfos = createPanopticAccountantPoolInfos();
+        PanopticVaultAccountant.PoolInfo[] memory poolInfos = createPanopticAccountantPoolInfos(
+            deployData.panopticPool
+        );
         _writePoolInfosToJson(vaultAddress, poolInfos, deployData.symbol);
         console.log("Generated poolInfosHash:");
         console.logBytes32(keccak256(abi.encode(poolInfos)));
@@ -181,20 +185,17 @@ contract DeployHypoVault is MerkleTreeHelper {
         console.log("STRATEGIST_ROLE capabilities set");
     }
 
-    function createPanopticAccountantPoolInfos()
-        internal
-        pure
-        returns (PanopticVaultAccountant.PoolInfo[] memory)
-    {
+    function createPanopticAccountantPoolInfos(
+        address panopticPool
+    ) internal pure returns (PanopticVaultAccountant.PoolInfo[] memory) {
         int24 MAX_PRICE_DEVIATION = 100;
 
         address token0 = 0x0000000000000000000000000000000000000000; // eth
         address token1 = 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A; // sepolia mock USDC
-        address ethUsdc500bpsV4PanopticPool = 0x5D44F6574B8dE88ffa2CCAEba0B07aD3C204571E;
 
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: IPanopticPoolV2(ethUsdc500bpsV4PanopticPool),
+            pool: IPanopticPoolV2(panopticPool),
             token0: IERC20Partial(token0),
             token1: IERC20Partial(token1),
             maxPriceDeviation: MAX_PRICE_DEVIATION
@@ -208,7 +209,7 @@ contract DeployHypoVault is MerkleTreeHelper {
         string memory symbol
     ) private {
         string memory filePath = string.concat(
-            "./hypoVaultManagerArtifacts/Production",
+            "./hypoVaultManagerArtifacts/",
             symbol,
             "VaultPoolInfos.json"
         );

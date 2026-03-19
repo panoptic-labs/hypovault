@@ -4130,50 +4130,45 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
         ManageLeaf[] memory leafs,
         ERC4626 vault,
         address panopticPool,
-        address weth
+        address weth,
+        bool isPayable
     ) internal {
         ERC20 asset = vault.asset();
         // Get asset symbol, handle native ETH (address(0))
         string memory assetSymbol = address(asset) == address(0) ? "ETH" : asset.symbol();
 
-        // Approvals
-        unchecked {
-            leafIndex++;
+        // Approvals (only for ERC20 vaults, not native ETH)
+        if (!isPayable) {
+            unchecked {
+                leafIndex++;
+            }
+            leafs[leafIndex] = ManageLeaf(
+                address(asset),
+                false,
+                "approve(address,uint256)",
+                new address[](1),
+                string.concat("Approve ", vault.symbol(), " to spend ", assetSymbol),
+                getAddress(sourceChain, "rawDataDecoderAndSanitizer")
+            );
+            leafs[leafIndex].argumentAddresses[0] = address(vault);
         }
-        leafs[leafIndex] = ManageLeaf(
-            address(asset),
-            false,
-            "approve(address,uint256)",
-            new address[](1),
-            string.concat("Approve ", vault.symbol(), " to spend ", assetSymbol),
-            getAddress(sourceChain, "rawDataDecoderAndSanitizer")
-        );
-        leafs[leafIndex].argumentAddresses[0] = address(vault);
 
-        // Depositing (non-payable for ERC20 vaults)
+        // Depositing
         unchecked {
             leafIndex++;
         }
         leafs[leafIndex] = ManageLeaf(
             address(vault),
-            false,
+            isPayable,
             "deposit(uint256,address)",
             new address[](1),
-            string.concat("Deposit ", assetSymbol, " for ", vault.symbol()),
-            getAddress(sourceChain, "rawDataDecoderAndSanitizer")
-        );
-        leafs[leafIndex].argumentAddresses[0] = getAddress(sourceChain, "boringVault");
-
-        // Depositing (payable for native ETH vaults)
-        unchecked {
-            leafIndex++;
-        }
-        leafs[leafIndex] = ManageLeaf(
-            address(vault),
-            true,
-            "deposit(uint256,address)",
-            new address[](1),
-            string.concat("Deposit ", assetSymbol, " for ", vault.symbol(), " (payable)"),
+            string.concat(
+                "Deposit ",
+                assetSymbol,
+                " for ",
+                vault.symbol(),
+                isPayable ? " (payable)" : ""
+            ),
             getAddress(sourceChain, "rawDataDecoderAndSanitizer")
         );
         leafs[leafIndex].argumentAddresses[0] = getAddress(sourceChain, "boringVault");
@@ -4202,36 +4197,34 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
             false,
             "withdraw(uint256,address,address,uint256[])",
             new address[](2),
-            string.concat("Withdraw ", assetSymbol, " from ", vault.symbol()),
+            string.concat(
+                "Withdraw ",
+                assetSymbol,
+                " from ",
+                vault.symbol(),
+                " (with open positions)"
+            ),
             getAddress(sourceChain, "rawDataDecoderAndSanitizer")
         );
         leafs[leafIndex].argumentAddresses[0] = getAddress(sourceChain, "boringVault");
         leafs[leafIndex].argumentAddresses[1] = getAddress(sourceChain, "boringVault");
 
-        // Minting (non-payable for ERC20 vaults)
+        // Minting
         unchecked {
             leafIndex++;
         }
         leafs[leafIndex] = ManageLeaf(
             address(vault),
-            false,
+            isPayable,
             "mint(uint256,address)",
             new address[](1),
-            string.concat("Mint ", vault.symbol(), " using ", assetSymbol),
-            getAddress(sourceChain, "rawDataDecoderAndSanitizer")
-        );
-        leafs[leafIndex].argumentAddresses[0] = getAddress(sourceChain, "boringVault");
-
-        // Minting (payable for native ETH vaults)
-        unchecked {
-            leafIndex++;
-        }
-        leafs[leafIndex] = ManageLeaf(
-            address(vault),
-            true,
-            "mint(uint256,address)",
-            new address[](1),
-            string.concat("Mint ", vault.symbol(), " using ", assetSymbol, " (payable)"),
+            string.concat(
+                "Mint ",
+                vault.symbol(),
+                " using ",
+                assetSymbol,
+                isPayable ? " (payable)" : ""
+            ),
             getAddress(sourceChain, "rawDataDecoderAndSanitizer")
         );
         leafs[leafIndex].argumentAddresses[0] = getAddress(sourceChain, "boringVault");
@@ -4251,6 +4244,7 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
         leafs[leafIndex].argumentAddresses[0] = getAddress(sourceChain, "boringVault");
         leafs[leafIndex].argumentAddresses[1] = getAddress(sourceChain, "boringVault");
 
+        // Dispatch
         unchecked {
             leafIndex++;
         }
@@ -4263,31 +4257,33 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
             getAddress(sourceChain, "rawDataDecoderAndSanitizer")
         );
 
-        // WETH.deposit() - wrap ETH to WETH
-        unchecked {
-            leafIndex++;
-        }
-        leafs[leafIndex] = ManageLeaf(
-            weth,
-            true, // canSendValue = true (payable)
-            "deposit()",
-            new address[](0),
-            "Wrap ETH to WETH",
-            getAddress(sourceChain, "rawDataDecoderAndSanitizer")
-        );
+        if (isPayable) {
+            // WETH.deposit() - wrap ETH to WETH
+            unchecked {
+                leafIndex++;
+            }
+            leafs[leafIndex] = ManageLeaf(
+                weth,
+                true,
+                "deposit()",
+                new address[](0),
+                "Wrap ETH to WETH",
+                getAddress(sourceChain, "rawDataDecoderAndSanitizer")
+            );
 
-        // WETH.withdraw(uint256) - unwrap WETH to ETH
-        unchecked {
-            leafIndex++;
+            // WETH.withdraw(uint256) - unwrap WETH to ETH
+            unchecked {
+                leafIndex++;
+            }
+            leafs[leafIndex] = ManageLeaf(
+                weth,
+                false,
+                "withdraw(uint256)",
+                new address[](0),
+                "Unwrap WETH to ETH",
+                getAddress(sourceChain, "rawDataDecoderAndSanitizer")
+            );
         }
-        leafs[leafIndex] = ManageLeaf(
-            weth,
-            false,
-            "withdraw(uint256)",
-            new address[](0),
-            "Unwrap WETH to ETH",
-            getAddress(sourceChain, "rawDataDecoderAndSanitizer")
-        );
     }
 
     // ========================================= Vault Craft =========================================

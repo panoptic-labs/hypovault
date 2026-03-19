@@ -16,5 +16,8 @@
       "name": "v1.1.x",
       "rev": "1b8cb9fc51ad0befd23edcd1a0c9bc5f59cccf41"
     }
+  },
+  "lib/panoptic-v2-core": {
+    "rev": "ddc742d4e190a55a75dee34b43b2a26151bc01de"
   }
 }
