@@ -4195,7 +4195,7 @@ contract MerkleTreeHelper is CommonBase, ChainValues {
         leafs[leafIndex] = ManageLeaf(
             address(vault),
             false,
-            "withdraw(uint256,address,address,uint256[])",
+            "withdraw(uint256,address,address,uint256[],bool)",
             new address[](2),
             string.concat(
                 "Withdraw ",

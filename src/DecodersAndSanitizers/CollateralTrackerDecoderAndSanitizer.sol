@@ -36,7 +36,8 @@ contract CollateralTrackerDecoderAndSanitizer is BaseDecoderAndSanitizer {
         uint256,
         address receiver,
         address owner,
-        uint256[] calldata positionIdList
+        uint256[] calldata positionIdList,
+        bool
     ) external pure virtual returns (bytes memory addressesFound) {
         addressesFound = abi.encodePacked(receiver, owner);
     }
