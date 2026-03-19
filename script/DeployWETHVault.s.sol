@@ -12,7 +12,7 @@ contract DeployWETHVault is Script, DeployHypoVault {
     // Addresses from the initial deployment
     address constant FACTORY_ADDRESS = address(0x363a9d605ca45cBfF3b597350DeADb53cdC292c7);
     address constant ACCOUNTANT_ADDRESS = address(0x25BBef1DF262c24aa1AACD1F7eCeEcc1a7AD08ab);
-    address constant DECODER_ADDRESS = address(0x38c833793ec6375e3e0232c73444a267daD2317A);
+    address constant DECODER_ADDRESS = address(0xb899BE50BAF25BBB3A3ca3403256B3c703E5AB5d);
     address constant AUTHORITY_ADDRESS = address(0x673BfafB4e2712215B422347c1571421B83E8A3d);
     address constant PANOPTIC_POOL_ADDRESS = address(0x03AFf7Be6A5afB2bC6830BC54778AF674006850A);
 
