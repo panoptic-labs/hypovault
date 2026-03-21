@@ -26,15 +26,17 @@ contract DeployHypoVault is MerkleTreeHelper {
         address collateralTracker;
         address panopticPool;
         address weth;
+        address token0;
+        address token1;
+        string chainName;
         string symbol;
         string name;
         bytes32 salt;
     }
 
-    // Real Panoptic multisig
-    // ISafe PanopticMultisig = ISafe(0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1);
     // @dev - test Safe on sepolia. NOT the real multisig.
-    address PanopticMultisig = address(0x9C44C2B07380DA62a5ea572b886048410b0c44fd);
+    // Real Panoptic multisig: 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1
+    address constant PanopticMultisig = 0x9C44C2B07380DA62a5ea572b886048410b0c44fd;
 
     // Deployment addresses
     address BalancerVaultAddr = address(0x7777); // Required by ManagerWithMerkleVerification
@@ -96,13 +98,13 @@ contract DeployHypoVault is MerkleTreeHelper {
         );
 
         // 5. Build merkle tree for manage operations
-        setSourceChainName(sepolia);
-        setAddress(true, sepolia, "boringVault", vaultAddress);
-        setAddress(true, sepolia, "managerAddress", managerAddress);
-        setAddress(true, sepolia, "accountantAddress", deployData.accountantAddress);
+        setSourceChainName(deployData.chainName);
+        setAddress(true, deployData.chainName, "boringVault", vaultAddress);
+        setAddress(true, deployData.chainName, "managerAddress", managerAddress);
+        setAddress(true, deployData.chainName, "accountantAddress", deployData.accountantAddress);
         setAddress(
             true,
-            sepolia,
+            deployData.chainName,
             "rawDataDecoderAndSanitizer",
             deployData.collateralTrackerDecoderAndSanitizer
         );
@@ -120,6 +122,8 @@ contract DeployHypoVault is MerkleTreeHelper {
         bytes32 manageRoot = manageTree[manageTree.length - 1][0];
         string memory filePath = string.concat(
             "./hypoVaultManagerArtifacts/",
+            deployData.chainName,
+            "/",
             deployData.symbol,
             "StrategistLeaves.json"
         );
@@ -142,9 +146,11 @@ contract DeployHypoVault is MerkleTreeHelper {
 
         // 10. Update PanopticVaultAccountant hashes for vault
         PanopticVaultAccountant.PoolInfo[] memory poolInfos = createPanopticAccountantPoolInfos(
-            deployData.panopticPool
+            deployData.panopticPool,
+            deployData.token0,
+            deployData.token1
         );
-        _writePoolInfosToJson(vaultAddress, poolInfos, deployData.symbol);
+        _writePoolInfosToJson(vaultAddress, poolInfos, deployData.symbol, deployData.chainName);
         console.log("Generated poolInfosHash:");
         console.logBytes32(keccak256(abi.encode(poolInfos)));
 
@@ -186,12 +192,11 @@ contract DeployHypoVault is MerkleTreeHelper {
     }
 
     function createPanopticAccountantPoolInfos(
-        address panopticPool
+        address panopticPool,
+        address token0,
+        address token1
     ) internal pure returns (PanopticVaultAccountant.PoolInfo[] memory) {
         int24 MAX_PRICE_DEVIATION = 100;
-
-        address token0 = 0x0000000000000000000000000000000000000000; // eth
-        address token1 = 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A; // sepolia mock USDC
 
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
@@ -206,10 +211,13 @@ contract DeployHypoVault is MerkleTreeHelper {
     function _writePoolInfosToJson(
         address vault,
         PanopticVaultAccountant.PoolInfo[] memory poolInfos,
-        string memory symbol
+        string memory symbol,
+        string memory chainName
     ) private {
         string memory filePath = string.concat(
             "./hypoVaultManagerArtifacts/",
+            chainName,
+            "/",
             symbol,
             "VaultPoolInfos.json"
         );

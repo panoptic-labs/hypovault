@@ -256,6 +256,9 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
                 collateralTracker: $ethUsdc500bpsV4Collateral0,
                 panopticPool: $ethUsdc500bpsV4PanopticPool,
                 weth: address($sepoliaWeth),
+                token0: address(0),
+                token1: 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A,
+                chainName: "sepolia",
                 symbol: "plpWETH",
                 name: "Panoptic PLP Vault | WETH",
                 salt: salt
