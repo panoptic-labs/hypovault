@@ -171,6 +171,11 @@ contract PanopticVaultAccountant is Ownable {
             int256 poolExposure1;
 
             // get exposure from options/tokenIds
+            int24 twapTick = pools[i].pool.getTWAP();
+
+            if (Math.abs(managerPrices[i].poolPrice - twapTick) > pools[i].maxPriceDeviation)
+                revert StaleOraclePrice();
+
             {
                 PositionBalance[] memory positionBalanceArray;
                 {
@@ -188,6 +193,10 @@ contract PanopticVaultAccountant is Ownable {
                         int256(uint256(shortPremium.leftSlot())) -
                         int256(uint256(longPremium.leftSlot()));
                 }
+                int24 poolPrice = pools[i].pool.getCurrentTick();
+
+                if (Math.abs(poolPrice - twapTick) > pools[i].maxPriceDeviation)
+                    revert StaleOraclePrice();
 
                 uint256 numLegs;
                 for (uint256 j = 0; j < tokenIds[i].length; j++) {
@@ -195,7 +204,7 @@ contract PanopticVaultAccountant is Ownable {
                     if (positionSize == 0) revert IncorrectPositionList();
                     TokenId _tokenId = tokenIds[i][j];
                     uint256 positionLegs = _tokenId.countLegs();
-                    int24 poolPrice = pools[i].pool.getCurrentTick();
+
                     for (uint256 k = 0; k < positionLegs; k++) {
                         // skip if leg is a credit/loan
                         if (_tokenId.width(k) != 0) {
@@ -286,10 +295,6 @@ contract PanopticVaultAccountant is Ownable {
                     );
                 }
             }
-
-            int24 twapTick = pools[i].pool.getTWAP();
-            if (Math.abs(managerPrices[i].poolPrice - twapTick) > pools[i].maxPriceDeviation)
-                revert StaleOraclePrice();
 
             // convert position & token values to underlying using pool's TWAP
             // If the pool token is not the underlying, it needs to be converted to the underlying.

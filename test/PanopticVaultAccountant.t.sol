@@ -114,11 +114,14 @@ contract MockPanopticPool {
     mapping(address => mapping(uint256 => bool)) public positionExists;
     mapping(address => uint256) public totalPositions;
     int24 public twapTick;
+    int24 public currentTick;
+    bool public useCurrentTick;
 
     constructor() {
         collateralToken0 = new MockCollateralToken();
         collateralToken1 = new MockCollateralToken();
         twapTick = 100;
+        currentTick = 100;
     }
 
     function numberOfLegs(address vault) external view returns (uint256) {
@@ -134,11 +137,16 @@ contract MockPanopticPool {
     }
 
     function getCurrentTick() external view returns (int24) {
-        return twapTick;
+        return useCurrentTick ? currentTick : twapTick;
     }
 
     function setTwapTick(int24 _twapTick) external {
         twapTick = _twapTick;
+    }
+
+    function setCurrentTick(int24 _currentTick) external {
+        currentTick = _currentTick;
+        useCurrentTick = true;
     }
 
     function getAccumulatedFeesAndPositionsData(
@@ -447,6 +455,48 @@ contract PanopticVaultAccountantTest is Test {
         );
 
         vm.expectRevert(PanopticVaultAccountant.StaleOraclePrice.selector);
+        accountant.computeNAV(vault, address(underlyingToken), managerInput);
+    }
+
+    function test_computeNAV_staleOraclePrice_poolPriceVsTwap_reverts() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
+
+        // TWAP is 100, set currentTick far from TWAP to trigger the new check
+        mockPool.setCurrentTick(TWAP_TICK + MAX_PRICE_DEVIATION + 1);
+
+        bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
+
+        vm.expectRevert(PanopticVaultAccountant.StaleOraclePrice.selector);
+        accountant.computeNAV(vault, address(underlyingToken), managerInput);
+    }
+
+    function test_computeNAV_staleOraclePrice_poolPriceVsTwap_negative_reverts() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
+
+        // currentTick far below TWAP
+        mockPool.setCurrentTick(TWAP_TICK - MAX_PRICE_DEVIATION - 1);
+
+        bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
+
+        vm.expectRevert(PanopticVaultAccountant.StaleOraclePrice.selector);
+        accountant.computeNAV(vault, address(underlyingToken), managerInput);
+    }
+
+    function test_computeNAV_poolPriceVsTwap_atBoundary_succeeds() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
+
+        // currentTick exactly at max deviation boundary — should NOT revert
+        mockPool.setCurrentTick(TWAP_TICK + MAX_PRICE_DEVIATION);
+
+        // Need some underlying balance so NAV computation completes
+        underlyingToken.setBalance(vault, 1 ether);
+
+        bytes memory managerInput = createManagerInput(pools, new TokenId[][](1));
+
+        // Should succeed (no revert)
         accountant.computeNAV(vault, address(underlyingToken), managerInput);
     }
 
