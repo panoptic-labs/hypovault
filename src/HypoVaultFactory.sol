@@ -64,7 +64,8 @@ contract HypoVaultFactory {
         string memory name,
         bytes32 salt
     ) external returns (address payable vault) {
-        vault = payable(Clones.cloneDeterministic(hypoVaultReference, salt));
+        bytes32 effectiveSalt = keccak256(abi.encode(msg.sender, salt));
+        vault = payable(Clones.cloneDeterministic(hypoVaultReference, effectiveSalt));
 
         HypoVault(vault).initialize(
             underlyingToken,
