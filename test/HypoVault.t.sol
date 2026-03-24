@@ -227,6 +227,78 @@ contract HypoVaultTest is Test, MerkleTreeHelper {
         );
     }
 
+    function test_sameSaltDifferentSenders_createsDifferentVaults() public {
+        bytes32 salt = keccak256("shared-salt");
+
+        vm.prank(Alice);
+        address vault1 = vaultFactory.createVault(
+            address(token),
+            Manager,
+            IVaultAccountant(address(accountant)),
+            100,
+            "V1",
+            "Vault1",
+            salt
+        );
+
+        vm.prank(Bob);
+        address vault2 = vaultFactory.createVault(
+            address(token),
+            Manager,
+            IVaultAccountant(address(accountant)),
+            100,
+            "V2",
+            "Vault2",
+            salt
+        );
+
+        assertTrue(
+            vault1 != vault2,
+            "Same salt from different senders should produce different vaults"
+        );
+    }
+
+    function test_frontRunning_doesNotBlockVictim() public {
+        bytes32 salt = keccak256("victim-salt");
+
+        // Attacker front-runs with the same salt
+        address attacker = address(0xBad);
+        vm.prank(attacker);
+        address attackerVault = vaultFactory.createVault(
+            address(token),
+            attacker, // attacker-controlled manager
+            IVaultAccountant(address(accountant)),
+            100,
+            "ATK",
+            "AttackerVault",
+            salt
+        );
+
+        // Victim's tx still succeeds with the same salt
+        vm.prank(Alice);
+        address victimVault = vaultFactory.createVault(
+            address(token),
+            Manager,
+            IVaultAccountant(address(accountant)),
+            100,
+            "VIC",
+            "VictimVault",
+            salt
+        );
+
+        assertTrue(victimVault != attackerVault, "Victim vault should be at a different address");
+        assertEq(
+            HypoVault(payable(victimVault)).manager(),
+            Manager,
+            "Victim vault should have correct manager"
+        );
+        assertEq(
+            HypoVault(payable(attackerVault)).manager(),
+            attacker,
+            "Attacker vault should have attacker as manager"
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                         SINGLE USER DEPOSITS
     //////////////////////////////////////////////////////////////*/
