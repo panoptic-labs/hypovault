@@ -1,23 +1,140 @@
-{ "metadata": 
-{"AccountantAddress":"0x2840BA44130258Cb40E09C457d5db487aAA03409","BoringVaultAddress":"0x747458449805Df428d4335d16c72483baF3eDc42","DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","DigestComposition":["Bytes20(DECODER_AND_SANITIZER_ADDRESS)","Bytes20(TARGET_ADDRESS)","Bytes1(CAN_SEND_VALUE)","Bytes4(TARGET_FUNCTION_SELECTOR)","Bytes{N*20}(ADDRESS_ARGUMENT_0,...,ADDRESS_ARGUMENT_N)"],"LeafCount":7,"ManageRoot":"0xc968940b3f5c9bfa08bad7bdb2d3a40bd7fc06e8408d677d61af136f621a49c0","ManagerAddress":"0x3401ffE183de97F6b6f41bfe50f92aF1a1c31969","TreeCapacity":8}
-,
-"leafs": [
-{"AddressArguments":["0x9ba1082Ab3cb9edEA988697A14BBe543A3dABEd2"],"CanSendValue":false,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Approve poUSDC to spend USDC","FunctionSelector":"0x095ea7b3","FunctionSignature":"approve(address,uint256)","LeafDigest":"0x64cd7e13d71c82ecd63b1f50c1c8c6672285398fef77173d7fad1e0fabda107b","PackedArgumentAddresses":"0x9ba1082ab3cb9edea988697a14bbe543a3dabed2","TargetAddress":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"}
-,
-{"AddressArguments":["0x747458449805Df428d4335d16c72483baF3eDc42"],"CanSendValue":false,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Deposit USDC for poUSDC","FunctionSelector":"0x6e553f65","FunctionSignature":"deposit(uint256,address)","LeafDigest":"0xf874fe2c997ae850baacf5d136957f59cb1edf1bd58a7a23f1e65b0a978472d5","PackedArgumentAddresses":"0x747458449805df428d4335d16c72483baf3edc42","TargetAddress":"0x9ba1082Ab3cb9edEA988697A14BBe543A3dABEd2"}
-,
-{"AddressArguments":["0x747458449805Df428d4335d16c72483baF3eDc42","0x747458449805Df428d4335d16c72483baF3eDc42"],"CanSendValue":false,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Withdraw USDC from poUSDC","FunctionSelector":"0xb460af94","FunctionSignature":"withdraw(uint256,address,address)","LeafDigest":"0x936c3061da2146e3315acb212a31d8f39e4afa7c35162ae11b10ffda44b2f047","PackedArgumentAddresses":"0x747458449805df428d4335d16c72483baf3edc42747458449805df428d4335d16c72483baf3edc42","TargetAddress":"0x9ba1082Ab3cb9edEA988697A14BBe543A3dABEd2"}
-,
-{"AddressArguments":["0x747458449805Df428d4335d16c72483baF3eDc42","0x747458449805Df428d4335d16c72483baF3eDc42"],"CanSendValue":false,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Withdraw USDC from poUSDC (with open positions)","FunctionSelector":"0xe51161ba","FunctionSignature":"withdraw(uint256,address,address,uint256[],bool)","LeafDigest":"0x36940ed31aa62df03cb6d368f6a0494a5c688452bc0cbafa16f5eeb93a510172","PackedArgumentAddresses":"0x747458449805df428d4335d16c72483baf3edc42747458449805df428d4335d16c72483baf3edc42","TargetAddress":"0x9ba1082Ab3cb9edEA988697A14BBe543A3dABEd2"}
-,
-{"AddressArguments":["0x747458449805Df428d4335d16c72483baF3eDc42"],"CanSendValue":false,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Mint poUSDC using USDC","FunctionSelector":"0x94bf804d","FunctionSignature":"mint(uint256,address)","LeafDigest":"0x5a2659271f8c58a2c96a47238a629f14f59bdd44586008909d039a5ee1e9079e","PackedArgumentAddresses":"0x747458449805df428d4335d16c72483baf3edc42","TargetAddress":"0x9ba1082Ab3cb9edEA988697A14BBe543A3dABEd2"}
-,
-{"AddressArguments":["0x747458449805Df428d4335d16c72483baF3eDc42","0x747458449805Df428d4335d16c72483baF3eDc42"],"CanSendValue":false,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Redeem poUSDC for USDC","FunctionSelector":"0xba087652","FunctionSignature":"redeem(uint256,address,address)","LeafDigest":"0xad9f26ae653bbe3c49b3d8db805922697b2d2e4f251a710747d6e3f7a920344a","PackedArgumentAddresses":"0x747458449805df428d4335d16c72483baf3edc42747458449805df428d4335d16c72483baf3edc42","TargetAddress":"0x9ba1082Ab3cb9edEA988697A14BBe543A3dABEd2"}
-,
-{"AddressArguments":[],"CanSendValue":false,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Dispatch mint/burn options on PanopticPool","FunctionSelector":"0xc25813aa","FunctionSignature":"dispatch(uint256[],uint256[],uint128[],int24[3][],bool,uint256)","LeafDigest":"0x456dbbff2192ba94a86fbc70d7519138f8ba3ff5b74420582dc31b8134de38a0","PackedArgumentAddresses":"0x","TargetAddress":"0xB50e8bb68f5855DA742f4579274902a20454174a"}
-,
-{"AddressArguments":[],"CanSendValue":false,"DecoderAndSanitizerAddress":"0x0000000000000000000000000000000000000000","Description":"","FunctionSelector":"0xc5d24601","FunctionSignature":"","LeafDigest":"0xa7a0fd846665d92e66be6155c6221b3acd7145ca7c4e4b67a594e4c516969400","PackedArgumentAddresses":"0x","TargetAddress":"0x0000000000000000000000000000000000000000"}
-],
-"MerkleTree": 
-{"0":["0xc968940b3f5c9bfa08bad7bdb2d3a40bd7fc06e8408d677d61af136f621a49c0"],"1":["0xff5a59b2c2430e7aa9d18351957fda22abae74fedeeab99627f168e6953b1098","0xa74ca92d709c0a0f305d1cbfcca733991f5bc9336083dc566a5e298ebd9cff4d"],"2":["0x9b6361df8cebfd39a6f95f0c244d1948813829f6dd037d8897ca4ef2b8dec1e1","0xff68fd7024d4cc1c707efbd5abe7fffd54769dd811193c1ee0b5330e9411ded9","0xc31348d45d57d4fe0e0a788b22beabaf6a789f6e22d25b6f37da7829c2cb5732","0x0c69df9caff1640c10c1d9d3cda30132fb47a6c8aadd3f6f89ff0281f263c40b"],"3":["0x64cd7e13d71c82ecd63b1f50c1c8c6672285398fef77173d7fad1e0fabda107b","0xf874fe2c997ae850baacf5d136957f59cb1edf1bd58a7a23f1e65b0a978472d5","0x936c3061da2146e3315acb212a31d8f39e4afa7c35162ae11b10ffda44b2f047","0x36940ed31aa62df03cb6d368f6a0494a5c688452bc0cbafa16f5eeb93a510172","0x5a2659271f8c58a2c96a47238a629f14f59bdd44586008909d039a5ee1e9079e","0xad9f26ae653bbe3c49b3d8db805922697b2d2e4f251a710747d6e3f7a920344a","0x456dbbff2192ba94a86fbc70d7519138f8ba3ff5b74420582dc31b8134de38a0","0xa7a0fd846665d92e66be6155c6221b3acd7145ca7c4e4b67a594e4c516969400"]}
+{
+  "metadata": {
+    "AccountantAddress": "0x2840BA44130258Cb40E09C457d5db487aAA03409",
+    "BoringVaultAddress": "0x747458449805Df428d4335d16c72483baF3eDc42",
+    "DecoderAndSanitizerAddress": "0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8",
+    "DigestComposition": [
+      "Bytes20(DECODER_AND_SANITIZER_ADDRESS)",
+      "Bytes20(TARGET_ADDRESS)",
+      "Bytes1(CAN_SEND_VALUE)",
+      "Bytes4(TARGET_FUNCTION_SELECTOR)",
+      "Bytes{N*20}(ADDRESS_ARGUMENT_0,...,ADDRESS_ARGUMENT_N)"
+    ],
+    "LeafCount": 7,
+    "ManageRoot": "0xc968940b3f5c9bfa08bad7bdb2d3a40bd7fc06e8408d677d61af136f621a49c0",
+    "ManagerAddress": "0x3401ffE183de97F6b6f41bfe50f92aF1a1c31969",
+    "TreeCapacity": 8
+  },
+  "leafs": [
+    {
+      "AddressArguments": ["0x9ba1082Ab3cb9edEA988697A14BBe543A3dABEd2"],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8",
+      "Description": "Approve poUSDC to spend USDC",
+      "FunctionSelector": "0x095ea7b3",
+      "FunctionSignature": "approve(address,uint256)",
+      "LeafDigest": "0x64cd7e13d71c82ecd63b1f50c1c8c6672285398fef77173d7fad1e0fabda107b",
+      "PackedArgumentAddresses": "0x9ba1082ab3cb9edea988697a14bbe543a3dabed2",
+      "TargetAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+    },
+    {
+      "AddressArguments": ["0x747458449805Df428d4335d16c72483baF3eDc42"],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8",
+      "Description": "Deposit USDC for poUSDC",
+      "FunctionSelector": "0x6e553f65",
+      "FunctionSignature": "deposit(uint256,address)",
+      "LeafDigest": "0xf874fe2c997ae850baacf5d136957f59cb1edf1bd58a7a23f1e65b0a978472d5",
+      "PackedArgumentAddresses": "0x747458449805df428d4335d16c72483baf3edc42",
+      "TargetAddress": "0x9ba1082Ab3cb9edEA988697A14BBe543A3dABEd2"
+    },
+    {
+      "AddressArguments": [
+        "0x747458449805Df428d4335d16c72483baF3eDc42",
+        "0x747458449805Df428d4335d16c72483baF3eDc42"
+      ],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8",
+      "Description": "Withdraw USDC from poUSDC",
+      "FunctionSelector": "0xb460af94",
+      "FunctionSignature": "withdraw(uint256,address,address)",
+      "LeafDigest": "0x936c3061da2146e3315acb212a31d8f39e4afa7c35162ae11b10ffda44b2f047",
+      "PackedArgumentAddresses": "0x747458449805df428d4335d16c72483baf3edc42747458449805df428d4335d16c72483baf3edc42",
+      "TargetAddress": "0x9ba1082Ab3cb9edEA988697A14BBe543A3dABEd2"
+    },
+    {
+      "AddressArguments": [
+        "0x747458449805Df428d4335d16c72483baF3eDc42",
+        "0x747458449805Df428d4335d16c72483baF3eDc42"
+      ],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8",
+      "Description": "Withdraw USDC from poUSDC (with open positions)",
+      "FunctionSelector": "0xe51161ba",
+      "FunctionSignature": "withdraw(uint256,address,address,uint256[],bool)",
+      "LeafDigest": "0x36940ed31aa62df03cb6d368f6a0494a5c688452bc0cbafa16f5eeb93a510172",
+      "PackedArgumentAddresses": "0x747458449805df428d4335d16c72483baf3edc42747458449805df428d4335d16c72483baf3edc42",
+      "TargetAddress": "0x9ba1082Ab3cb9edEA988697A14BBe543A3dABEd2"
+    },
+    {
+      "AddressArguments": ["0x747458449805Df428d4335d16c72483baF3eDc42"],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8",
+      "Description": "Mint poUSDC using USDC",
+      "FunctionSelector": "0x94bf804d",
+      "FunctionSignature": "mint(uint256,address)",
+      "LeafDigest": "0x5a2659271f8c58a2c96a47238a629f14f59bdd44586008909d039a5ee1e9079e",
+      "PackedArgumentAddresses": "0x747458449805df428d4335d16c72483baf3edc42",
+      "TargetAddress": "0x9ba1082Ab3cb9edEA988697A14BBe543A3dABEd2"
+    },
+    {
+      "AddressArguments": [
+        "0x747458449805Df428d4335d16c72483baF3eDc42",
+        "0x747458449805Df428d4335d16c72483baF3eDc42"
+      ],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8",
+      "Description": "Redeem poUSDC for USDC",
+      "FunctionSelector": "0xba087652",
+      "FunctionSignature": "redeem(uint256,address,address)",
+      "LeafDigest": "0xad9f26ae653bbe3c49b3d8db805922697b2d2e4f251a710747d6e3f7a920344a",
+      "PackedArgumentAddresses": "0x747458449805df428d4335d16c72483baf3edc42747458449805df428d4335d16c72483baf3edc42",
+      "TargetAddress": "0x9ba1082Ab3cb9edEA988697A14BBe543A3dABEd2"
+    },
+    {
+      "AddressArguments": [],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8",
+      "Description": "Dispatch mint/burn options on PanopticPool",
+      "FunctionSelector": "0xc25813aa",
+      "FunctionSignature": "dispatch(uint256[],uint256[],uint128[],int24[3][],bool,uint256)",
+      "LeafDigest": "0x456dbbff2192ba94a86fbc70d7519138f8ba3ff5b74420582dc31b8134de38a0",
+      "PackedArgumentAddresses": "0x",
+      "TargetAddress": "0xB50e8bb68f5855DA742f4579274902a20454174a"
+    },
+    {
+      "AddressArguments": [],
+      "CanSendValue": false,
+      "DecoderAndSanitizerAddress": "0x0000000000000000000000000000000000000000",
+      "Description": "",
+      "FunctionSelector": "0xc5d24601",
+      "FunctionSignature": "",
+      "LeafDigest": "0xa7a0fd846665d92e66be6155c6221b3acd7145ca7c4e4b67a594e4c516969400",
+      "PackedArgumentAddresses": "0x",
+      "TargetAddress": "0x0000000000000000000000000000000000000000"
+    }
+  ],
+  "MerkleTree": {
+    "0": ["0xc968940b3f5c9bfa08bad7bdb2d3a40bd7fc06e8408d677d61af136f621a49c0"],
+    "1": [
+      "0xff5a59b2c2430e7aa9d18351957fda22abae74fedeeab99627f168e6953b1098",
+      "0xa74ca92d709c0a0f305d1cbfcca733991f5bc9336083dc566a5e298ebd9cff4d"
+    ],
+    "2": [
+      "0x9b6361df8cebfd39a6f95f0c244d1948813829f6dd037d8897ca4ef2b8dec1e1",
+      "0xff68fd7024d4cc1c707efbd5abe7fffd54769dd811193c1ee0b5330e9411ded9",
+      "0xc31348d45d57d4fe0e0a788b22beabaf6a789f6e22d25b6f37da7829c2cb5732",
+      "0x0c69df9caff1640c10c1d9d3cda30132fb47a6c8aadd3f6f89ff0281f263c40b"
+    ],
+    "3": [
+      "0x64cd7e13d71c82ecd63b1f50c1c8c6672285398fef77173d7fad1e0fabda107b",
+      "0xf874fe2c997ae850baacf5d136957f59cb1edf1bd58a7a23f1e65b0a978472d5",
+      "0x936c3061da2146e3315acb212a31d8f39e4afa7c35162ae11b10ffda44b2f047",
+      "0x36940ed31aa62df03cb6d368f6a0494a5c688452bc0cbafa16f5eeb93a510172",
+      "0x5a2659271f8c58a2c96a47238a629f14f59bdd44586008909d039a5ee1e9079e",
+      "0xad9f26ae653bbe3c49b3d8db805922697b2d2e4f251a710747d6e3f7a920344a",
+      "0x456dbbff2192ba94a86fbc70d7519138f8ba3ff5b74420582dc31b8134de38a0",
+      "0xa7a0fd846665d92e66be6155c6221b3acd7145ca7c4e4b67a594e4c516969400"
+    ]
+  }
 }

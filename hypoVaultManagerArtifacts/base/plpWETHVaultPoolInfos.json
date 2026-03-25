@@ -1,6 +1,11 @@
 {
-"vaultAddress":"0xaD80aD589dc5e4258913980a3e8AC9d2B3178976",
-"poolInfos": [
-{"maxPriceDeviation":100,"pool":"0xB50e8bb68f5855DA742f4579274902a20454174a","token0":"0x0000000000000000000000000000000000000000","token1":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"}
-]
+  "vaultAddress": "0xaD80aD589dc5e4258913980a3e8AC9d2B3178976",
+  "poolInfos": [
+    {
+      "maxPriceDeviation": 100,
+      "pool": "0xB50e8bb68f5855DA742f4579274902a20454174a",
+      "token0": "0x0000000000000000000000000000000000000000",
+      "token1": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+    }
+  ]
 }
