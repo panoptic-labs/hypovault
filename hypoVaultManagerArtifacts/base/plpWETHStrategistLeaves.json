@@ -1,140 +1,23 @@
-{
-  "metadata": {
-    "AccountantAddress": "0x1D78f23bF0B3249eC05d879bCc30A4e05F6fc86E",
-    "BoringVaultAddress": "0xD58C4F9AEe5bBfcf28dC9a8d3D57b323fA6521b1",
-    "DecoderAndSanitizerAddress": "0x61d29005A8c46a4a5F4Ae9ae7E2DD051C93bEf35",
-    "DigestComposition": [
-      "Bytes20(DECODER_AND_SANITIZER_ADDRESS)",
-      "Bytes20(TARGET_ADDRESS)",
-      "Bytes1(CAN_SEND_VALUE)",
-      "Bytes4(TARGET_FUNCTION_SELECTOR)",
-      "Bytes{N*20}(ADDRESS_ARGUMENT_0,...,ADDRESS_ARGUMENT_N)"
-    ],
-    "LeafCount": 8,
-    "ManageRoot": "0x87a262e63ee265a69bac74aab3173f9d28ac212b145fac4e76df9e99a9719839",
-    "ManagerAddress": "0x95eC124FAAB70D7aE147c3BE0336E01a828AE2d5",
-    "TreeCapacity": 8
-  },
-  "leafs": [
-    {
-      "AddressArguments": ["0xD58C4F9AEe5bBfcf28dC9a8d3D57b323fA6521b1"],
-      "CanSendValue": true,
-      "DecoderAndSanitizerAddress": "0x61d29005A8c46a4a5F4Ae9ae7E2DD051C93bEf35",
-      "Description": "Deposit ETH for poETH (payable)",
-      "FunctionSelector": "0x6e553f65",
-      "FunctionSignature": "deposit(uint256,address)",
-      "LeafDigest": "0x35b3db2a20cc918ee86782b2b423a83bd1228289cd2c0943bf3ba1e9580822d7",
-      "PackedArgumentAddresses": "0xd58c4f9aee5bbfcf28dc9a8d3d57b323fa6521b1",
-      "TargetAddress": "0xA0769A548909e52472E56116584789004b51644c"
-    },
-    {
-      "AddressArguments": [
-        "0xD58C4F9AEe5bBfcf28dC9a8d3D57b323fA6521b1",
-        "0xD58C4F9AEe5bBfcf28dC9a8d3D57b323fA6521b1"
-      ],
-      "CanSendValue": false,
-      "DecoderAndSanitizerAddress": "0x61d29005A8c46a4a5F4Ae9ae7E2DD051C93bEf35",
-      "Description": "Withdraw ETH from poETH",
-      "FunctionSelector": "0xb460af94",
-      "FunctionSignature": "withdraw(uint256,address,address)",
-      "LeafDigest": "0x99b349496975693a9840622b0b44ee3d39b6b6676a298199e8accf08081482b0",
-      "PackedArgumentAddresses": "0xd58c4f9aee5bbfcf28dc9a8d3d57b323fa6521b1d58c4f9aee5bbfcf28dc9a8d3d57b323fa6521b1",
-      "TargetAddress": "0xA0769A548909e52472E56116584789004b51644c"
-    },
-    {
-      "AddressArguments": [
-        "0xD58C4F9AEe5bBfcf28dC9a8d3D57b323fA6521b1",
-        "0xD58C4F9AEe5bBfcf28dC9a8d3D57b323fA6521b1"
-      ],
-      "CanSendValue": false,
-      "DecoderAndSanitizerAddress": "0x61d29005A8c46a4a5F4Ae9ae7E2DD051C93bEf35",
-      "Description": "Withdraw ETH from poETH (with open positions)",
-      "FunctionSelector": "0xe51161ba",
-      "FunctionSignature": "withdraw(uint256,address,address,uint256[],bool)",
-      "LeafDigest": "0x72d4430b28a359f26b85110b8849f1bd3c2bce41c7c2e1cba833516f79422f49",
-      "PackedArgumentAddresses": "0xd58c4f9aee5bbfcf28dc9a8d3d57b323fa6521b1d58c4f9aee5bbfcf28dc9a8d3d57b323fa6521b1",
-      "TargetAddress": "0xA0769A548909e52472E56116584789004b51644c"
-    },
-    {
-      "AddressArguments": ["0xD58C4F9AEe5bBfcf28dC9a8d3D57b323fA6521b1"],
-      "CanSendValue": true,
-      "DecoderAndSanitizerAddress": "0x61d29005A8c46a4a5F4Ae9ae7E2DD051C93bEf35",
-      "Description": "Mint poETH using ETH (payable)",
-      "FunctionSelector": "0x94bf804d",
-      "FunctionSignature": "mint(uint256,address)",
-      "LeafDigest": "0xfc699c2a73ba975b7b33c4782a27dfbb44538e90156e2dbe7cc75bd898e52a0a",
-      "PackedArgumentAddresses": "0xd58c4f9aee5bbfcf28dc9a8d3d57b323fa6521b1",
-      "TargetAddress": "0xA0769A548909e52472E56116584789004b51644c"
-    },
-    {
-      "AddressArguments": [
-        "0xD58C4F9AEe5bBfcf28dC9a8d3D57b323fA6521b1",
-        "0xD58C4F9AEe5bBfcf28dC9a8d3D57b323fA6521b1"
-      ],
-      "CanSendValue": false,
-      "DecoderAndSanitizerAddress": "0x61d29005A8c46a4a5F4Ae9ae7E2DD051C93bEf35",
-      "Description": "Redeem poETH for ETH",
-      "FunctionSelector": "0xba087652",
-      "FunctionSignature": "redeem(uint256,address,address)",
-      "LeafDigest": "0xcc92f3d3f0d4a801a8c8144230ed40950af314add384daac4e9f2da47ceb6dc8",
-      "PackedArgumentAddresses": "0xd58c4f9aee5bbfcf28dc9a8d3d57b323fa6521b1d58c4f9aee5bbfcf28dc9a8d3d57b323fa6521b1",
-      "TargetAddress": "0xA0769A548909e52472E56116584789004b51644c"
-    },
-    {
-      "AddressArguments": [],
-      "CanSendValue": false,
-      "DecoderAndSanitizerAddress": "0x61d29005A8c46a4a5F4Ae9ae7E2DD051C93bEf35",
-      "Description": "Dispatch mint/burn options on PanopticPool",
-      "FunctionSelector": "0xc25813aa",
-      "FunctionSignature": "dispatch(uint256[],uint256[],uint128[],int24[3][],bool,uint256)",
-      "LeafDigest": "0x0cf0f4c7d4dad67689b6879460726545c7945c79460fcfc772a85ec047ba439e",
-      "PackedArgumentAddresses": "0x",
-      "TargetAddress": "0x2B07ca6D403ce0A3B176BD7036BbFC57A4a0aD83"
-    },
-    {
-      "AddressArguments": [],
-      "CanSendValue": true,
-      "DecoderAndSanitizerAddress": "0x61d29005A8c46a4a5F4Ae9ae7E2DD051C93bEf35",
-      "Description": "Wrap ETH to WETH",
-      "FunctionSelector": "0xd0e30db0",
-      "FunctionSignature": "deposit()",
-      "LeafDigest": "0x673692f0d4521bbcf83357bcffc0b1fd7fd6e025a549dc65896a0cee542c557e",
-      "PackedArgumentAddresses": "0x",
-      "TargetAddress": "0x4200000000000000000000000000000000000006"
-    },
-    {
-      "AddressArguments": [],
-      "CanSendValue": false,
-      "DecoderAndSanitizerAddress": "0x61d29005A8c46a4a5F4Ae9ae7E2DD051C93bEf35",
-      "Description": "Unwrap WETH to ETH",
-      "FunctionSelector": "0x2e1a7d4d",
-      "FunctionSignature": "withdraw(uint256)",
-      "LeafDigest": "0x2e47fb11eef7dbbb22435bbedca680e94757a4e6f43e2b0cf18af4357af86657",
-      "PackedArgumentAddresses": "0x",
-      "TargetAddress": "0x4200000000000000000000000000000000000006"
-    }
-  ],
-  "MerkleTree": {
-    "0": ["0x87a262e63ee265a69bac74aab3173f9d28ac212b145fac4e76df9e99a9719839"],
-    "1": [
-      "0x480d1d16c8a65554c6a9b321f29463b01e54310727b832a2e8344ce8dd154680",
-      "0xf1e0328d2574029f053921e1b3eee290058a8f7ae8cafac15711933d30ba4ba4"
-    ],
-    "2": [
-      "0x24d6726892c0734eb99f411baa384bfecb4239fc4a6ba6cfd2115d25363e29e6",
-      "0x6c6ecbfa7589ec6fb9b718b1b5cb4131724a80077f42e43ca1f2cd2cbbede358",
-      "0x46d792a618f1405ab322726cfacf2b0c1f58122b85cab4bc6f2653be11253114",
-      "0x4a7216f8547e554104aebdf2cd0887e2d370b7ebe851bcafb7cf99910d4a8627"
-    ],
-    "3": [
-      "0x35b3db2a20cc918ee86782b2b423a83bd1228289cd2c0943bf3ba1e9580822d7",
-      "0x99b349496975693a9840622b0b44ee3d39b6b6676a298199e8accf08081482b0",
-      "0x72d4430b28a359f26b85110b8849f1bd3c2bce41c7c2e1cba833516f79422f49",
-      "0xfc699c2a73ba975b7b33c4782a27dfbb44538e90156e2dbe7cc75bd898e52a0a",
-      "0xcc92f3d3f0d4a801a8c8144230ed40950af314add384daac4e9f2da47ceb6dc8",
-      "0x0cf0f4c7d4dad67689b6879460726545c7945c79460fcfc772a85ec047ba439e",
-      "0x673692f0d4521bbcf83357bcffc0b1fd7fd6e025a549dc65896a0cee542c557e",
-      "0x2e47fb11eef7dbbb22435bbedca680e94757a4e6f43e2b0cf18af4357af86657"
-    ]
-  }
+{ "metadata": 
+{"AccountantAddress":"0x2840BA44130258Cb40E09C457d5db487aAA03409","BoringVaultAddress":"0xaD80aD589dc5e4258913980a3e8AC9d2B3178976","DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","DigestComposition":["Bytes20(DECODER_AND_SANITIZER_ADDRESS)","Bytes20(TARGET_ADDRESS)","Bytes1(CAN_SEND_VALUE)","Bytes4(TARGET_FUNCTION_SELECTOR)","Bytes{N*20}(ADDRESS_ARGUMENT_0,...,ADDRESS_ARGUMENT_N)"],"LeafCount":8,"ManageRoot":"0xedb06094b7b0cc16dbf86978fc85d42be758d0039ef6edd30e9f7349a7ccaf17","ManagerAddress":"0x59faB018508C1247887Edc667EF5B824F708e071","TreeCapacity":8}
+,
+"leafs": [
+{"AddressArguments":["0xaD80aD589dc5e4258913980a3e8AC9d2B3178976"],"CanSendValue":true,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Deposit ETH for poETH (payable)","FunctionSelector":"0x6e553f65","FunctionSignature":"deposit(uint256,address)","LeafDigest":"0x3b9cb697cad95f67d6f0254b67a88e6d2879b8918c6733820dc546fe84010be0","PackedArgumentAddresses":"0xad80ad589dc5e4258913980a3e8ac9d2b3178976","TargetAddress":"0x0d82b189c96EbB1f44A7207e6A9cfB1e490f2869"}
+,
+{"AddressArguments":["0xaD80aD589dc5e4258913980a3e8AC9d2B3178976","0xaD80aD589dc5e4258913980a3e8AC9d2B3178976"],"CanSendValue":false,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Withdraw ETH from poETH","FunctionSelector":"0xb460af94","FunctionSignature":"withdraw(uint256,address,address)","LeafDigest":"0x4c9a9108e44d009ba01425ffe4cc23194d0003c0b58ffe48ffcccda75ceee67b","PackedArgumentAddresses":"0xad80ad589dc5e4258913980a3e8ac9d2b3178976ad80ad589dc5e4258913980a3e8ac9d2b3178976","TargetAddress":"0x0d82b189c96EbB1f44A7207e6A9cfB1e490f2869"}
+,
+{"AddressArguments":["0xaD80aD589dc5e4258913980a3e8AC9d2B3178976","0xaD80aD589dc5e4258913980a3e8AC9d2B3178976"],"CanSendValue":false,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Withdraw ETH from poETH (with open positions)","FunctionSelector":"0xe51161ba","FunctionSignature":"withdraw(uint256,address,address,uint256[],bool)","LeafDigest":"0x83dce544134bb37b1b85aadd6df26a1d415275b91ad811f7b4170693b9b64cf1","PackedArgumentAddresses":"0xad80ad589dc5e4258913980a3e8ac9d2b3178976ad80ad589dc5e4258913980a3e8ac9d2b3178976","TargetAddress":"0x0d82b189c96EbB1f44A7207e6A9cfB1e490f2869"}
+,
+{"AddressArguments":["0xaD80aD589dc5e4258913980a3e8AC9d2B3178976"],"CanSendValue":true,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Mint poETH using ETH (payable)","FunctionSelector":"0x94bf804d","FunctionSignature":"mint(uint256,address)","LeafDigest":"0x20dc1338494ab0b95d913172a1603ec050bfb99f029e1749345033518357407f","PackedArgumentAddresses":"0xad80ad589dc5e4258913980a3e8ac9d2b3178976","TargetAddress":"0x0d82b189c96EbB1f44A7207e6A9cfB1e490f2869"}
+,
+{"AddressArguments":["0xaD80aD589dc5e4258913980a3e8AC9d2B3178976","0xaD80aD589dc5e4258913980a3e8AC9d2B3178976"],"CanSendValue":false,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Redeem poETH for ETH","FunctionSelector":"0xba087652","FunctionSignature":"redeem(uint256,address,address)","LeafDigest":"0xd5d58d76989d78e160de38adec81ead66e30e1d20bb0121f688da5f2234e0193","PackedArgumentAddresses":"0xad80ad589dc5e4258913980a3e8ac9d2b3178976ad80ad589dc5e4258913980a3e8ac9d2b3178976","TargetAddress":"0x0d82b189c96EbB1f44A7207e6A9cfB1e490f2869"}
+,
+{"AddressArguments":[],"CanSendValue":false,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Dispatch mint/burn options on PanopticPool","FunctionSelector":"0xc25813aa","FunctionSignature":"dispatch(uint256[],uint256[],uint128[],int24[3][],bool,uint256)","LeafDigest":"0x456dbbff2192ba94a86fbc70d7519138f8ba3ff5b74420582dc31b8134de38a0","PackedArgumentAddresses":"0x","TargetAddress":"0xB50e8bb68f5855DA742f4579274902a20454174a"}
+,
+{"AddressArguments":[],"CanSendValue":true,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Wrap ETH to WETH","FunctionSelector":"0xd0e30db0","FunctionSignature":"deposit()","LeafDigest":"0x22510469e587ce080e4a086a3c1eb9104c904b6f3890cb1d4371faba87959fe2","PackedArgumentAddresses":"0x","TargetAddress":"0x4200000000000000000000000000000000000006"}
+,
+{"AddressArguments":[],"CanSendValue":false,"DecoderAndSanitizerAddress":"0x840CA8C3223e5aB43bcDebaF64A840a8c40EFfd8","Description":"Unwrap WETH to ETH","FunctionSelector":"0x2e1a7d4d","FunctionSignature":"withdraw(uint256)","LeafDigest":"0x27912fe94cd326418c86e94372a4c33d4a1007178745e4e945a805299e4721c9","PackedArgumentAddresses":"0x","TargetAddress":"0x4200000000000000000000000000000000000006"}
+],
+"MerkleTree": 
+{"0":["0xedb06094b7b0cc16dbf86978fc85d42be758d0039ef6edd30e9f7349a7ccaf17"],"1":["0x362ba617a452b151fd9e40a1063481c66bca00fe49e1d354e5f312685f5c3b30","0xaa497cfc28baab207c748d7deb57046f15a05266276ffb5ff26de2010ff826e1"],"2":["0x701e64404ad0904c7fa5f46dcb35ef5eb160316b69685a8bad22857552c5361d","0x1ac7ca25b65bbab46982ad051f39d84d19d06628b9783a97cceebd8f21e110b7","0xdaedfcd66be71874a36f060ffff0534aa5c6f3adf1d5246f25aa439b79fcd983","0xf81f60ff22df5d04afabfd509839e3fe5207584ee7ae5197f9dd2598b556a289"],"3":["0x3b9cb697cad95f67d6f0254b67a88e6d2879b8918c6733820dc546fe84010be0","0x4c9a9108e44d009ba01425ffe4cc23194d0003c0b58ffe48ffcccda75ceee67b","0x83dce544134bb37b1b85aadd6df26a1d415275b91ad811f7b4170693b9b64cf1","0x20dc1338494ab0b95d913172a1603ec050bfb99f029e1749345033518357407f","0xd5d58d76989d78e160de38adec81ead66e30e1d20bb0121f688da5f2234e0193","0x456dbbff2192ba94a86fbc70d7519138f8ba3ff5b74420582dc31b8134de38a0","0x22510469e587ce080e4a086a3c1eb9104c904b6f3890cb1d4371faba87959fe2","0x27912fe94cd326418c86e94372a4c33d4a1007178745e4e945a805299e4721c9"]}
 }

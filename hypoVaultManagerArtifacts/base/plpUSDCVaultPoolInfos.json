@@ -1,11 +1,6 @@
 {
-  "vaultAddress": "0xdd7a8d6c6975488e801129bC84302d74e2361208",
-  "poolInfos": [
-    {
-      "maxPriceDeviation": 100,
-      "pool": "0x2B07ca6D403ce0A3B176BD7036BbFC57A4a0aD83",
-      "token0": "0x0000000000000000000000000000000000000000",
-      "token1": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-    }
-  ]
+"vaultAddress":"0x747458449805Df428d4335d16c72483baF3eDc42",
+"poolInfos": [
+{"maxPriceDeviation":100,"pool":"0xB50e8bb68f5855DA742f4579274902a20454174a","token0":"0x0000000000000000000000000000000000000000","token1":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"}
+]
 }
