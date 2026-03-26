@@ -14,24 +14,7 @@ import {LeftRightSigned} from "lib/panoptic-v2-core/contracts/types/LeftRight.so
 import {LiquidityChunk} from "lib/panoptic-v2-core/contracts/types/LiquidityChunk.sol";
 import {PositionBalance} from "lib/panoptic-v2-core/contracts/types/PositionBalance.sol";
 import {TokenId} from "lib/panoptic-v2-core/contracts/types/TokenId.sol";
-
-interface IPanopticPoolV2 {
-    function getTWAP() external view returns (int24 twapTick);
-
-    function getAccumulatedFeesAndPositionsData(
-        address user,
-        bool includePendingPremium,
-        TokenId[] calldata positionIdList
-    ) external view returns (LeftRightUnsigned, LeftRightUnsigned, PositionBalance[] memory);
-
-    function numberOfLegs(address user) external view returns (uint256);
-
-    function collateralToken0() external view returns (IERC4626);
-
-    function collateralToken1() external view returns (IERC4626);
-
-    function getCurrentTick() external view returns (int24);
-}
+import {PanopticPoolV2} from "lib/panoptic-v2-core/contracts/PanopticPool.sol";
 
 /// @author Axicon Labs Limited
 contract PanopticVaultAccountant is Ownable {
@@ -41,7 +24,7 @@ contract PanopticVaultAccountant is Ownable {
     /// @param token1 The token1 of the pool
     /// @param maxPriceDeviation The maximum price deviation allowed for the oracle prices
     struct PoolInfo {
-        IPanopticPoolV2 pool;
+        PanopticPoolV2 pool;
         IERC20Partial token0;
         IERC20Partial token1;
         int24 maxPriceDeviation;
@@ -122,8 +105,8 @@ contract PanopticVaultAccountant is Ownable {
             }
             for (uint256 j = 0; j < pools.length; j++) {
                 if (
-                    erc4626Vaults[i] == pools[j].pool.collateralToken0() ||
-                    erc4626Vaults[i] == pools[j].pool.collateralToken1()
+                    address(erc4626Vaults[i]) == address(pools[j].pool.collateralToken0()) ||
+                    address(erc4626Vaults[i]) == address(pools[j].pool.collateralToken1())
                 ) revert DuplicateERC4626();
             }
         }
@@ -182,9 +165,9 @@ contract PanopticVaultAccountant is Ownable {
                     LeftRightUnsigned shortPremium;
                     LeftRightUnsigned longPremium;
 
-                    (shortPremium, longPremium, positionBalanceArray) = pools[i]
+                    (shortPremium, longPremium, positionBalanceArray, , ) = pools[i]
                         .pool
-                        .getAccumulatedFeesAndPositionsData(_vault, true, tokenIds[i]);
+                        .getFullPositionsData(_vault, true, tokenIds[i]);
 
                     poolExposure0 =
                         int256(uint256(shortPremium.rightSlot())) -

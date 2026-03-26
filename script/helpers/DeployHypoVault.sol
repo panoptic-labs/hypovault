@@ -200,7 +200,7 @@ contract DeployHypoVault is MerkleTreeHelper {
 
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: IPanopticPoolV2(panopticPool),
+            pool: PanopticPoolV2(panopticPool),
             token0: IERC20Partial(token0),
             token1: IERC20Partial(token1),
             maxPriceDeviation: MAX_PRICE_DEVIATION

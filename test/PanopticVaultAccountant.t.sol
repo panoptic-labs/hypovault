@@ -149,7 +149,7 @@ contract MockPanopticPool {
         useCurrentTick = true;
     }
 
-    function getAccumulatedFeesAndPositionsData(
+    function getFullPositionsData(
         address,
         bool,
         TokenId[] memory
@@ -159,10 +159,18 @@ contract MockPanopticPool {
         returns (
             LeftRightUnsigned shortPremium,
             LeftRightUnsigned longPremium,
-            PositionBalance[] memory positionBalanceArray
+            PositionBalance[] memory positionBalanceArray,
+            LeftRightUnsigned[] memory collateralRequirements,
+            LeftRightSigned[] memory netPremiaPerPosition
         )
     {
-        return (mockShortPremium, mockLongPremium, mockPositionBalanceArray);
+        return (
+            mockShortPremium,
+            mockLongPremium,
+            mockPositionBalanceArray,
+            new LeftRightUnsigned[](0),
+            new LeftRightSigned[](0)
+        );
     }
 
     function setMockPremiums(
@@ -591,7 +599,7 @@ contract PanopticVaultAccountantTest is Test {
         // Create pools where token0 IS the underlying token - no conversion needed
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: IPanopticPoolV2(address(mockPool)),
+            pool: PanopticPoolV2(address(mockPool)),
             token0: underlyingToken, // Same as underlying - no conversion
             token1: token1,
             maxPriceDeviation: MAX_PRICE_DEVIATION
@@ -636,7 +644,7 @@ contract PanopticVaultAccountantTest is Test {
         // Create pools where BOTH tokens are the underlying token - absolutely no conversion
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: IPanopticPoolV2(address(mockPool)),
+            pool: PanopticPoolV2(address(mockPool)),
             token0: underlyingToken, // Same as underlying
             token1: underlyingToken, // Same as underlying
             maxPriceDeviation: MAX_PRICE_DEVIATION
@@ -674,7 +682,7 @@ contract PanopticVaultAccountantTest is Test {
         // Create pools where token0 is underlying - only token1 needs conversion
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: IPanopticPoolV2(address(mockPool)),
+            pool: PanopticPoolV2(address(mockPool)),
             token0: underlyingToken, // Same as underlying
             token1: token1,
             maxPriceDeviation: MAX_PRICE_DEVIATION
@@ -742,7 +750,7 @@ contract PanopticVaultAccountantTest is Test {
         // Build pool with distinct tokens (not the underlying)
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: IPanopticPoolV2(address(mockPool)),
+            pool: PanopticPoolV2(address(mockPool)),
             token0: token0,
             token1: token1,
             maxPriceDeviation: MAX_PRICE_DEVIATION
@@ -1039,7 +1047,7 @@ contract PanopticVaultAccountantTest is Test {
     {
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: IPanopticPoolV2(address(mockPool)),
+            pool: PanopticPoolV2(address(mockPool)),
             token0: token0,
             token1: token1,
             maxPriceDeviation: MAX_PRICE_DEVIATION
@@ -1055,7 +1063,7 @@ contract PanopticVaultAccountantTest is Test {
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](2);
         pools[0] = createDefaultPools()[0];
         pools[1] = PanopticVaultAccountant.PoolInfo({
-            pool: IPanopticPoolV2(address(mockPool2)),
+            pool: PanopticPoolV2(address(mockPool2)),
             token0: token0,
             token1: token1,
             maxPriceDeviation: MAX_PRICE_DEVIATION
