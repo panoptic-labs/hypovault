@@ -58,10 +58,10 @@ contract ChainConfig is CommonBase {
     function _base() private pure returns (Config memory) {
         return
             Config({
-                factory: 0x363a9d605ca45cBfF3b597350DeADb53cdC292c7,
-                accountant: 0x1D78f23bF0B3249eC05d879bCc30A4e05F6fc86E,
-                decoder: 0x61d29005A8c46a4a5F4Ae9ae7E2DD051C93bEf35,
-                authority: 0x673BfafB4e2712215B422347c1571421B83E8A3d,
+                factory: 0x9bE53b169a41030f1710A9B82e9eA6413f14D12E,
+                accountant: 0x345cA3407942f9d175c9eA8B90e83A36F570f852,
+                decoder: 0x4A290b3EC46cF320421Bb2aaee96d445de31CF0b,
+                authority: 0x278D37CaBFFB4B72D2866E30fEFE08aef773E0B6,
                 panopticPool: 0x2B07ca6D403ce0A3B176BD7036BbFC57A4a0aD83,
                 wethCollateralTracker: 0xA0769A548909e52472E56116584789004b51644c,
                 usdcCollateralTracker: 0x407113cFaE84B225143f7666B6C849f5aAA60f5c,
