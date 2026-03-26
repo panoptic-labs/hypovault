@@ -164,10 +164,14 @@ contract MockPanopticPool {
             LeftRightSigned[] memory netPremiaPerPosition
         )
     {
-        return (mockShortPremium, mockLongPremium, mockPositionBalanceArray, new LeftRightUnsigned[](0), new LeftRightSigned[](0));
+        return (
+            mockShortPremium,
+            mockLongPremium,
+            mockPositionBalanceArray,
+            new LeftRightUnsigned[](0),
+            new LeftRightSigned[](0)
+        );
     }
-
-    
 
     function setMockPremiums(
         LeftRightUnsigned _shortPremium,

@@ -16,7 +16,6 @@ import {PositionBalance} from "lib/panoptic-v2-core/contracts/types/PositionBala
 import {TokenId} from "lib/panoptic-v2-core/contracts/types/TokenId.sol";
 import {PanopticPoolV2} from "lib/panoptic-v2-core/contracts/PanopticPool.sol";
 
-
 /// @author Axicon Labs Limited
 contract PanopticVaultAccountant is Ownable {
     /// @notice Holds the information required to compute the NAV of a PanopticPool
