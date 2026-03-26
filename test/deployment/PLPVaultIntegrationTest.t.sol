@@ -540,7 +540,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
             keccak256(abi.encode(poolInfos))
         );
 
-        int24 twapTick = IPanopticPoolV2($ethUsdc500bpsV4PanopticPool).getTWAP();
+        int24 twapTick = PanopticPoolV2($ethUsdc500bpsV4PanopticPool).getTWAP();
         PanopticVaultAccountant.ManagerPrices[]
             memory managerPrices = new PanopticVaultAccountant.ManagerPrices[](1);
         managerPrices[0] = PanopticVaultAccountant.ManagerPrices({
@@ -672,7 +672,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
 
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
-            pool: IPanopticPoolV2(ethUsdc500bpsV4PanopticPool),
+            pool: PanopticPoolV2(ethUsdc500bpsV4PanopticPool),
             token0: IERC20Partial(token0),
             token1: IERC20Partial(token1),
             maxPriceDeviation: MAX_PRICE_DEVIATION
