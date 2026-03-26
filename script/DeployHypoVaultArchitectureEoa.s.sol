@@ -10,7 +10,7 @@ import {ChainConfig} from "./helpers/ChainConfig.sol";
 // Usage: CHAIN_NAME=sepolia forge script script/DeployHypoVaultArchitectureEoa.s.sol --rpc-url sepolia --sender <addr> -vvvv --broadcast --verify
 contract DeployHypoVaultArchitectureEoa is Script, DeployArchitecture, ChainConfig {
     // CREATE2 salt
-    bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v15"));
+    bytes32 salt = keccak256(abi.encodePacked("my-unique-salt-v17"));
 
     function run() public {
         Config memory c = getChainConfig();
