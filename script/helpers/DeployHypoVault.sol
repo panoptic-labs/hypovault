@@ -155,7 +155,6 @@ contract DeployHypoVault is MerkleTreeHelper {
             new IERC4626[](0)
         );
         console.log("Vault hashes updated");
-
     }
 
     function _configureRoles(DeployStruct memory deployData, address managerAddress) internal {
