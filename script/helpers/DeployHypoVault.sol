@@ -34,10 +34,6 @@ contract DeployHypoVault is MerkleTreeHelper {
         bytes32 salt;
     }
 
-    // @dev - test Safe on sepolia. NOT the real multisig.
-    // Real Panoptic multisig: 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1
-    address constant PanopticMultisig = 0x9C44C2B07380DA62a5ea572b886048410b0c44fd;
-
     // Deployment addresses
     address BalancerVaultAddr = address(0x7777); // Required by ManagerWithMerkleVerification
 
@@ -53,7 +49,7 @@ contract DeployHypoVault is MerkleTreeHelper {
         )
     {
         // 1. Deploy HypoVault via Factory
-        uint256 performanceFeeBps = 1000; // 10%
+        uint256 performanceFeeBps = 0;
         vault = HypoVaultFactory(deployData.vaultFactory).createVault(
             deployData.underlyingToken,
             deployData.deployer,
@@ -132,10 +128,9 @@ contract DeployHypoVault is MerkleTreeHelper {
         console.log("Generated manageRoot:");
         console.logBytes32(manageRoot);
 
-        // 6. Set manageRoot for both multisig and turnkey
-        manager.setManageRoot(PanopticMultisig, manageRoot);
+        // 6. Set manageRoot for turnkey
         manager.setManageRoot(deployData.turnkeyAccount, manageRoot);
-        console.log("ManageRoot set for multisig and turnkey");
+        console.log("ManageRoot set for turnkey");
 
         // 7. Set RolesAuthority as authority on HypoVaultManagerWithMerkleVerification
         manager.setAuthority(Authority(deployData.authorityAddress));
@@ -161,7 +156,6 @@ contract DeployHypoVault is MerkleTreeHelper {
         );
         console.log("Vault hashes updated");
 
-        // TODO: Add transfer ownership calls to the multisig
     }
 
     function _configureRoles(DeployStruct memory deployData, address managerAddress) internal {

@@ -24,8 +24,8 @@ contract ChainConfig is CommonBase {
     address constant USDC_TURNKEY = 0x3c1c79d0cfc316Ba959194c89696a8382d7d283b;
 
     // Salts (same across all chains)
-    string constant WETH_VAULT_SALT = "my-unique-salt-v9-weth";
-    string constant USDC_VAULT_SALT = "my-unique-salt-v9-usdc";
+    string constant WETH_VAULT_SALT = "my-salt-v0-weth";
+    string constant USDC_VAULT_SALT = "my-salt-v0-usdc";
 
     function getChainConfig() internal view returns (Config memory) {
         string memory chainName = vm.envString("CHAIN_NAME");
@@ -33,6 +33,7 @@ contract ChainConfig is CommonBase {
 
         if (key == keccak256("sepolia")) return _sepolia();
         if (key == keccak256("base")) return _base();
+        if (key == keccak256("mainnet")) return _mainnet();
 
         revert(string.concat("Unknown CHAIN_NAME: ", chainName));
     }
@@ -52,6 +53,25 @@ contract ChainConfig is CommonBase {
                 token0: address(0),
                 token1: 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A,
                 chainName: "sepolia"
+            });
+    }
+
+    function _mainnet() private pure returns (Config memory) {
+        return
+            Config({
+                factory: 0x4FAe3e0B293Df7980eB9D55dF5463e40E502546d,
+                accountant: 0xCCAA8adC2776786Fd0A14Fb1f22D6089E0637a49,
+                decoder: 0x1c8620AC42c1F69eE493B953165FCd1864DEB439,
+                authority: 0xBddfe76460A6124e24E157599D0dD60519490f56,
+                // Panoptic pool: ETH/USDC 0.3% (tick spacing 60)
+                panopticPool: 0x00000000b8Dc165CC8E838eaB940a873826cBcD6,
+                wethCollateralTracker: 0x3F09A5d583df28bE3e1E6e796195b54413B1C68a,
+                usdcCollateralTracker: 0xaF483Cf4758c8c396693Ec56151C6f33a8f42E0b,
+                weth: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
+                usdc: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
+                token0: address(0),
+                token1: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
+                chainName: "mainnet"
             });
     }
 
