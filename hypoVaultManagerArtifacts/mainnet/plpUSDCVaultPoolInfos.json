@@ -1,0 +1,11 @@
+{
+  "vaultAddress": "0x963Fe9c93bc353602656ee4051A75114bA74d6c5",
+  "poolInfos": [
+    {
+      "maxPriceDeviation": 100,
+      "pool": "0x000000007588B488d180899cDEa2080a886D2441",
+      "token0": "0x0000000000000000000000000000000000000000",
+      "token1": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+    }
+  ]
+}
