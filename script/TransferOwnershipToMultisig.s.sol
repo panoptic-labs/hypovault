@@ -30,21 +30,11 @@ contract TransferOwnershipToMultisig is Script {
 
         vm.startBroadcast();
 
-        // 1. Transfer vault ownership (OwnableUpgradeable)
         HypoVault(payable(WETH_VAULT)).transferOwnership(MULTISIG);
         console.log("WETH Vault ownership transferred");
 
         HypoVault(payable(USDC_VAULT)).transferOwnership(MULTISIG);
         console.log("USDC Vault ownership transferred");
-
-        // 2. Transfer manager ownership (Solmate Auth)
-        HypoVaultManagerWithMerkleVerification(WETH_MANAGER).transferOwnership(MULTISIG);
-        console.log("WETH Manager ownership transferred");
-
-        HypoVaultManagerWithMerkleVerification(USDC_MANAGER).transferOwnership(MULTISIG);
-        console.log("USDC Manager ownership transferred");
-
-        // 3. Transfer shared contracts
         RolesAuthority(AUTHORITY).transferOwnership(MULTISIG);
         console.log("RolesAuthority ownership transferred");
 
