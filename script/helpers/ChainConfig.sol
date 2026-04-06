@@ -64,9 +64,9 @@ contract ChainConfig is CommonBase {
                 decoder: 0x1c8620AC42c1F69eE493B953165FCd1864DEB439,
                 authority: 0xBddfe76460A6124e24E157599D0dD60519490f56,
                 // Panoptic pool: ETH/USDC 0.3% (tick spacing 60)
-                panopticPool: 0x00000000b8Dc165CC8E838eaB940a873826cBcD6,
-                wethCollateralTracker: 0x3F09A5d583df28bE3e1E6e796195b54413B1C68a,
-                usdcCollateralTracker: 0xaF483Cf4758c8c396693Ec56151C6f33a8f42E0b,
+                panopticPool: 0x000000007588B488d180899cDEa2080a886D2441,
+                wethCollateralTracker: 0x6cd0186Fb4c32B6fD23279bBE0022506958216f9,
+                usdcCollateralTracker: 0x6778d652A0BCe658C9a0E27D506eA20D179140e5,
                 weth: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
                 usdc: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
                 token0: address(0),
