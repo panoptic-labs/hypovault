@@ -24,8 +24,9 @@ contract DeployTimelock is Script, ChainConfig {
         address[] memory proposers = new address[](1);
         proposers[0] = c.panopticMultisig;
 
+        // Open execution: anyone can execute a ready operation.
         address[] memory executors = new address[](1);
-        executors[0] = c.panopticMultisig;
+        executors[0] = address(0);
 
         TimelockController timelock = new TimelockController{salt: salt}(
             c.timelockMinDelay,
