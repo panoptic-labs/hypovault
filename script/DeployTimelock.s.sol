@@ -13,8 +13,13 @@ interface IOwnableTransfer {
 contract DeployTimelock is Script, ChainConfig {
     bytes32 salt = keccak256(abi.encodePacked("hypovault-timelock-v1"));
 
+    uint256 constant TIMELOCK_MAX_DELAY = 30 days;
+
     function run() public {
         Config memory c = getChainConfig();
+
+        require(c.panopticMultisig != address(0), "proposer (multisig) is zero address");
+        require(c.timelockMinDelay <= TIMELOCK_MAX_DELAY, "timelockMinDelay exceeds max delay");
 
         vm.startBroadcast();
 
