@@ -13,7 +13,7 @@ interface IOwnableTransfer {
 contract DeployTimelock is Script, ChainConfig {
     bytes32 salt = keccak256(abi.encodePacked("hypovault-timelock-v1"));
 
-    uint256 constant TIMELOCK_MAX_DELAY = 30 days;
+    uint256 constant TIMELOCK_MAX_DELAY = 7 days;
 
     function run() public {
         Config memory c = getChainConfig();
