@@ -66,7 +66,7 @@ contract ChainConfig is CommonBase {
                 wethManager: 0x95eC124FAAB70D7aE147c3BE0336E01a828AE2d5,
                 // Test Safe on sepolia, NOT the real Panoptic multisig
                 panopticMultisig: 0x9C44C2B07380DA62a5ea572b886048410b0c44fd,
-                timelockMinDelay: 2 days
+                timelockMinDelay: 1 days
             });
     }
 
@@ -91,7 +91,7 @@ contract ChainConfig is CommonBase {
                 wethVault: 0x779a2aa634A004b3a3f3b322083744869BBC6D66,
                 wethManager: 0xcc80f113298DdF9D399323D5288aE5Eeaed20D44,
                 panopticMultisig: 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1,
-                timelockMinDelay: 2 days
+                timelockMinDelay: 1 days
             });
     }
 
@@ -115,7 +115,7 @@ contract ChainConfig is CommonBase {
                 wethVault: 0x41b7D0515d709A4Fd2CF27f9d141D0c2F8713D04,
                 wethManager: 0x2a4923456c79E9ebD10F5Bf5305a5C742bBc1D7C,
                 panopticMultisig: 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1,
-                timelockMinDelay: 2 days
+                timelockMinDelay: 1 days
             });
     }
 }
