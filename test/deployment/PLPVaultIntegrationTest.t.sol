@@ -222,8 +222,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         $TurnkeyAccount0 = address(0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8);
         address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
         $sepoliaWeth = ERC20S(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
-        $ethUsdc500bpsV4Collateral0 = 0x45f93888565bA53650Af5ceF6279776B0e6B8A92; // Underlying: ETH
-        $ethUsdc500bpsV4PanopticPool = 0x03AFf7Be6A5afB2bC6830BC54778AF674006850A; // Underlying: ETH
+        $ethUsdc500bpsV4Collateral0 = 0x09a60B78D06A03E5148faedD3bfEE6F58B22012F; // Underlying: ETH
+        $ethUsdc500bpsV4PanopticPool = 0x872b98C46b2062F663BEb2CC9D4cE046Da2a2918; // Underlying: ETH
 
         /*
            STEP 1: Deployments
@@ -466,8 +466,8 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
         $TurnkeyAccount0 = address(0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8);
         address BalancerVault = address(0x7777); // Required by ManagerWithMerkleVerification
         $sepoliaWeth = ERC20S(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
-        $ethUsdc500bpsV4Collateral0 = 0x45f93888565bA53650Af5ceF6279776B0e6B8A92; // Underlying: WETH9 | 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
-        $ethUsdc500bpsV4PanopticPool = 0x03AFf7Be6A5afB2bC6830BC54778AF674006850A;
+        $ethUsdc500bpsV4Collateral0 = 0x09a60B78D06A03E5148faedD3bfEE6F58B22012F; // Underlying: WETH9 | 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
+        $ethUsdc500bpsV4PanopticPool = 0x872b98C46b2062F663BEb2CC9D4cE046Da2a2918;
 
         // use contract suite deployed from EOA
         $wethPlpVault = HypoVault(payable(0xD58C4F9AEe5bBfcf28dC9a8d3D57b323fA6521b1));
@@ -668,7 +668,7 @@ contract HypoVaultTest is Test, MerkleTreeHelper, DeployArchitecture, DeployHypo
 
         address token0 = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14; // sepolia weth9
         address token1 = 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A; // sepolia mock USDC
-        address ethUsdc500bpsV4PanopticPool = 0x03AFf7Be6A5afB2bC6830BC54778AF674006850A;
+        address ethUsdc500bpsV4PanopticPool = 0x872b98C46b2062F663BEb2CC9D4cE046Da2a2918;
 
         PanopticVaultAccountant.PoolInfo[] memory pools = new PanopticVaultAccountant.PoolInfo[](1);
         pools[0] = PanopticVaultAccountant.PoolInfo({
