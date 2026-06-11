@@ -10,6 +10,10 @@ solc_version = "0.8.28"
 bytecode_hash = "none"
 cbor_metadata = false
 
+[lint]
+ignore = ["lib/**"]
+lint_on_build = false
+
 [rpc_endpoints]
 mainnet = "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
 sepolia = "https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}"

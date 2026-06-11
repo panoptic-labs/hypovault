@@ -1,6 +1,6 @@
 [submodule "lib/boring-vault"]
 	path = lib/boring-vault
-	url = https://github.com/whoislewys/boring-vault
+	url = https://github.com/panoptic-labs/boring-vault
   branch = main
 [submodule "lib/forge-safe"]
 	path = lib/forge-safe
