@@ -2062,6 +2062,30 @@ contract PanopticVaultAccountantTest is Test {
         accountant.computeNAV(vault, address(underlyingToken), managerInput);
     }
 
+    function test_computeNAV_revert_duplicateTokenId() public {
+        PanopticVaultAccountant.PoolInfo[] memory pools = createDefaultPools();
+        accountant.updateHashes(vault, pools, new IERC4626[](0));
+
+        setupBasicScenario();
+
+        mockPool.setNumberOfLegs(vault, 2);
+        PositionBalance[] memory positions = new PositionBalance[](2);
+        positions[0] = PositionBalance.wrap(100);
+        positions[1] = PositionBalance.wrap(100);
+        mockPool.setMockPositionBalanceArray(positions);
+
+        TokenId duplicateTokenId = createOutOfRangeTokenId(TWAP_TICK, true, false);
+        TokenId[][] memory tokenIds = new TokenId[][](1);
+        tokenIds[0] = new TokenId[](2);
+        tokenIds[0][0] = duplicateTokenId;
+        tokenIds[0][1] = duplicateTokenId;
+
+        bytes memory managerInput = createManagerInput(pools, tokenIds);
+
+        vm.expectRevert(PanopticVaultAccountant.IncorrectPositionList.selector);
+        accountant.computeNAV(vault, address(underlyingToken), managerInput);
+    }
+
     /*//////////////////////////////////////////////////////////////
                         BOUNDARY CONDITION TESTS
     //////////////////////////////////////////////////////////////*/

@@ -183,9 +183,14 @@ contract PanopticVaultAccountant is Ownable {
 
                 uint256 numLegs;
                 for (uint256 j = 0; j < tokenIds[i].length; j++) {
+                    TokenId _tokenId = tokenIds[i][j];
+                    for (uint256 k = 0; k < j; k++) {
+                        if (TokenId.unwrap(_tokenId) == TokenId.unwrap(tokenIds[i][k]))
+                            revert IncorrectPositionList();
+                    }
+
                     uint128 positionSize = uint128(PositionBalance.unwrap(positionBalanceArray[j]));
                     if (positionSize == 0) revert IncorrectPositionList();
-                    TokenId _tokenId = tokenIds[i][j];
                     uint256 positionLegs = _tokenId.countLegs();
 
                     for (uint256 k = 0; k < positionLegs; k++) {
