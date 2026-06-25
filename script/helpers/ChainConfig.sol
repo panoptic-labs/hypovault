@@ -17,6 +17,13 @@ contract ChainConfig is CommonBase {
         address token0;
         address token1;
         string chainName;
+        // Timelock inputs (used by DeployTimelock.s.sol)
+        address usdcVault;
+        address usdcManager;
+        address wethVault;
+        address wethManager;
+        address panopticMultisig; // PROPOSER + CANCELLER (+ EXECUTOR unless openExecution)
+        uint256 timelockMinDelay;
     }
 
     // Signers (same across all chains)
@@ -52,7 +59,14 @@ contract ChainConfig is CommonBase {
                 usdc: 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A,
                 token0: address(0),
                 token1: 0xFFFeD8254566B7F800f6D8CDb843ec75AE49B07A,
-                chainName: "sepolia"
+                chainName: "sepolia",
+                usdcVault: 0xdd7a8d6c6975488e801129bC84302d74e2361208,
+                usdcManager: 0xFB5aa3e0b46F3859D90B14b52ffd287013b5Ec53,
+                wethVault: 0xD58C4F9AEe5bBfcf28dC9a8d3D57b323fA6521b1,
+                wethManager: 0x95eC124FAAB70D7aE147c3BE0336E01a828AE2d5,
+                // Test Safe on sepolia, NOT the real Panoptic multisig
+                panopticMultisig: 0x9C44C2B07380DA62a5ea572b886048410b0c44fd,
+                timelockMinDelay: 1 days
             });
     }
 
@@ -70,7 +84,13 @@ contract ChainConfig is CommonBase {
                 usdc: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
                 token0: address(0),
                 token1: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
-                chainName: "mainnet"
+                chainName: "mainnet",
+                usdcVault: 0x963Fe9c93bc353602656ee4051A75114bA74d6c5,
+                usdcManager: 0xf42EED8F0d3326ad59fc1f5d4c4009B5F6B4D87c,
+                wethVault: 0x779a2aa634A004b3a3f3b322083744869BBC6D66,
+                wethManager: 0xcc80f113298DdF9D399323D5288aE5Eeaed20D44,
+                panopticMultisig: 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1,
+                timelockMinDelay: 1 days
             });
     }
 
@@ -88,7 +108,13 @@ contract ChainConfig is CommonBase {
                 usdc: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913,
                 token0: address(0),
                 token1: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913,
-                chainName: "base"
+                chainName: "base",
+                usdcVault: 0xb452af299c565D04B05E601efF2840e000C922f1,
+                usdcManager: 0xdd6E2406a044582463CFE9F0C774870eAf4A310B,
+                wethVault: 0x41b7D0515d709A4Fd2CF27f9d141D0c2F8713D04,
+                wethManager: 0x2a4923456c79E9ebD10F5Bf5305a5C742bBc1D7C,
+                panopticMultisig: 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1,
+                timelockMinDelay: 1 days
             });
     }
 }
