@@ -73,23 +73,23 @@ contract ChainConfig is CommonBase {
     function _mainnet() private pure returns (Config memory) {
         return
             Config({
-                factory: 0x4FAe3e0B293Df7980eB9D55dF5463e40E502546d,
-                accountant: 0xCCAA8adC2776786Fd0A14Fb1f22D6089E0637a49,
-                decoder: 0x1c8620AC42c1F69eE493B953165FCd1864DEB439,
-                authority: 0xBddfe76460A6124e24E157599D0dD60519490f56,
+                factory: 0xd5049B2647de57141dE7F65E5124707B99A452A3,
+                accountant: 0x65aA902AE3135658587FFC36ED51B61c927114e1,
+                decoder: 0xC87c45d2dbE5acb56013e2591427ECC84Fa251E6,
+                authority: 0xb952D345c413Ddb7850173422bAe4968e0330598,
                 // Panoptic pool: ETH/USDC 0.3% (tick spacing 60)
-                panopticPool: 0x000000007588B488d180899cDEa2080a886D2441,
-                wethCollateralTracker: 0x6cd0186Fb4c32B6fD23279bBE0022506958216f9,
-                usdcCollateralTracker: 0x6778d652A0BCe658C9a0E27D506eA20D179140e5,
+                panopticPool: 0x00000000563b70d704f4c6675a5f6ac989fbae13,
+                wethCollateralTracker: 0x1e46b0289B7E0F710E2Db8Ab87800dd782D624f7,
+                usdcCollateralTracker: 0x12bF31955522BAC337D93e1bC0a39F68D8BDa216,
                 weth: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
                 usdc: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
                 token0: address(0),
                 token1: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
                 chainName: "mainnet",
-                usdcVault: 0x963Fe9c93bc353602656ee4051A75114bA74d6c5,
-                usdcManager: 0xf42EED8F0d3326ad59fc1f5d4c4009B5F6B4D87c,
-                wethVault: 0x779a2aa634A004b3a3f3b322083744869BBC6D66,
-                wethManager: 0xcc80f113298DdF9D399323D5288aE5Eeaed20D44,
+                usdcVault: 0x236d0558f06cd60780b232d4Ec4c92d2cb7e4D18,
+                usdcManager: 0x2ce65016366ef7320078e0758D58Cf1038bc7C4e,
+                wethVault: 0xd4e2c720a760049cc4151bcf61e3a9348db9cd92,
+                wethManager: 0xB6Fc48e658C9B1a7dbdFA51A5E153ab60BB2e04d,
                 panopticMultisig: 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1,
                 timelockMinDelay: 1 days
             });
