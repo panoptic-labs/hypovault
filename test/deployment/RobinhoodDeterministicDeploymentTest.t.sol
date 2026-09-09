@@ -19,8 +19,14 @@ contract RobinhoodDeterministicDeploymentTest is Test {
     }
 
     function testProductionPredictedAddresses() public pure {
-        assertEq(Config.predictAddress(Config.HYPO_VAULT_INIT_CODE_HASH), Config.HYPO_VAULT_IMPLEMENTATION);
-        assertEq(Config.predictAddress(Config.HYPO_VAULT_FACTORY_INIT_CODE_HASH), Config.HYPO_VAULT_FACTORY);
+        assertEq(
+            Config.predictAddress(Config.HYPO_VAULT_INIT_CODE_HASH),
+            Config.HYPO_VAULT_IMPLEMENTATION
+        );
+        assertEq(
+            Config.predictAddress(Config.HYPO_VAULT_FACTORY_INIT_CODE_HASH),
+            Config.HYPO_VAULT_FACTORY
+        );
     }
 
     function testFactoryConstructorArgument() public pure {
@@ -51,8 +57,14 @@ contract RobinhoodDeterministicDeploymentTest is Test {
     function testLegacySaltDoesNotProduceProductionAddresses() public pure {
         bytes32 legacySalt = keccak256("my-salt-v0");
 
-        assertNotEq(_predictWithSalt(Config.HYPO_VAULT_INIT_CODE_HASH, legacySalt), Config.HYPO_VAULT_IMPLEMENTATION);
-        assertNotEq(_predictWithSalt(Config.HYPO_VAULT_FACTORY_INIT_CODE_HASH, legacySalt), Config.HYPO_VAULT_FACTORY);
+        assertNotEq(
+            _predictWithSalt(Config.HYPO_VAULT_INIT_CODE_HASH, legacySalt),
+            Config.HYPO_VAULT_IMPLEMENTATION
+        );
+        assertNotEq(
+            _predictWithSalt(Config.HYPO_VAULT_FACTORY_INIT_CODE_HASH, legacySalt),
+            Config.HYPO_VAULT_FACTORY
+        );
     }
 
     function testNoVaultInstanceIsCreatedByArchitectureDeployment() public {
@@ -69,7 +81,9 @@ contract RobinhoodDeterministicDeploymentTest is Test {
     }
 
     function _deploy(bytes memory initCode) private returns (address deployed) {
-        (bool success, bytes memory returnData) = Config.CREATE2_DEPLOYER.call(abi.encodePacked(Config.SALT, initCode));
+        (bool success, bytes memory returnData) = Config.CREATE2_DEPLOYER.call(
+            abi.encodePacked(Config.SALT, initCode)
+        );
 
         assertTrue(success);
         assertEq(returnData.length, 20);
@@ -80,8 +94,20 @@ contract RobinhoodDeterministicDeploymentTest is Test {
     }
 
     function _predictWithSalt(bytes32 initCodeHash, bytes32 salt) private pure returns (address) {
-        return address(
-            uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), Config.CREATE2_DEPLOYER, salt, initCodeHash))))
-        );
+        return
+            address(
+                uint160(
+                    uint256(
+                        keccak256(
+                            abi.encodePacked(
+                                bytes1(0xff),
+                                Config.CREATE2_DEPLOYER,
+                                salt,
+                                initCodeHash
+                            )
+                        )
+                    )
+                )
+            );
     }
 }

@@ -84,7 +84,8 @@ contract DeployHypoVaultArchitectureRobinhood is Script {
         if (Config.CREATE2_DEPLOYER.code.length == 0) revert EmptyCreate2Deployer();
         if (Config.CREATE2_DEPLOYER.codehash != Config.CREATE2_DEPLOYER_RUNTIME_CODE_HASH) {
             revert UnexpectedCreate2DeployerCodeHash(
-                Config.CREATE2_DEPLOYER.codehash, Config.CREATE2_DEPLOYER_RUNTIME_CODE_HASH
+                Config.CREATE2_DEPLOYER.codehash,
+                Config.CREATE2_DEPLOYER_RUNTIME_CODE_HASH
             );
         }
         if (Config.HYPO_VAULT_IMPLEMENTATION.code.length != 0) {
@@ -96,7 +97,9 @@ contract DeployHypoVaultArchitectureRobinhood is Script {
     }
 
     function _deploy(bytes memory initCode) private returns (address deployed) {
-        (bool success, bytes memory returnData) = Config.CREATE2_DEPLOYER.call(abi.encodePacked(Config.SALT, initCode));
+        (bool success, bytes memory returnData) = Config.CREATE2_DEPLOYER.call(
+            abi.encodePacked(Config.SALT, initCode)
+        );
         if (!success) revert Create2DeploymentFailed(returnData);
         if (returnData.length != 20) revert InvalidCreate2ReturnData(returnData);
 

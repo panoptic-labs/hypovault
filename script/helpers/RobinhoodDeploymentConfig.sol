@@ -13,9 +13,11 @@ library RobinhoodDeploymentConfig {
         0x2fa86add0aed31f33a762c9d88e807c475bd51d0f52bd0955754b2608f7e4989;
     address internal constant BROADCASTER = 0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8;
 
-    bytes32 internal constant SALT = 0xe78b3302c1a713353b49c40fcbd176c072797bfcd948b809b61bf8fd3216ea8b;
+    bytes32 internal constant SALT =
+        0xe78b3302c1a713353b49c40fcbd176c072797bfcd948b809b61bf8fd3216ea8b;
 
-    address internal constant HYPO_VAULT_IMPLEMENTATION = 0xF16714665955DBd0361D997eFc50fe391D96E8D0;
+    address internal constant HYPO_VAULT_IMPLEMENTATION =
+        0xF16714665955DBd0361D997eFc50fe391D96E8D0;
     address internal constant HYPO_VAULT_FACTORY = 0xd5049B2647de57141dE7F65E5124707B99A452A3;
 
     bytes32 internal constant HYPO_VAULT_INIT_CODE_HASH =
@@ -30,11 +32,20 @@ library RobinhoodDeploymentConfig {
     }
 
     function factoryInitCode() internal pure returns (bytes memory) {
-        return abi.encodePacked(type(HypoVaultFactory).creationCode, abi.encode(HYPO_VAULT_IMPLEMENTATION));
+        return
+            abi.encodePacked(
+                type(HypoVaultFactory).creationCode,
+                abi.encode(HYPO_VAULT_IMPLEMENTATION)
+            );
     }
 
     function predictAddress(bytes32 initCodeHash) internal pure returns (address predicted) {
-        predicted =
-            address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), CREATE2_DEPLOYER, SALT, initCodeHash)))));
+        predicted = address(
+            uint160(
+                uint256(
+                    keccak256(abi.encodePacked(bytes1(0xff), CREATE2_DEPLOYER, SALT, initCodeHash))
+                )
+            )
+        );
     }
 }

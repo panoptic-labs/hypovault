@@ -23,7 +23,8 @@ contract VerifyHypoVaultArchitectureRobinhood is Script {
             revert MissingCode(Config.HYPO_VAULT_FACTORY);
         }
 
-        address hypoVaultReferenceAddress = HypoVaultFactory(Config.HYPO_VAULT_FACTORY).hypoVaultReference();
+        address hypoVaultReferenceAddress = HypoVaultFactory(Config.HYPO_VAULT_FACTORY)
+            .hypoVaultReference();
         if (hypoVaultReferenceAddress != Config.HYPO_VAULT_IMPLEMENTATION) {
             revert ReferenceMismatch(hypoVaultReferenceAddress, Config.HYPO_VAULT_IMPLEMENTATION);
         }
