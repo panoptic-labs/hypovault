@@ -1,7 +1,12 @@
 # Robinhood Chain deterministic architecture deployment
 
-This runbook deploys only the production `HypoVault` implementation and
-`HypoVaultFactory`. It must not create vault instances.
+This runbook prepares two independent production deployments:
+
+1. the `HypoVault` implementation and `HypoVaultFactory`; and
+2. the governance `TimelockController`.
+
+Neither workflow creates vault instances. The timelock workflow also does not transfer
+ownership; ownership handoff belongs in a separate, later reviewed transaction batch.
 
 ## Network and deployment inputs
 
@@ -16,13 +21,35 @@ This runbook deploys only the production `HypoVault` implementation and
 | HypoVault implementation | `0xF16714665955DBd0361D997eFc50fe391D96E8D0`                         |
 | HypoVaultFactory         | `0xd5049B2647de57141dE7F65E5124707B99A452A3`                         |
 
+The production architecture salt is the literal value of
+`keccak256(bytes("my-salt-v1"))`. The literal hash is retained as the source of truth so
+an accidental label change cannot alter the deployment addresses.
+
+## Timelock inputs
+
+| Input                   | Value                                                                |
+| ----------------------- | -------------------------------------------------------------------- |
+| TimelockController      | `0xaeB1ad4d0452fd79eD7dDE25A08Fd60346c60912`                         |
+| Salt label              | `hypovault-timelock-v1`                                              |
+| Salt                    | `0x5894bdfe5513cb18dd7f6e5ae30cd1bbcf26773ae48d25d0d72c472384825707` |
+| Init code hash          | `0xe2b9422b27a33697d9c1f32e55fd0e96817d67f969ec8214b9646a2717d33e7e` |
+| Minimum delay           | `1 day` (`86400` seconds)                                            |
+| Proposer/Canceller Safe | `0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1`                         |
+| Expected Safe threshold | `3`                                                                  |
+| Executor                | `address(0)` (open execution)                                        |
+| Admin                   | `address(0)` (self-administered)                                     |
+
+These are the exact constructor inputs, CREATE2 salt, compiler settings, and dependency
+bytecode used for the Ethereum production timelock, so they reproduce the Ethereum
+address on Robinhood Chain.
+
 Configure the Alchemy endpoint without committing its API key:
 
 ```sh
 export ROBINHOOD_ALCHEMY_API_KEY='<key>'
 ```
 
-## Pre-broadcast procedure
+## Architecture pre-broadcast procedure
 
 1. Confirm the sender has at least `0.01 ETH` on Robinhood Chain.
 2. Run the deterministic deployment tests:
@@ -54,6 +81,38 @@ forge script script/VerifyHypoVaultArchitectureRobinhood.s.sol \
   -vv
 ```
 
+## Timelock pre-broadcast procedure
+
+1. Run the same deterministic deployment test suite shown above.
+2. Run a simulation and inspect the predicted address and constructor inputs:
+
+   ```sh
+   forge script script/DeployTimelockControllerRobinhood.s.sol \
+     --rpc-url robinhood \
+     --sender 0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8 \
+     -vvvv
+   ```
+
+3. Confirm the simulation checks all of the following:
+   - the chain ID is `4663`;
+   - the canonical CREATE2 deployer has the expected runtime code hash;
+   - the timelock target address is empty;
+   - the proposer Safe has code and a threshold of `3`; and
+   - the predicted address equals `0xaeB1ad4d0452fd79eD7dDE25A08Fd60346c60912`.
+4. Obtain explicit approval before adding `--broadcast`.
+
+After the receipt is successful, run the read-only live verification:
+
+```sh
+forge script script/VerifyTimelockControllerRobinhood.s.sol \
+  --rpc-url robinhood \
+  -vv
+```
+
+The verifier checks the delay, proposer and canceller roles, open executor role,
+self-admin role, and absence of an admin role for the broadcaster. Do not combine this
+deployment with ownership transfers.
+
 ## Deployment record
 
 Status: **Not broadcast**
@@ -62,6 +121,7 @@ Status: **Not broadcast**
 | ------------------------ | ---------------- | ------------ | -------- |
 | HypoVault implementation | Pending          | Pending      | Pending  |
 | HypoVaultFactory         | Pending          | Pending      | Pending  |
+| TimelockController       | Pending          | Pending      | Pending  |
 
 After broadcasting, verify that both addresses contain code and that
 `HypoVaultFactory.hypoVaultReference()` returns

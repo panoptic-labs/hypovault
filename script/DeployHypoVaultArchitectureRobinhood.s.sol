@@ -47,7 +47,7 @@ contract DeployHypoVaultArchitectureRobinhood is Script {
         console2.log("Broadcast sender balance:", Config.BROADCASTER.balance);
         console2.log("Recommended sender balance:", Config.RECOMMENDED_BROADCASTER_BALANCE);
         console2.log("CREATE2 salt:");
-        console2.logBytes32(Config.SALT);
+        console2.logBytes32(Config.PRODUCTION_SALT);
         console2.log("HypoVault init code hash:");
         console2.logBytes32(implementationInitCodeHash);
         console2.log("HypoVaultFactory init code hash:");
@@ -98,7 +98,7 @@ contract DeployHypoVaultArchitectureRobinhood is Script {
 
     function _deploy(bytes memory initCode) private returns (address deployed) {
         (bool success, bytes memory returnData) = Config.CREATE2_DEPLOYER.call(
-            abi.encodePacked(Config.SALT, initCode)
+            abi.encodePacked(Config.PRODUCTION_SALT, initCode)
         );
         if (!success) revert Create2DeploymentFailed(returnData);
         if (returnData.length != 20) revert InvalidCreate2ReturnData(returnData);

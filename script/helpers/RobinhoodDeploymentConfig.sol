@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {HypoVault} from "../../src/HypoVault.sol";
 import {HypoVaultFactory} from "../../src/HypoVaultFactory.sol";
+import {TimelockController} from "../../lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/governance/TimelockController.sol";
 
 /// @notice Immutable inputs for the production HypoVault architecture on Robinhood Chain.
 library RobinhoodDeploymentConfig {
@@ -13,17 +14,31 @@ library RobinhoodDeploymentConfig {
         0x2fa86add0aed31f33a762c9d88e807c475bd51d0f52bd0955754b2608f7e4989;
     address internal constant BROADCASTER = 0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8;
 
-    bytes32 internal constant SALT =
+    // keccak256(bytes("my-salt-v1")); kept literal as the production source of truth.
+    bytes32 internal constant PRODUCTION_SALT =
         0xe78b3302c1a713353b49c40fcbd176c072797bfcd948b809b61bf8fd3216ea8b;
+
+    // These inputs exactly reproduce the Ethereum production timelock deployment.
+    bytes32 internal constant TIMELOCK_SALT =
+        0x5894bdfe5513cb18dd7f6e5ae30cd1bbcf26773ae48d25d0d72c472384825707;
+    uint256 internal constant TIMELOCK_MIN_DELAY = 1 days;
+    uint256 internal constant TIMELOCK_MAX_DELAY = 7 days;
+    address internal constant TIMELOCK_PROPOSER_SAFE = 0x82BF455e9ebd6a541EF10b683dE1edCaf05cE7A1;
+    uint256 internal constant TIMELOCK_PROPOSER_SAFE_THRESHOLD = 3;
+    address internal constant TIMELOCK_EXECUTOR = address(0);
+    address internal constant TIMELOCK_ADMIN = address(0);
 
     address internal constant HYPO_VAULT_IMPLEMENTATION =
         0xF16714665955DBd0361D997eFc50fe391D96E8D0;
     address internal constant HYPO_VAULT_FACTORY = 0xd5049B2647de57141dE7F65E5124707B99A452A3;
+    address internal constant TIMELOCK = 0xaeB1ad4d0452fd79eD7dDE25A08Fd60346c60912;
 
     bytes32 internal constant HYPO_VAULT_INIT_CODE_HASH =
         0xa88995e4883d0fd6cf45327800243e559d18bd5f3ca22f39f5e83740f3817fcd;
     bytes32 internal constant HYPO_VAULT_FACTORY_INIT_CODE_HASH =
         0xccb4c113392d1b8e3e7fc51a6f09892ca6f018c418246d1664a6ccc82dea5dbb;
+    bytes32 internal constant TIMELOCK_INIT_CODE_HASH =
+        0xe2b9422b27a33697d9c1f32e55fd0e96817d67f969ec8214b9646a2717d33e7e;
 
     uint256 internal constant RECOMMENDED_BROADCASTER_BALANCE = 0.01 ether;
 
@@ -39,11 +54,32 @@ library RobinhoodDeploymentConfig {
             );
     }
 
+    function timelockInitCode() internal pure returns (bytes memory) {
+        address[] memory proposers = new address[](1);
+        proposers[0] = TIMELOCK_PROPOSER_SAFE;
+
+        address[] memory executors = new address[](1);
+        executors[0] = TIMELOCK_EXECUTOR;
+
+        return
+            abi.encodePacked(
+                type(TimelockController).creationCode,
+                abi.encode(TIMELOCK_MIN_DELAY, proposers, executors, TIMELOCK_ADMIN)
+            );
+    }
+
     function predictAddress(bytes32 initCodeHash) internal pure returns (address predicted) {
+        return predictAddress(PRODUCTION_SALT, initCodeHash);
+    }
+
+    function predictAddress(
+        bytes32 salt,
+        bytes32 initCodeHash
+    ) internal pure returns (address predicted) {
         predicted = address(
             uint160(
                 uint256(
-                    keccak256(abi.encodePacked(bytes1(0xff), CREATE2_DEPLOYER, SALT, initCodeHash))
+                    keccak256(abi.encodePacked(bytes1(0xff), CREATE2_DEPLOYER, salt, initCodeHash))
                 )
             )
         );

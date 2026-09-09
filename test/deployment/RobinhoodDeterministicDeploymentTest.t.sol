@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {HypoVaultFactory} from "../../src/HypoVaultFactory.sol";
 import {RobinhoodDeploymentConfig as Config} from "../../script/helpers/RobinhoodDeploymentConfig.sol";
+import {TimelockController} from "../../lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/governance/TimelockController.sol";
 
 contract RobinhoodDeterministicDeploymentTest is Test {
     bytes internal constant CREATE2_DEPLOYER_RUNTIME =
@@ -14,8 +15,11 @@ contract RobinhoodDeterministicDeploymentTest is Test {
 
     function testProductionInitCodeHashes() public pure {
         assertEq(keccak256(CREATE2_DEPLOYER_RUNTIME), Config.CREATE2_DEPLOYER_RUNTIME_CODE_HASH);
+        assertEq(Config.PRODUCTION_SALT, keccak256("my-salt-v1"));
+        assertEq(Config.TIMELOCK_SALT, keccak256("hypovault-timelock-v1"));
         assertEq(keccak256(Config.implementationInitCode()), Config.HYPO_VAULT_INIT_CODE_HASH);
         assertEq(keccak256(Config.factoryInitCode()), Config.HYPO_VAULT_FACTORY_INIT_CODE_HASH);
+        assertEq(keccak256(Config.timelockInitCode()), Config.TIMELOCK_INIT_CODE_HASH);
     }
 
     function testProductionPredictedAddresses() public pure {
@@ -26,6 +30,10 @@ contract RobinhoodDeterministicDeploymentTest is Test {
         assertEq(
             Config.predictAddress(Config.HYPO_VAULT_FACTORY_INIT_CODE_HASH),
             Config.HYPO_VAULT_FACTORY
+        );
+        assertEq(
+            Config.predictAddress(Config.TIMELOCK_SALT, Config.TIMELOCK_INIT_CODE_HASH),
+            Config.TIMELOCK
         );
     }
 
@@ -67,6 +75,22 @@ contract RobinhoodDeterministicDeploymentTest is Test {
         );
     }
 
+    function testCanonicalDeployerDeploysProductionTimelock() public {
+        vm.etch(Config.CREATE2_DEPLOYER, CREATE2_DEPLOYER_RUNTIME);
+
+        address timelockAddress = _deploy(Config.TIMELOCK_SALT, Config.timelockInitCode());
+        assertEq(timelockAddress, Config.TIMELOCK);
+        assertGt(timelockAddress.code.length, 0);
+
+        TimelockController timelock = TimelockController(payable(timelockAddress));
+        assertEq(timelock.getMinDelay(), Config.TIMELOCK_MIN_DELAY);
+        assertTrue(timelock.hasRole(timelock.PROPOSER_ROLE(), Config.TIMELOCK_PROPOSER_SAFE));
+        assertTrue(timelock.hasRole(timelock.CANCELLER_ROLE(), Config.TIMELOCK_PROPOSER_SAFE));
+        assertTrue(timelock.hasRole(timelock.EXECUTOR_ROLE(), Config.TIMELOCK_EXECUTOR));
+        assertTrue(timelock.hasRole(timelock.DEFAULT_ADMIN_ROLE(), timelockAddress));
+        assertFalse(timelock.hasRole(timelock.DEFAULT_ADMIN_ROLE(), Config.BROADCASTER));
+    }
+
     function testNoVaultInstanceIsCreatedByArchitectureDeployment() public {
         vm.recordLogs();
         vm.etch(Config.CREATE2_DEPLOYER, CREATE2_DEPLOYER_RUNTIME);
@@ -81,8 +105,12 @@ contract RobinhoodDeterministicDeploymentTest is Test {
     }
 
     function _deploy(bytes memory initCode) private returns (address deployed) {
+        return _deploy(Config.PRODUCTION_SALT, initCode);
+    }
+
+    function _deploy(bytes32 salt, bytes memory initCode) private returns (address deployed) {
         (bool success, bytes memory returnData) = Config.CREATE2_DEPLOYER.call(
-            abi.encodePacked(Config.SALT, initCode)
+            abi.encodePacked(salt, initCode)
         );
 
         assertTrue(success);
