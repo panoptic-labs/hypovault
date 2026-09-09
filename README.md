@@ -369,7 +369,7 @@ $ forge snapshot
 
 ### Deploy via EOA
 
-For the Robinhood Chain production implementation, factory, and timelock deployments, use the
+For the Robinhood Chain production architecture and timelock deployments, use the
 [Robinhood deterministic deployment runbook](docs/robinhood-chain-deployment.md). That
 runbook uses the canonical CREATE2 deployer, keeps timelock ownership handoff separate,
 and must be reviewed without `--broadcast` first.

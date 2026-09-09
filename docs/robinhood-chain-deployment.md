@@ -2,7 +2,7 @@
 
 This runbook prepares two independent production deployments:
 
-1. the `HypoVault` implementation and `HypoVaultFactory`; and
+1. the five-contract `HypoVault` architecture; and
 2. the governance `TimelockController`.
 
 Neither workflow creates vault instances. The timelock workflow also does not transfer
@@ -20,10 +20,20 @@ ownership; ownership handoff belongs in a separate, later reviewed transaction b
 | Salt                     | `0xe78b3302c1a713353b49c40fcbd176c072797bfcd948b809b61bf8fd3216ea8b` |
 | HypoVault implementation | `0xF16714665955DBd0361D997eFc50fe391D96E8D0`                         |
 | HypoVaultFactory         | `0xd5049B2647de57141dE7F65E5124707B99A452A3`                         |
+| Robinhood WETH           | `0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73`                         |
+| PanopticVaultAccountant  | `0x9e345d862c41010F87D8E5A279e8D320D2831D36`                         |
+| Decoder                  | `0xC87c45d2dbE5acb56013e2591427ECC84Fa251E6`                         |
+| RolesAuthority           | `0xb952D345c413Ddb7850173422bAe4968e0330598`                         |
 
 The production architecture salt is the literal value of
 `keccak256(bytes("my-salt-v1"))`. The literal hash is retained as the source of truth so
 an accidental label change cannot alter the deployment addresses.
+
+The accountant constructor is `(BROADCASTER, WETH)`. The decoder constructor references
+the deterministic `HypoVault` implementation. The RolesAuthority constructor is
+`(BROADCASTER, address(0))`, where the zero address is its optional parent authority.
+The accountant and RolesAuthority remain owned by the broadcaster until the separate
+timelock handoff. The decoder is not ownable.
 
 ## Timelock inputs
 
@@ -58,7 +68,7 @@ export ROBINHOOD_ALCHEMY_API_KEY='<key>'
    forge test --match-contract RobinhoodDeterministicDeploymentTest -vv
    ```
 
-3. Run a simulation and inspect the two predicted addresses:
+3. Run a simulation and inspect all five predicted addresses:
 
    ```sh
    forge script script/DeployHypoVaultArchitectureRobinhood.s.sol \
@@ -67,13 +77,15 @@ export ROBINHOOD_ALCHEMY_API_KEY='<key>'
      -vvvv
    ```
 
-4. Recheck that the canonical deployer has code and both target addresses are empty.
+4. Recheck that the canonical deployer and Robinhood WETH have code and all five target
+   addresses are empty.
 5. Obtain explicit approval before adding `--broadcast`.
 
-For broadcast, use `--slow` so the implementation transaction is confirmed before the
-factory transaction is sent. Do not add `--broadcast` during preparation or review.
+For broadcast, use `--slow` so each transaction is confirmed in order: implementation,
+factory, accountant, decoder, then RolesAuthority. Do not add `--broadcast` during
+preparation or review.
 
-After both receipts are successful, run the read-only live verification:
+After all five receipts are successful, run the read-only live verification:
 
 ```sh
 forge script script/VerifyHypoVaultArchitectureRobinhood.s.sol \
@@ -121,8 +133,13 @@ Status: **Not broadcast**
 | ------------------------ | ---------------- | ------------ | -------- |
 | HypoVault implementation | Pending          | Pending      | Pending  |
 | HypoVaultFactory         | Pending          | Pending      | Pending  |
+| PanopticVaultAccountant  | Pending          | Pending      | Pending  |
+| Decoder                  | Pending          | Pending      | Pending  |
+| RolesAuthority           | Pending          | Pending      | Pending  |
 | TimelockController       | Pending          | Pending      | Pending  |
 
-After broadcasting, verify that both addresses contain code and that
+After broadcasting, verify that all five architecture addresses contain code, that
 `HypoVaultFactory.hypoVaultReference()` returns
-`0xF16714665955DBd0361D997eFc50fe391D96E8D0` before updating this record.
+`0xF16714665955DBd0361D997eFc50fe391D96E8D0`, that the accountant uses the Robinhood WETH
+address, and that the accountant and RolesAuthority are initially owned by the
+broadcaster before updating this record.

@@ -4,6 +4,8 @@ pragma solidity ^0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {HypoVaultFactory} from "../../src/HypoVaultFactory.sol";
+import {PanopticVaultAccountant} from "../../src/accountants/PanopticVaultAccountant.sol";
+import {RolesAuthority} from "../../lib/boring-vault/lib/solmate/src/auth/authorities/RolesAuthority.sol";
 import {RobinhoodDeploymentConfig as Config} from "../../script/helpers/RobinhoodDeploymentConfig.sol";
 import {TimelockController} from "../../lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/governance/TimelockController.sol";
 
@@ -19,6 +21,9 @@ contract RobinhoodDeterministicDeploymentTest is Test {
         assertEq(Config.TIMELOCK_SALT, keccak256("hypovault-timelock-v1"));
         assertEq(keccak256(Config.implementationInitCode()), Config.HYPO_VAULT_INIT_CODE_HASH);
         assertEq(keccak256(Config.factoryInitCode()), Config.HYPO_VAULT_FACTORY_INIT_CODE_HASH);
+        assertEq(keccak256(Config.accountantInitCode()), Config.ACCOUNTANT_INIT_CODE_HASH);
+        assertEq(keccak256(Config.decoderInitCode()), Config.DECODER_INIT_CODE_HASH);
+        assertEq(keccak256(Config.rolesAuthorityInitCode()), Config.ROLES_AUTHORITY_INIT_CODE_HASH);
         assertEq(keccak256(Config.timelockInitCode()), Config.TIMELOCK_INIT_CODE_HASH);
     }
 
@@ -30,6 +35,12 @@ contract RobinhoodDeterministicDeploymentTest is Test {
         assertEq(
             Config.predictAddress(Config.HYPO_VAULT_FACTORY_INIT_CODE_HASH),
             Config.HYPO_VAULT_FACTORY
+        );
+        assertEq(Config.predictAddress(Config.ACCOUNTANT_INIT_CODE_HASH), Config.ACCOUNTANT);
+        assertEq(Config.predictAddress(Config.DECODER_INIT_CODE_HASH), Config.DECODER);
+        assertEq(
+            Config.predictAddress(Config.ROLES_AUTHORITY_INIT_CODE_HASH),
+            Config.ROLES_AUTHORITY
         );
         assertEq(
             Config.predictAddress(Config.TIMELOCK_SALT, Config.TIMELOCK_INIT_CODE_HASH),
@@ -49,7 +60,7 @@ contract RobinhoodDeterministicDeploymentTest is Test {
         assertEq(address(uint160(uint256(encodedReference))), Config.HYPO_VAULT_IMPLEMENTATION);
     }
 
-    function testCanonicalDeployerDeploysImplementationThenFactory() public {
+    function testCanonicalDeployerDeploysProductionArchitecture() public {
         vm.etch(Config.CREATE2_DEPLOYER, CREATE2_DEPLOYER_RUNTIME);
 
         address implementation = _deploy(Config.implementationInitCode());
@@ -60,6 +71,22 @@ contract RobinhoodDeterministicDeploymentTest is Test {
         assertEq(factory, Config.HYPO_VAULT_FACTORY);
         assertGt(factory.code.length, 0);
         assertEq(HypoVaultFactory(factory).hypoVaultReference(), Config.HYPO_VAULT_IMPLEMENTATION);
+
+        address accountantAddress = _deploy(Config.accountantInitCode());
+        assertEq(accountantAddress, Config.ACCOUNTANT);
+        PanopticVaultAccountant accountant = PanopticVaultAccountant(accountantAddress);
+        assertEq(accountant.owner(), Config.BROADCASTER);
+        assertEq(accountant.wethAddress(), Config.WETH);
+
+        address decoder = _deploy(Config.decoderInitCode());
+        assertEq(decoder, Config.DECODER);
+        assertGt(decoder.code.length, 0);
+
+        address rolesAuthorityAddress = _deploy(Config.rolesAuthorityInitCode());
+        assertEq(rolesAuthorityAddress, Config.ROLES_AUTHORITY);
+        RolesAuthority rolesAuthority = RolesAuthority(rolesAuthorityAddress);
+        assertEq(rolesAuthority.owner(), Config.BROADCASTER);
+        assertEq(address(rolesAuthority.authority()), address(0));
     }
 
     function testLegacySaltDoesNotProduceProductionAddresses() public pure {
@@ -97,6 +124,9 @@ contract RobinhoodDeterministicDeploymentTest is Test {
 
         _deploy(Config.implementationInitCode());
         _deploy(Config.factoryInitCode());
+        _deploy(Config.accountantInitCode());
+        _deploy(Config.decoderInitCode());
+        _deploy(Config.rolesAuthorityInitCode());
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i; i < logs.length; ++i) {
