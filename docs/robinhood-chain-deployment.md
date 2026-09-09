@@ -59,6 +59,24 @@ Configure the Alchemy endpoint without committing its API key:
 export ROBINHOOD_ALCHEMY_API_KEY='<key>'
 ```
 
+## Approved signer setup
+
+`--sender` only selects the address Foundry uses when constructing and simulating
+transactions. It does not provide signing credentials. A broadcast must also use an
+approved signer that resolves to the configured broadcaster
+`0x62CB5f6E9F8Bca7032dDf993de8A02ae437D39b8`.
+
+Before adding `--broadcast`, configure one of the team's approved signing paths outside
+the repository:
+
+- the Turnkey signing workflow for the configured broadcaster;
+- a Foundry keystore selected with `--account <approved-account>`; or
+- an approved hardware or remote signer with its corresponding Foundry signer options.
+
+Verify the resolved signer address before broadcasting. Do not place a raw private key
+in this repository, the command line, shell history, or the runbook. The final command
+must use the same `--sender` shown below together with the chosen signer-specific options.
+
 ## Architecture pre-broadcast procedure
 
 1. Confirm the sender has at least `0.01 ETH` on Robinhood Chain.
@@ -77,13 +95,17 @@ export ROBINHOOD_ALCHEMY_API_KEY='<key>'
      -vvvv
    ```
 
-4. Recheck that the canonical deployer and Robinhood WETH have code and all five target
-   addresses are empty.
+4. On the first attempt, recheck that the canonical deployer and Robinhood WETH have code
+   and all five target addresses are empty. On a recovery attempt, the script accepts an
+   existing target only when its runtime code and configured state match exactly.
 5. Obtain explicit approval before adding `--broadcast`.
 
 For broadcast, use `--slow` so each transaction is confirmed in order: implementation,
 factory, accountant, decoder, then RolesAuthority. Do not add `--broadcast` during
-preparation or review.
+preparation or review. These are separate transactions, not one atomic transaction. If a
+later transaction fails after earlier receipts succeed, rerun the same script: it validates
+and skips correct existing deployments and sends only the missing transactions. It aborts
+before sending new transactions if existing code or state is unexpected.
 
 After all five receipts are successful, run the read-only live verification:
 

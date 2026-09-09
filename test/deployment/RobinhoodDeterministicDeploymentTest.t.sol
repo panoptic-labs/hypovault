@@ -6,6 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {HypoVaultFactory} from "../../src/HypoVaultFactory.sol";
 import {PanopticVaultAccountant} from "../../src/accountants/PanopticVaultAccountant.sol";
 import {RolesAuthority} from "../../lib/boring-vault/lib/solmate/src/auth/authorities/RolesAuthority.sol";
+import {DeployHypoVaultArchitectureRobinhood} from "../../script/DeployHypoVaultArchitectureRobinhood.s.sol";
 import {RobinhoodDeploymentConfig as Config} from "../../script/helpers/RobinhoodDeploymentConfig.sol";
 import {TimelockController} from "../../lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/governance/TimelockController.sol";
 
@@ -64,25 +65,30 @@ contract RobinhoodDeterministicDeploymentTest is Test {
         vm.etch(Config.CREATE2_DEPLOYER, CREATE2_DEPLOYER_RUNTIME);
 
         address implementation = _deploy(Config.implementationInitCode());
+        assertEq(implementation.codehash, Config.HYPO_VAULT_RUNTIME_CODE_HASH);
         assertEq(implementation, Config.HYPO_VAULT_IMPLEMENTATION);
         assertGt(implementation.code.length, 0);
 
         address factory = _deploy(Config.factoryInitCode());
+        assertEq(factory.codehash, Config.HYPO_VAULT_FACTORY_RUNTIME_CODE_HASH);
         assertEq(factory, Config.HYPO_VAULT_FACTORY);
         assertGt(factory.code.length, 0);
         assertEq(HypoVaultFactory(factory).hypoVaultReference(), Config.HYPO_VAULT_IMPLEMENTATION);
 
         address accountantAddress = _deploy(Config.accountantInitCode());
+        assertEq(accountantAddress.codehash, Config.ACCOUNTANT_RUNTIME_CODE_HASH);
         assertEq(accountantAddress, Config.ACCOUNTANT);
         PanopticVaultAccountant accountant = PanopticVaultAccountant(accountantAddress);
         assertEq(accountant.owner(), Config.BROADCASTER);
         assertEq(accountant.wethAddress(), Config.WETH);
 
         address decoder = _deploy(Config.decoderInitCode());
+        assertEq(decoder.codehash, Config.DECODER_RUNTIME_CODE_HASH);
         assertEq(decoder, Config.DECODER);
         assertGt(decoder.code.length, 0);
 
         address rolesAuthorityAddress = _deploy(Config.rolesAuthorityInitCode());
+        assertEq(rolesAuthorityAddress.codehash, Config.ROLES_AUTHORITY_RUNTIME_CODE_HASH);
         assertEq(rolesAuthorityAddress, Config.ROLES_AUTHORITY);
         RolesAuthority rolesAuthority = RolesAuthority(rolesAuthorityAddress);
         assertEq(rolesAuthority.owner(), Config.BROADCASTER);
@@ -116,6 +122,63 @@ contract RobinhoodDeterministicDeploymentTest is Test {
         assertTrue(timelock.hasRole(timelock.EXECUTOR_ROLE(), Config.TIMELOCK_EXECUTOR));
         assertTrue(timelock.hasRole(timelock.DEFAULT_ADMIN_ROLE(), timelockAddress));
         assertFalse(timelock.hasRole(timelock.DEFAULT_ADMIN_ROLE(), Config.BROADCASTER));
+    }
+
+    function testPartialBroadcastRecoverySkipsImplementationAndCompletes() public {
+        vm.chainId(Config.CHAIN_ID);
+        vm.etch(Config.CREATE2_DEPLOYER, CREATE2_DEPLOYER_RUNTIME);
+        vm.etch(Config.WETH, hex"00");
+        vm.deal(Config.BROADCASTER, 1 ether);
+
+        address implementation = _deploy(Config.implementationInitCode());
+        assertEq(implementation, Config.HYPO_VAULT_IMPLEMENTATION);
+
+        bytes memory factoryCall = abi.encodePacked(
+            Config.PRODUCTION_SALT,
+            Config.factoryInitCode()
+        );
+        bytes memory factoryFailure = bytes("factory failure");
+        vm.mockCallRevert(Config.CREATE2_DEPLOYER, factoryCall, factoryFailure);
+
+        DeployHypoVaultArchitectureRobinhood deployment = new DeployHypoVaultArchitectureRobinhood();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DeployHypoVaultArchitectureRobinhood.Create2DeploymentFailed.selector,
+                factoryFailure
+            )
+        );
+        deployment.run();
+        vm.stopBroadcast();
+
+        assertGt(Config.HYPO_VAULT_IMPLEMENTATION.code.length, 0);
+        assertEq(Config.HYPO_VAULT_FACTORY.code.length, 0);
+
+        vm.clearMockedCalls();
+        deployment.run();
+
+        assertEq(Config.HYPO_VAULT_IMPLEMENTATION.codehash, Config.HYPO_VAULT_RUNTIME_CODE_HASH);
+        assertEq(Config.HYPO_VAULT_FACTORY.codehash, Config.HYPO_VAULT_FACTORY_RUNTIME_CODE_HASH);
+        assertEq(Config.ACCOUNTANT.codehash, Config.ACCOUNTANT_RUNTIME_CODE_HASH);
+        assertEq(Config.DECODER.codehash, Config.DECODER_RUNTIME_CODE_HASH);
+        assertEq(Config.ROLES_AUTHORITY.codehash, Config.ROLES_AUTHORITY_RUNTIME_CODE_HASH);
+    }
+
+    function testPartialBroadcastRecoveryRejectsUnexpectedExistingCode() public {
+        vm.chainId(Config.CHAIN_ID);
+        vm.etch(Config.CREATE2_DEPLOYER, CREATE2_DEPLOYER_RUNTIME);
+        vm.etch(Config.WETH, hex"00");
+        vm.etch(Config.HYPO_VAULT_IMPLEMENTATION, hex"00");
+
+        DeployHypoVaultArchitectureRobinhood deployment = new DeployHypoVaultArchitectureRobinhood();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DeployHypoVaultArchitectureRobinhood.UnexpectedRuntimeCodeHash.selector,
+                Config.HYPO_VAULT_IMPLEMENTATION,
+                keccak256(hex"00"),
+                Config.HYPO_VAULT_RUNTIME_CODE_HASH
+            )
+        );
+        deployment.run();
     }
 
     function testNoVaultInstanceIsCreatedByArchitectureDeployment() public {

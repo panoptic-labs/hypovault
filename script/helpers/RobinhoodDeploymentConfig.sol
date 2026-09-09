@@ -53,6 +53,17 @@ library RobinhoodDeploymentConfig {
     bytes32 internal constant TIMELOCK_INIT_CODE_HASH =
         0xe2b9422b27a33697d9c1f32e55fd0e96817d67f969ec8214b9646a2717d33e7e;
 
+    bytes32 internal constant HYPO_VAULT_RUNTIME_CODE_HASH =
+        0x2e99b69b40edb2a36e9bf218decc363e4a203001ca0e69cbb038feec49587155;
+    bytes32 internal constant HYPO_VAULT_FACTORY_RUNTIME_CODE_HASH =
+        0xdd5796df43154b9bfba64ac121d4e1dfc8aa686ee850d0dec25dd688e00ccf63;
+    bytes32 internal constant ACCOUNTANT_RUNTIME_CODE_HASH =
+        0x1c8a46e0adfa6e9d49663d0d1a00837dee5791f0fffef870eb44905b66372520;
+    bytes32 internal constant DECODER_RUNTIME_CODE_HASH =
+        0x1440b87c8d68df4c79c85db8f90f84773d3475050273e1e5a7e6ca403e71dd6e;
+    bytes32 internal constant ROLES_AUTHORITY_RUNTIME_CODE_HASH =
+        0xb04b6776c9bb01dea568f402f6d1b6404be6b72ee79df0edb3ff8fc623de117b;
+
     uint256 internal constant RECOMMENDED_BROADCASTER_BALANCE = 0.01 ether;
 
     function implementationInitCode() internal pure returns (bytes memory) {

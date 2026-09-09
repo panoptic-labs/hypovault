@@ -14,7 +14,6 @@ contract DeployHypoVaultArchitectureRobinhood is Script {
     error Create2DeploymentFailed(bytes revertData);
     error EmptyCreate2Deployer();
     error EmptyWeth();
-    error ExistingCode(address target);
     error AuthorityMismatch(address actual, address expected);
     error InitCodeHashMismatch(bytes32 actual, bytes32 expected);
     error InvalidCreate2ReturnData(bytes returnData);
@@ -23,6 +22,7 @@ contract DeployHypoVaultArchitectureRobinhood is Script {
     error PredictedAddressMismatch(address actual, address expected);
     error ReferenceMismatch(address actual, address expected);
     error UnexpectedCreate2DeployerCodeHash(bytes32 actual, bytes32 expected);
+    error UnexpectedRuntimeCodeHash(address target, bytes32 actual, bytes32 expected);
     error UnexpectedChainId(uint256 actual, uint256 expected);
     error WethMismatch(address actual, address expected);
 
@@ -45,29 +45,40 @@ contract DeployHypoVaultArchitectureRobinhood is Script {
 
         vm.startBroadcast(Config.BROADCASTER);
 
-        address implementation = _deploy(Config.implementationInitCode());
-        _assertAddress(implementation, Config.HYPO_VAULT_IMPLEMENTATION);
-        if (implementation.code.length == 0) revert MissingDeployedCode(implementation);
-
-        address factory = _deploy(Config.factoryInitCode());
-        _assertAddress(factory, Config.HYPO_VAULT_FACTORY);
-        if (factory.code.length == 0) revert MissingDeployedCode(factory);
-
-        address accountant = _deploy(Config.accountantInitCode());
-        _assertAddress(accountant, Config.ACCOUNTANT);
-        if (accountant.code.length == 0) revert MissingDeployedCode(accountant);
-
-        address decoder = _deploy(Config.decoderInitCode());
-        _assertAddress(decoder, Config.DECODER);
-        if (decoder.code.length == 0) revert MissingDeployedCode(decoder);
-
-        address rolesAuthority = _deploy(Config.rolesAuthorityInitCode());
-        _assertAddress(rolesAuthority, Config.ROLES_AUTHORITY);
-        if (rolesAuthority.code.length == 0) revert MissingDeployedCode(rolesAuthority);
+        address implementation = _deployIfMissing(
+            "HypoVault implementation",
+            Config.implementationInitCode(),
+            Config.HYPO_VAULT_IMPLEMENTATION,
+            Config.HYPO_VAULT_RUNTIME_CODE_HASH
+        );
+        address factory = _deployIfMissing(
+            "HypoVaultFactory",
+            Config.factoryInitCode(),
+            Config.HYPO_VAULT_FACTORY,
+            Config.HYPO_VAULT_FACTORY_RUNTIME_CODE_HASH
+        );
+        address accountant = _deployIfMissing(
+            "PanopticVaultAccountant",
+            Config.accountantInitCode(),
+            Config.ACCOUNTANT,
+            Config.ACCOUNTANT_RUNTIME_CODE_HASH
+        );
+        address decoder = _deployIfMissing(
+            "CollateralTrackerDecoderAndSanitizer",
+            Config.decoderInitCode(),
+            Config.DECODER,
+            Config.DECODER_RUNTIME_CODE_HASH
+        );
+        address rolesAuthority = _deployIfMissing(
+            "RolesAuthority",
+            Config.rolesAuthorityInitCode(),
+            Config.ROLES_AUTHORITY,
+            Config.ROLES_AUTHORITY_RUNTIME_CODE_HASH
+        );
 
         vm.stopBroadcast();
 
-        _assertPostDeploymentState(factory, accountant, rolesAuthority);
+        _assertPostDeploymentState();
 
         console2.log("=== Deployment simulation complete ===");
         console2.log("HypoVault implementation:", implementation);
@@ -87,18 +98,30 @@ contract DeployHypoVaultArchitectureRobinhood is Script {
                 Config.CREATE2_DEPLOYER_RUNTIME_CODE_HASH
             );
         }
-        if (Config.HYPO_VAULT_IMPLEMENTATION.code.length != 0) {
-            revert ExistingCode(Config.HYPO_VAULT_IMPLEMENTATION);
-        }
-        if (Config.HYPO_VAULT_FACTORY.code.length != 0) {
-            revert ExistingCode(Config.HYPO_VAULT_FACTORY);
-        }
-        if (Config.ACCOUNTANT.code.length != 0) revert ExistingCode(Config.ACCOUNTANT);
-        if (Config.DECODER.code.length != 0) revert ExistingCode(Config.DECODER);
-        if (Config.ROLES_AUTHORITY.code.length != 0) {
-            revert ExistingCode(Config.ROLES_AUTHORITY);
-        }
         if (Config.WETH.code.length == 0) revert EmptyWeth();
+
+        _assertExistingDeploymentState();
+    }
+
+    function _assertExistingDeploymentState() private view {
+        _assertCodeIfPresent(Config.HYPO_VAULT_IMPLEMENTATION, Config.HYPO_VAULT_RUNTIME_CODE_HASH);
+        _assertCodeIfPresent(
+            Config.HYPO_VAULT_FACTORY,
+            Config.HYPO_VAULT_FACTORY_RUNTIME_CODE_HASH
+        );
+        _assertCodeIfPresent(Config.ACCOUNTANT, Config.ACCOUNTANT_RUNTIME_CODE_HASH);
+        _assertCodeIfPresent(Config.DECODER, Config.DECODER_RUNTIME_CODE_HASH);
+        _assertCodeIfPresent(Config.ROLES_AUTHORITY, Config.ROLES_AUTHORITY_RUNTIME_CODE_HASH);
+
+        if (Config.HYPO_VAULT_FACTORY.code.length != 0) {
+            _assertFactoryState();
+        }
+        if (Config.ACCOUNTANT.code.length != 0) {
+            _assertAccountantState();
+        }
+        if (Config.ROLES_AUTHORITY.code.length != 0) {
+            _assertRolesAuthorityState();
+        }
     }
 
     function _assertAndPrintDeploymentInputs() private pure {
@@ -151,30 +174,72 @@ contract DeployHypoVaultArchitectureRobinhood is Script {
         console2.log(string.concat("Predicted ", label, ":"), predicted);
     }
 
-    function _assertPostDeploymentState(
-        address factory,
-        address accountant,
-        address rolesAuthority
-    ) private view {
-        address hypoVaultReferenceAddress = HypoVaultFactory(factory).hypoVaultReference();
+    function _assertPostDeploymentState() private view {
+        _assertRequiredCode(Config.HYPO_VAULT_IMPLEMENTATION, Config.HYPO_VAULT_RUNTIME_CODE_HASH);
+        _assertRequiredCode(Config.HYPO_VAULT_FACTORY, Config.HYPO_VAULT_FACTORY_RUNTIME_CODE_HASH);
+        _assertRequiredCode(Config.ACCOUNTANT, Config.ACCOUNTANT_RUNTIME_CODE_HASH);
+        _assertRequiredCode(Config.DECODER, Config.DECODER_RUNTIME_CODE_HASH);
+        _assertRequiredCode(Config.ROLES_AUTHORITY, Config.ROLES_AUTHORITY_RUNTIME_CODE_HASH);
+        _assertFactoryState();
+        _assertAccountantState();
+        _assertRolesAuthorityState();
+    }
+
+    function _assertFactoryState() private view {
+        address hypoVaultReferenceAddress = HypoVaultFactory(Config.HYPO_VAULT_FACTORY)
+            .hypoVaultReference();
         if (hypoVaultReferenceAddress != Config.HYPO_VAULT_IMPLEMENTATION) {
             revert ReferenceMismatch(hypoVaultReferenceAddress, Config.HYPO_VAULT_IMPLEMENTATION);
         }
+    }
 
-        PanopticVaultAccountant accountantContract = PanopticVaultAccountant(accountant);
+    function _assertAccountantState() private view {
+        PanopticVaultAccountant accountantContract = PanopticVaultAccountant(Config.ACCOUNTANT);
         if (accountantContract.owner() != Config.BROADCASTER) {
             revert OwnerMismatch(accountantContract.owner(), Config.BROADCASTER);
         }
         if (accountantContract.wethAddress() != Config.WETH) {
             revert WethMismatch(accountantContract.wethAddress(), Config.WETH);
         }
+    }
 
-        RolesAuthority rolesAuthorityContract = RolesAuthority(rolesAuthority);
+    function _assertRolesAuthorityState() private view {
+        RolesAuthority rolesAuthorityContract = RolesAuthority(Config.ROLES_AUTHORITY);
         if (rolesAuthorityContract.owner() != Config.BROADCASTER) {
             revert OwnerMismatch(rolesAuthorityContract.owner(), Config.BROADCASTER);
         }
         if (address(rolesAuthorityContract.authority()) != address(0)) {
             revert AuthorityMismatch(address(rolesAuthorityContract.authority()), address(0));
+        }
+    }
+
+    function _deployIfMissing(
+        string memory label,
+        bytes memory initCode,
+        address expectedAddress,
+        bytes32 expectedRuntimeCodeHash
+    ) internal returns (address deployed) {
+        if (expectedAddress.code.length != 0) {
+            _assertCodeIfPresent(expectedAddress, expectedRuntimeCodeHash);
+            console2.log(string.concat("Skipping existing ", label, ":"), expectedAddress);
+            return expectedAddress;
+        }
+
+        deployed = _deploy(initCode);
+        _assertAddress(deployed, expectedAddress);
+        _assertRequiredCode(deployed, expectedRuntimeCodeHash);
+    }
+
+    function _assertCodeIfPresent(address target, bytes32 expectedCodeHash) private view {
+        if (target.code.length != 0 && target.codehash != expectedCodeHash) {
+            revert UnexpectedRuntimeCodeHash(target, target.codehash, expectedCodeHash);
+        }
+    }
+
+    function _assertRequiredCode(address target, bytes32 expectedCodeHash) private view {
+        if (target.code.length == 0) revert MissingDeployedCode(target);
+        if (target.codehash != expectedCodeHash) {
+            revert UnexpectedRuntimeCodeHash(target, target.codehash, expectedCodeHash);
         }
     }
 
