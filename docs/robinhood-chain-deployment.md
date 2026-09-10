@@ -77,6 +77,11 @@ Verify the resolved signer address before broadcasting. Do not place a raw priva
 in this repository, the command line, shell history, or the runbook. The final command
 must use the same `--sender` shown below together with the chosen signer-specific options.
 
+For the chain-scoped Turnkey policy used for this deployment, submit the complete unsigned
+transaction with Turnkey's `signTransaction` activity so the policy can inspect
+`eth.tx.from` and `eth.tx.chain_id`. Foundry's native Turnkey integration signs a raw
+payload and therefore does not expose those parsed transaction fields to this policy.
+
 ## Architecture pre-broadcast procedure
 
 1. Confirm the sender has at least `0.01 ETH` on Robinhood Chain.
@@ -149,16 +154,28 @@ deployment with ownership transfers.
 
 ## Deployment record
 
-Status: **Not broadcast**
+Status: **Broadcast and verified on 2026-09-10**
 
-| Contract                 | Transaction hash | Block number | Gas used |
-| ------------------------ | ---------------- | ------------ | -------- |
-| HypoVault implementation | Pending          | Pending      | Pending  |
-| HypoVaultFactory         | Pending          | Pending      | Pending  |
-| PanopticVaultAccountant  | Pending          | Pending      | Pending  |
-| Decoder                  | Pending          | Pending      | Pending  |
-| RolesAuthority           | Pending          | Pending      | Pending  |
-| TimelockController       | Pending          | Pending      | Pending  |
+| Contract                 | Transaction hash                                                                                                                                                                    | Block number | Gas used                 |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ------------------------ |
+| HypoVault implementation | [`0x761422a867240adf114df33ce0f4043b3a90ed090e1788c433d31e1821384078`](https://robinhoodchain.blockscout.com/tx/0x761422a867240adf114df33ce0f4043b3a90ed090e1788c433d31e1821384078) | `59663446`   | `3226077`                |
+| HypoVaultFactory         | [`0x5b24b8002215de8d20fba3debd6d722f0e6a818a5102a040e8618e963b889cd8`](https://robinhoodchain.blockscout.com/tx/0x5b24b8002215de8d20fba3debd6d722f0e6a818a5102a040e8618e963b889cd8) | `59667701`   | `307452`                 |
+| PanopticVaultAccountant  | [`0x4f32322fb3e61856804dc843d2a63c8e905eee795393ebf3a1deddf467a7fdc8`](https://robinhoodchain.blockscout.com/tx/0x4f32322fb3e61856804dc843d2a63c8e905eee795393ebf3a1deddf467a7fdc8) | `59677273`   | `5434170` (shared batch) |
+| Decoder                  | [`0x4f32322fb3e61856804dc843d2a63c8e905eee795393ebf3a1deddf467a7fdc8`](https://robinhoodchain.blockscout.com/tx/0x4f32322fb3e61856804dc843d2a63c8e905eee795393ebf3a1deddf467a7fdc8) | `59677273`   | `5434170` (shared batch) |
+| RolesAuthority           | [`0x4f32322fb3e61856804dc843d2a63c8e905eee795393ebf3a1deddf467a7fdc8`](https://robinhoodchain.blockscout.com/tx/0x4f32322fb3e61856804dc843d2a63c8e905eee795393ebf3a1deddf467a7fdc8) | `59677273`   | `5434170` (shared batch) |
+| TimelockController       | [`0x4f32322fb3e61856804dc843d2a63c8e905eee795393ebf3a1deddf467a7fdc8`](https://robinhoodchain.blockscout.com/tx/0x4f32322fb3e61856804dc843d2a63c8e905eee795393ebf3a1deddf467a7fdc8) | `59677273`   | `5434170` (shared batch) |
+
+The implementation and factory were broadcast first as individual calls to the canonical
+CREATE2 deployer, using broadcaster nonces `0` and `1`. After both receipts and runtime
+code hashes were verified, the four remaining deployments were executed atomically at
+nonce `2` through canonical Multicall3
+`0xcA11bde05977b3631167028862bE2a173976CA11`. Each mandatory inner call targeted the
+canonical CREATE2 deployer with `allowFailure = false`. The Multicall3 runtime bytecode
+matched the canonical Ethereum deployment before broadcast. The shared batch gas value in
+the table is the total transaction gas and is not attributable to each contract separately.
+
+Both live verification scripts passed after the final receipt. No vault instances were
+created and no ownership transfers were performed.
 
 After broadcasting, verify that all five architecture addresses contain code, that
 `HypoVaultFactory.hypoVaultReference()` returns
